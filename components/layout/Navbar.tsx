@@ -78,15 +78,15 @@ export default function Navbar() {
             }}
             className="flex items-center gap-3 transition-opacity hover:opacity-90"
           >
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] shadow-md">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--accent)]/50 shadow-[0_0_15px_rgba(212,175,55,0.4)] bg-[var(--accent)]">
               <img
                 src="/images/wac-logo.jpg"
                 alt="World Albanian Congress Logo"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
               />
             </div>
             <div className="hidden sm:flex items-center">
-              <span className="text-xl font-serif tracking-tight text-white">
+              <span className="text-xl font-serif tracking-tight text-white mt-1">
                 World{" "}
                 <span className="text-[#D4AF37] italic font-light opacity-90">
                   Albanian

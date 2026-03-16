@@ -13,6 +13,14 @@ export type EnrichedDirectoryPerson = PersonDirectoryRow & {
   current_title?: string | null;
 };
 
+export type UserProfileForRelevance = {
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  industry_name: string | null;
+  skills: string[] | null;
+} | null;
+
 export type SearchFilters = {
   q?: string;
   country?: string;

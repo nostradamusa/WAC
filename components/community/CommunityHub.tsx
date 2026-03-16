@@ -26,10 +26,11 @@ export default function CommunityHub() {
 
         {/* RIGHT COLUMN: DISCOVER (Sticky) */}
         <div className="hidden lg:block lg:col-span-4">
-          <div className="sticky top-24 space-y-4 pb-20">
-            
-            {/* WAC Spotlight Discovery Engine */}
-            <WacSpotlightWidget />
+          <div className="sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="space-y-4 pb-12 pt-1 pr-1">
+              
+              {/* WAC Spotlight Discovery Engine */}
+              <WacSpotlightWidget />
 
             <div className="wac-card p-5">
               <h3 className="font-serif font-bold text-lg text-[var(--accent)] flex items-center gap-2 mb-4">
@@ -60,6 +61,33 @@ export default function CommunityHub() {
               <Link href="/profile" className="block w-full text-center py-2 rounded-full border border-[var(--accent)]/50 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors">
                 Update Profile
               </Link>
+            </div>
+
+            {/* Right Sidebar Footer */}
+            <div className="flex flex-col items-center justify-center pt-4 pb-8 px-4 text-[12px] text-white/50 space-y-2 text-center">
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                <Link href="/about" className="hover:text-[var(--accent)] hover:underline transition-colors">About</Link>
+                <Link href="/accessibility" className="hover:text-[var(--accent)] hover:underline transition-colors">Accessibility</Link>
+                <Link href="/help" className="hover:text-[var(--accent)] hover:underline transition-colors">Help Center</Link>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                <Link href="/terms" className="hover:text-[var(--accent)] hover:underline transition-colors">Privacy & Terms</Link>
+                <Link href="/ads/choices" className="hover:text-[var(--accent)] hover:underline transition-colors">Ad Choices</Link>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                <Link href="/advertising" className="hover:text-[var(--accent)] hover:underline transition-colors">Advertising</Link>
+                <Link href="/business" className="hover:text-[var(--accent)] hover:underline transition-colors">Business Services</Link>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                <Link href="/app" className="font-bold text-white/70 hover:text-[var(--accent)] hover:underline transition-colors">Get the WAC app</Link>
+                <Link href="/more" className="hover:text-[var(--accent)] hover:underline transition-colors">More</Link>
+              </div>
+              <div className="pt-2 flex items-center justify-center gap-2 text-white/40">
+                <span className="font-serif font-bold italic text-white/60">WAC</span>
+                <span>World Albanian Congress © {new Date().getFullYear()}</span>
+              </div>
+            </div>
+
             </div>
           </div>
         </div>

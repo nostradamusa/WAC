@@ -6,7 +6,7 @@ import { Search, Calendar, MapPin, Users, Building, ChevronRight, Compass } from
 import { useRouter, useSearchParams } from "next/navigation";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
-export default function EventsDirectoryPage() {
+function EventsDirectoryPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
@@ -163,5 +163,13 @@ export default function EventsDirectoryPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function EventsDirectoryPage() {
+  return (
+    <Suspense fallback={<div className="wac-page pb-24 animate-pulse h-screen" />}>
+      <EventsDirectoryPageInner />
+    </Suspense>
   );
 }

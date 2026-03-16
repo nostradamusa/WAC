@@ -42,6 +42,8 @@ export interface NetworkComment {
   author_business_id: string | null
   author_organization_id: string | null
   
+  parent_id?: string | null
+  
   content: string
   created_at: string
   updated_at: string

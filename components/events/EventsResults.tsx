@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import EventCard, { EventEntry } from "./EventCard";
 
-export default function EventsResults() {
+function EventsResultsInner() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q")?.toLowerCase() || "";
 
@@ -98,5 +98,22 @@ export default function EventsResults() {
         <EventCard key={ev.id} event={ev} />
       ))}
     </div>
+  );
+}
+
+export default function EventsResults() {
+  return (
+    <Suspense fallback={
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div
+            key={i}
+            className="wac-card p-6 h-64 animate-pulse flex flex-col justify-between rounded-2xl"
+          />
+        ))}
+      </div>
+    }>
+      <EventsResultsInner />
+    </Suspense>
   );
 }

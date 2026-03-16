@@ -18,6 +18,7 @@ export default function PostComments({ postId }: { postId: string }) {
   const [editContent, setEditContent] = useState("");
   const [activeOptionsId, setActiveOptionsId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
@@ -86,12 +87,13 @@ export default function PostComments({ postId }: { postId: string }) {
        finalContent = finalContent.replace(regex, `[@${m.name}](${linkPath})`);
     });
 
-    const { success, data } = await addPostComment(postId, finalContent);
+    const { success, data } = await addPostComment(postId, finalContent, replyingToId);
     
     if (success && data && !Array.isArray(data)) {
       setComments((prev) => [...prev, data as any]);
       setNewContent("");
       setActiveMentions([]); // clear memory
+      setReplyingToId(null);
     }
     
     setIsSubmitting(false);
@@ -216,6 +218,136 @@ export default function PostComments({ postId }: { postId: string }) {
     });
   };
 
+  // Build a comment tree
+  const topLevelComments = comments.filter((c) => !c.parent_id);
+  const getReplies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
+
+  const renderCommentThread = (comment: NetworkComment, isReply = false) => {
+    let cAuthorName = "Unknown";
+    let cAuthorAvatar = null;
+    let cAuthorLink = "#";
+    
+    if (comment.author_profile) {
+      cAuthorName = comment.author_profile.full_name || "User";
+      cAuthorAvatar = comment.author_profile.avatar_url;
+      cAuthorLink = comment.author_profile.username ? `/people/${comment.author_profile.username}` : "#";
+    } else if (comment.author_business) {
+      cAuthorName = comment.author_business.name;
+      cAuthorAvatar = comment.author_business.logo_url;
+      cAuthorLink = `/businesses/${comment.author_business.slug}`;
+    } else if (comment.author_organization) {
+      cAuthorName = comment.author_organization.name;
+      cAuthorAvatar = comment.author_organization.logo_url;
+      cAuthorLink = `/organizations/${comment.author_organization.slug}`;
+    }
+
+    const replies = getReplies(comment.id);
+    const isEditing = editingCommentId === comment.id;
+
+    return (
+      <div key={comment.id} className={`flex gap-3 text-sm flex-col ${isReply ? 'mt-3 pl-2 sm:pl-4 border-l-2 border-white/5' : ''}`}>
+        <div className="flex gap-3 items-start">
+          <Link href={cAuthorLink} className="shrink-0 group">
+            <div className={`relative ${isReply ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden bg-black/20 border border-[var(--border)] group-hover:border-[var(--accent)] transition`}>
+              {cAuthorAvatar ? (
+                <Image src={cAuthorAvatar} alt={cAuthorName} fill className="object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center font-bold text-[#D4AF37] text-xs">
+                  {cAuthorName.charAt(0)}
+                </div>
+              )}
+            </div>
+          </Link>
+          <div className="flex-1 min-w-0">
+             <div className="bg-black/20 rounded-2xl rounded-tl-[4px] p-3 border border-[var(--border)]/50 relative group">
+               <div className="flex justify-between items-start mb-1 gap-2">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <Link href={cAuthorLink} className="font-semibold hover:text-[var(--accent)] transition truncate">
+                      {cAuthorName}
+                    </Link>
+                    <span className="text-xs opacity-50 shrink-0">{timeAgo(comment.created_at)}</span>
+                  </div>
+                  
+                  {currentUserId === comment.submitted_by && (
+                    <div className="relative">
+                      <button 
+                        onClick={() => setActiveOptionsId(activeOptionsId === comment.id ? null : comment.id)}
+                        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--accent)] transition p-1"
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                      
+                      {activeOptionsId === comment.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setActiveOptionsId(null)} />
+                          <div className="absolute right-0 top-full mt-1 w-28 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up">
+                            <button 
+                              onClick={() => { 
+                                setEditingCommentId(comment.id); 
+                                setEditContent(comment.content); 
+                                setActiveOptionsId(null); 
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition"
+                            >
+                              Edit
+                            </button>
+                            <div className="h-px w-full bg-white/5" />
+                            <button 
+                              onClick={() => handleDeleteComment(comment.id)}
+                              className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+               </div>
+               
+               {isEditing ? (
+                 <div className="mt-2 flex flex-col gap-2">
+                   <textarea 
+                     value={editContent}
+                     onChange={(e) => setEditContent(e.target.value)}
+                     className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] resize-none"
+                     rows={2}
+                   />
+                   <div className="flex gap-2 justify-end">
+                      <button onClick={() => setEditingCommentId(null)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white transition">Cancel</button>
+                      <button onClick={() => handleEditCommentSubmit(comment.id)} className="px-3 py-1 text-[10px] bg-[var(--accent)] text-black font-bold rounded hover:bg-[#F2D06B] transition">Save</button>
+                   </div>
+                 </div>
+               ) : (
+                 <p className="opacity-90 whitespace-pre-wrap break-words">{renderCommentContent(comment.content)}</p>
+               )}
+             </div>
+             
+             {/* Comment Actions Area */}
+             <div className="flex items-center gap-4 mt-1.5 px-2">
+               <button 
+                 onClick={() => {
+                   setReplyingToId(isReply ? comment.parent_id! : comment.id);
+                   textareaRef.current?.focus();
+                 }} 
+                 className="text-xs font-semibold text-white/50 hover:text-[var(--accent)] transition"
+               >
+                 Reply
+               </button>
+             </div>
+          </div>
+        </div>
+
+        {/* Render nested replies */}
+        {replies.length > 0 && (
+          <div className="ml-8 mt-1 space-y-2 relative">
+            {replies.map(reply => renderCommentThread(reply, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="mt-4 pt-4 border-t border-[var(--border)] relative">
       
@@ -223,105 +355,8 @@ export default function PostComments({ postId }: { postId: string }) {
       {isLoading ? (
         <div className="flex justify-center p-4"><Loader2 className="animate-spin opacity-50" size={20} /></div>
       ) : comments.length > 0 ? (
-        <div className="space-y-4 mb-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-          {comments.map((comment) => {
-            let cAuthorName = "Unknown";
-            let cAuthorAvatar = null;
-            let cAuthorLink = "#";
-            
-            if (comment.author_profile) {
-              cAuthorName = comment.author_profile.full_name || "User";
-              cAuthorAvatar = comment.author_profile.avatar_url;
-              cAuthorLink = comment.author_profile.username ? `/people/${comment.author_profile.username}` : "#";
-            } else if (comment.author_business) {
-              cAuthorName = comment.author_business.name;
-              cAuthorAvatar = comment.author_business.logo_url;
-              cAuthorLink = `/businesses/${comment.author_business.slug}`;
-            } else if (comment.author_organization) {
-              cAuthorName = comment.author_organization.name;
-              cAuthorAvatar = comment.author_organization.logo_url;
-              cAuthorLink = `/organizations/${comment.author_organization.slug}`;
-            }
-
-            return (
-              <div key={comment.id} className="flex gap-3 text-sm items-center">
-                <Link href={cAuthorLink} className="shrink-0 group">
-                  <div className="relative w-8 h-8 rounded-full overflow-hidden bg-black/20 border border-[var(--border)] group-hover:border-[var(--accent)] transition">
-                    {cAuthorAvatar ? (
-                      <Image src={cAuthorAvatar} alt={cAuthorName} fill className="object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-[#D4AF37] text-xs">
-                        {cAuthorName.charAt(0)}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="flex-1 min-w-0 bg-black/20 rounded-2xl p-3 border border-[var(--border)]/50 relative">
-                   <div className="flex justify-between items-start mb-1 gap-2">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <Link href={cAuthorLink} className="font-semibold hover:text-[var(--accent)] transition truncate">
-                          {cAuthorName}
-                        </Link>
-                        <span className="text-xs opacity-50 shrink-0">{timeAgo(comment.created_at)}</span>
-                      </div>
-                      
-                      {currentUserId === comment.submitted_by && (
-                        <div className="relative">
-                          <button 
-                            onClick={() => setActiveOptionsId(activeOptionsId === comment.id ? null : comment.id)}
-                            className="opacity-40 hover:opacity-100 hover:text-[var(--accent)] transition p-1"
-                          >
-                            <MoreHorizontal size={14} />
-                          </button>
-                          
-                          {activeOptionsId === comment.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveOptionsId(null)} />
-                              <div className="absolute right-0 top-full mt-1 w-28 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up">
-                                <button 
-                                  onClick={() => { 
-                                    setEditingCommentId(comment.id); 
-                                    setEditContent(comment.content); 
-                                    setActiveOptionsId(null); 
-                                  }}
-                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition"
-                                >
-                                  Edit
-                                </button>
-                                <div className="h-px w-full bg-white/5" />
-                                <button 
-                                  onClick={() => handleDeleteComment(comment.id)}
-                                  className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                   </div>
-                   
-                   {editingCommentId === comment.id ? (
-                     <div className="mt-2 flex flex-col gap-2">
-                       <textarea 
-                         value={editContent}
-                         onChange={(e) => setEditContent(e.target.value)}
-                         className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] resize-none"
-                         rows={2}
-                       />
-                       <div className="flex gap-2 justify-end">
-                          <button onClick={() => setEditingCommentId(null)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white transition">Cancel</button>
-                          <button onClick={() => handleEditCommentSubmit(comment.id)} className="px-3 py-1 text-[10px] bg-[var(--accent)] text-black font-bold rounded hover:bg-[#F2D06B] transition">Save</button>
-                       </div>
-                     </div>
-                   ) : (
-                     <p className="opacity-90 whitespace-pre-wrap break-words">{renderCommentContent(comment.content)}</p>
-                   )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="space-y-4 mb-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+          {topLevelComments.map((comment) => renderCommentThread(comment))}
         </div>
       ) : (
         <div className="text-center text-sm opacity-50 py-2 mb-4">No comments yet. Be the first to start a discussion!</div>
@@ -372,8 +407,22 @@ export default function PostComments({ postId }: { postId: string }) {
             </div>
           </div>
         )}
-
+        
         <form onSubmit={handleSubmit} className="relative w-full">
+          {replyingToId && (
+            <div className="flex items-center justify-between text-xs px-4 py-2 bg-white/5 rounded-t-xl border-t border-x border-white/10">
+              <span className="text-white/70">
+                Replying to <span className="font-semibold">{comments.find(c => c.id === replyingToId)?.author_profile?.full_name || 'user'}</span>
+              </span>
+              <button 
+                type="button" 
+                onClick={() => setReplyingToId(null)}
+                className="hover:text-red-400 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <div className="relative">
             <textarea
               ref={textareaRef}
@@ -381,7 +430,7 @@ export default function PostComments({ postId }: { postId: string }) {
               onChange={handleTextChange}
               placeholder="Write a comment... (Type @ to mention)"
               rows={1}
-              className="w-full bg-black/20 border border-[var(--border)] rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden"
+              className={`w-full bg-black/20 border border-[var(--border)] ${replyingToId ? 'rounded-b-2xl border-t-0' : 'rounded-2xl'} pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden`}
               onKeyDown={(e) => {
                 if (showMentions) {
                   if (e.key === 'ArrowDown') {

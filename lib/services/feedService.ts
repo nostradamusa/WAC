@@ -77,38 +77,58 @@ export async function togglePostReaction(
   }
 }
 
-export async function addPostComment(postId: string, content: string): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function getAuthorProfileId(userId: string): Promise<string | null> {
+  if (typeof window === "undefined") return userId; // Default to user ID on server
+
+  const actorJson = localStorage.getItem("wac_active_actor");
+  if (actorJson) {
+    try {
+      const actor = JSON.parse(actorJson);
+      // If the active actor is a business or organization, we might want to return null
+      // or a specific profile ID associated with that entity.
+      // For now, if it's a business/org, we assume the comment is still made by the user's profile.
+      // This logic might need refinement based on how you want to attribute comments from entities.
+      if (actor.type === "business" || actor.type === "organization") {
+        // If comments from businesses/orgs should be attributed to a specific profile,
+        // you'd fetch that profile ID here. For now, we'll default to the user's profile.
+        return userId;
+      }
+    } catch (e) {
+      console.error("Failed to parse actor JSON in getAuthorProfileId", e);
+    }
+  }
+  return userId; // Default to the user's profile ID
+}
+
+export async function addPostComment(
+  postId: string,
+  content: string,
+  parentId?: string | null
+): Promise<{ success: boolean; data?: any; error?: any }> {
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (sessionError || !userId) {
       return { success: false, error: "Authentication required to comment." };
     }
-    
-    // Check local storage for active actor context (if user is posting as a business/org)
-    // For now, default to personal profile
-    let authorPayload = { author_profile_id: session.user.id };
-    
-    if (typeof window !== "undefined") {
-      const actorJson = localStorage.getItem("wac_active_actor");
-      if (actorJson) {
-        try {
-          const actor = JSON.parse(actorJson);
-          if (actor.type === "business") authorPayload = { author_business_id: actor.id } as any;
-          else if (actor.type === "organization") authorPayload = { author_organization_id: actor.id } as any;
-        } catch (e) {
-          console.error("Failed to parse actor JSON", e);
-        }
-      }
+
+    const authorProfileId = await getAuthorProfileId(userId);
+
+    const payload: any = {
+      post_id: postId,
+      content,
+      submitted_by: userId,
+    };
+
+    if (parentId) {
+      payload.parent_id = parentId;
     }
+
+    if (authorProfileId) payload.author_profile_id = authorProfileId;
 
     const { data, error } = await supabase
       .from("feed_comments")
-      .insert({
-        post_id: postId,
-        submitted_by: session.user.id,
-        content: content,
-        ...authorPayload
-      })
+      .insert([payload])
       .select(`
         *,
         author_profile:profiles!author_profile_id(full_name, username, avatar_url, is_verified),
@@ -118,14 +138,14 @@ export async function addPostComment(postId: string, content: string): Promise<{
       .single();
 
     if (error) {
-      console.error("Error creating comment:", error);
-      return { success: false, error: "Failed to post comment." };
+      console.error("Error inserting comment:", error);
+      return { success: false, error };
     }
 
     return { success: true, data };
   } catch (err: any) {
-    console.error("Exception in addPostComment:", err);
-    return { success: false, error: err.message || "An unexpected error occurred." };
+    console.error("addPostComment catch error:", err);
+    return { success: false, error: err };
   }
 }
 

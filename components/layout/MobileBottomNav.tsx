@@ -50,8 +50,8 @@ export default function MobileBottomNav() {
                 {Icon ? (
                   <Icon size={24} strokeWidth={isActive ? 2 : 1.5} />
                 ) : item.imageSrc ? (
-                  <div className={`w-6 h-6 rounded-full overflow-hidden border ${isActive ? "border-[var(--accent)]" : "border-white/20"} flex items-center justify-center`}>
-                    <img src={item.imageSrc} alt={item.name} className="w-full h-full object-cover" />
+                  <div className={`w-6 h-6 rounded-full overflow-hidden border ${isActive ? "border-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.6)]" : "border-white/20"} flex items-center justify-center bg-[var(--accent)]`}>
+                    <img src={item.imageSrc} alt={item.name} className="w-full h-full object-cover scale-[1.4] mix-blend-multiply" />
                   </div>
                 ) : null}
                 {item.name === "Alerts" && (

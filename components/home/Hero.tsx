@@ -41,7 +41,17 @@ export default function Hero() {
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(176,141,87,0.12)_0%,transparent_60%)] pointer-events-none" />
 
       <div className="relative z-10 max-w-5xl">
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-serif tracking-tight mb-8 md:mb-12 leading-tight text-white">
+        <div className="flex justify-center mb-6 md:mb-8">
+          <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(212,175,55,0.25)] animate-in zoom-in duration-700 relative">
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.3)_0%,transparent_60%)] mix-blend-overlay pointer-events-none"></div>
+             <img 
+               src="/images/wac-logo.jpg" 
+               alt="WAC Eagle Globe" 
+               className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95" 
+             />
+          </div>
+        </div>
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-serif tracking-tight mb-8 md:mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
           World{" "}
           <span className="text-[#D4AF37] italic font-light opacity-90">
             Albanian

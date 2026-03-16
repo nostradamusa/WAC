@@ -1,23 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, X, Search, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { useScrollDirection } from "@/lib/hooks/useScrollDirection";
+import { searchMessagingContacts, getOrCreateConversation, MessagingContact } from "@/lib/services/messagingService";
+import { useDebounce } from "@/lib/hooks/useDebounce";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 export default function NewMessageFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const scrollDirection = useScrollDirection();
+  const router = useRouter();
+  const [isSearching, setIsSearching] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [filteredContacts, setFilteredContacts] = useState<MessagingContact[]>([]);
+  const debouncedQuery = useDebounce(searchQuery, 300);
 
-  const mockContacts = [
-    { id: "1", name: "Arben Lleshi", headline: "Real Estate Broker", verified: true, avatar: "https://i.pravatar.cc/150?u=a" },
-    { id: "3", name: "Teuta Hoxha", headline: "Architect", verified: false, avatar: "https://i.pravatar.cc/150?u=b" },
-    { id: "5", name: "Dritan Celaj", headline: "Software Engineer", verified: true, avatar: "https://i.pravatar.cc/150?u=c" },
-    { id: "7", name: "Erand Kapo", headline: "CEO at TechCorp", verified: false, avatar: "https://i.pravatar.cc/150?u=d" },
-  ];
+  useEffect(() => {
+    if (!debouncedQuery || debouncedQuery.length < 2) {
+      setFilteredContacts([]);
+      return;
+    }
 
-  const filteredContacts = mockContacts.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    async function search() {
+      setIsSearching(true);
+      const results = await searchMessagingContacts(debouncedQuery);
+      setFilteredContacts(results);
+      setIsSearching(false);
+    }
+    
+    search();
+  }, [debouncedQuery]);
+
+  const handleStartChat = async (contact: MessagingContact) => {
+    setIsCreating(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUserId = sessionData.session?.user.id;
+    
+    if (!currentUserId) {
+      alert("You must be logged in to send a message.");
+      setIsCreating(false);
+      return;
+    }
+
+    const { success, conversationId } = await getOrCreateConversation(
+      currentUserId,
+      contact.id,
+      contact.type
+    );
+
+    setIsCreating(false);
+
+    if (success && conversationId) {
+      setIsOpen(false);
+      router.push(`/messages/${conversationId}`);
+    } else {
+      alert("Failed to create conversation.");
+    }
+  };
 
   return (
     <>
@@ -55,21 +99,37 @@ export default function NewMessageFAB() {
             </div>
 
             <div className="flex-1 overflow-y-auto wac-scrollbar">
-               {filteredContacts.length === 0 ? (
+               {isSearching ? (
+                 <div className="p-8 flex justify-center"><Loader2 className="animate-spin opacity-50" size={24} /></div>
+               ) : searchQuery.length < 2 ? (
+                 <div className="p-8 text-center text-white/50 text-sm">
+                   Type at least 2 characters to search...
+                 </div>
+               ) : filteredContacts.length === 0 ? (
                  <div className="p-8 text-center text-white/50 text-sm">
                    No contacts found matching "{searchQuery}"
                  </div>
                ) : (
                  <div className="p-2 flex flex-col gap-1">
                    {filteredContacts.map(contact => (
-                     <button key={contact.id} className="w-full flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl transition text-left">
-                        <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0">
-                           <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" />
+                     <button 
+                       key={contact.id}
+                       disabled={isCreating}
+                       onClick={() => handleStartChat(contact)}
+                       className="w-full flex items-center gap-3 p-3 hover:bg-white/5 rounded-xl transition text-left disabled:opacity-50"
+                     >
+                        <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden shrink-0 flex items-center justify-center font-bold text-[var(--accent)] text-xs">
+                           {contact.avatar_url ? (
+                             <img src={contact.avatar_url} alt={contact.name} className="w-full h-full object-cover" />
+                           ) : (
+                             contact.name.charAt(0)
+                           )}
                         </div>
                         <div className="flex flex-col flex-1">
                            <div className="flex items-center gap-1">
                               <span className="font-semibold text-sm">{contact.name}</span>
-                              {contact.verified && <CheckCircle2 size={12} className="text-[#D4AF37]" />}
+                              {contact.is_verified && <CheckCircle2 size={12} className="text-[#D4AF37]" />}
+                              <span className="text-[10px] ml-auto px-1.5 py-0.5 rounded bg-white/10 capitalize">{contact.type}</span>
                            </div>
                            <span className="text-xs text-white/50">{contact.headline}</span>
                         </div>

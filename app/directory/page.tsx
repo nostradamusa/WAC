@@ -92,22 +92,9 @@ export default async function PeoplePage({
     location: params.location?.trim() ?? "",
   };
 
-  // Fetch current user for relevance sorting
-  let currentUserProfile: UserProfileForRelevance = null;
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) {
-    const { data: profile } = await supabase
-      .from("people_directory_v1")
-      .select("country, state, city, industry_name, skills")
-      .eq("user_id", user.id)
-      .single();
-    
-    if (profile) {
-      currentUserProfile = profile;
-    }
-  }
 
-  const { data: people, error } = await getPeopleDirectory(filters, currentUserProfile);
+  const { data: people, error } = await getPeopleDirectory(filters, user?.id);
   const entitiesCount = filters.q
     ? await getEntitiesCount(filters.q)
     : undefined;
