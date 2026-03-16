@@ -13,8 +13,8 @@ export default function PeopleSkeleton() {
                 </div>
               </div>
               <div className="mt-4 flex flex-col gap-2">
-                 <div className="h-4 w-1/3 rounded bg-[rgba(255,255,255,0.05)]" />
-                 <div className="h-4 w-1/4 rounded bg-[rgba(255,255,255,0.05)]" />
+                <div className="h-4 w-1/3 rounded bg-[rgba(255,255,255,0.05)]" />
+                <div className="h-4 w-1/4 rounded bg-[rgba(255,255,255,0.05)]" />
               </div>
               <div className="mt-auto pt-5">
                 <div className="flex flex-wrap gap-2">

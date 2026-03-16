@@ -1,8 +1,0 @@
-export default function ProfileExperienceSection() {
-  return (
-    <div>
-      <h2>Experience</h2>
-      <p>This is where user experience will appear.</p>
-    </div>
-  )
-}

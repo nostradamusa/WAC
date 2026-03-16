@@ -1,87 +1,73 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { supabase } from "@/app/lib/supabase"
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+
+import Hero from "@/components/home/Hero";
+import WhyItExists from "@/components/home/WhyItExists";
+import EcosystemHub from "@/components/home/EcosystemHub";
+import HomeFeedPreview from "@/components/home/HomeFeedPreview";
+import NetworkIntelligence from "@/components/home/NetworkIntelligence";
+import LivingNetwork from "@/components/home/LivingNetwork";
+import MembersPreview from "@/components/home/MembersPreview";
+import Vision from "@/components/home/Vision";
+import JoinNetwork from "@/components/home/JoinNetwork";
 
 export default function Home() {
-  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadUser() {
-      const { data, error } = await supabase.auth.getUser()
-
-      if (error) {
-        console.error("Get user error:", error)
-        return
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data?.user) {
+        setUserEmail(data.user.email ?? null);
+        setUserId(data.user.id ?? null);
       }
-
-      setUserEmail(data.user?.email ?? null)
     }
 
-    loadUser()
+    loadUser();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserEmail(session?.user?.email ?? null)
-    })
+      setUserEmail(session?.user?.email ?? null);
+      setUserId(session?.user?.id ?? null);
+    });
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => subscription.unsubscribe();
+  }, []);
 
   async function signInWithGoogle() {
-    const { error } = await supabase.auth.signInWithOAuth({
+    await supabase.auth.signInWithOAuth({
       provider: "google",
-    })
-
-    if (error) {
-      console.error("Google sign-in error:", error)
-    }
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
   }
 
   async function signOut() {
-    const { error } = await supabase.auth.signOut()
-
-    if (error) {
-      console.error("Sign out error:", error)
-    } else {
-      setUserEmail(null)
-    }
+    await supabase.auth.signOut();
+    setUserEmail(null);
+    setUserId(null);
   }
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1>World Albanian Congress</h1>
-      <p>Authentication test</p>
-
-      {userEmail ? (
-        <>
-          <p>Signed in as: {userEmail}</p>
-          <button
-            onClick={signOut}
-            style={{
-              marginTop: 20,
-              padding: "12px 20px",
-              fontSize: "16px",
-              cursor: "pointer",
-            }}
-          >
-            Sign out
-          </button>
-        </>
-      ) : (
-        <button
-          onClick={signInWithGoogle}
-          style={{
-            marginTop: 20,
-            padding: "12px 20px",
-            fontSize: "16px",
-            cursor: "pointer",
-          }}
-        >
-          Continue with Google
-        </button>
-      )}
+    <div className="flex min-h-screen flex-col bg-[var(--background)]">
+      {/* Narrative Architectural Scroll */}
+      <main className="flex-1 w-full flex flex-col pt-10">
+        <Hero />
+        <EcosystemHub />
+        <HomeFeedPreview />
+        <NetworkIntelligence userId={userId} />
+        <LivingNetwork />
+        <MembersPreview />
+        <WhyItExists />
+        <Vision />
+        <JoinNetwork userId={userId} />
+      </main>
     </div>
-  )
+  );
 }

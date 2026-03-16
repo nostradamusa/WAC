@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
 
 :root {
   --background: #151311;
@@ -41,7 +42,7 @@ body {
     radial-gradient(circle at top, rgba(158, 36, 36, 0.08), transparent 28%),
     linear-gradient(to bottom, #181512 0%, #141210 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol";
   margin: 0;
   min-height: 100vh;
   text-rendering: optimizeLegibility;
@@ -90,6 +91,28 @@ select:focus {
   background: rgba(255, 248, 239, 0.05);
 }
 
+/* Native select dark theme fixes */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  background-color: rgba(255, 248, 239, 0.03);
+  color: var(--foreground);
+  border: 1px solid var(--input);
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23b08d57' viewBox='0 0 20 20'%3E%3Cpath d='M5 7l5 5 5-5H5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 34px;
+}
+
+select option {
+  background-color: #1b1714;
+  color: var(--foreground);
+}
+
 button {
   cursor: pointer;
   transition:
@@ -97,15 +120,21 @@ button {
     opacity 0.2s ease,
     background-color 0.2s ease,
     border-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 button:hover {
-  opacity: 0.96;
+  opacity: 0.98;
 }
 
 button:active {
   transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 ::selection {
@@ -117,42 +146,119 @@ button:active {
 .wac-page {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem;
+  padding-top: 8rem; /* Clears the 6rem header and adds spacing */
+  padding-bottom: 2.5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .wac-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
   color: var(--card-foreground);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   box-shadow:
-    0 14px 40px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(6px);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.wac-card:hover {
+  border-color: rgba(176, 141, 87, 0.35);
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
 }
 
 .wac-button-primary {
-  background: linear-gradient(180deg, #a92a2a 0%, #8e1f1f 100%);
+  background: var(--primary);
   color: var(--primary-foreground);
-  border: 1px solid #b33a3a;
-  border-radius: 12px;
-  padding: 0.7rem 1rem;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 0.7rem 1.25rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(158, 36, 36, 0.25);
 }
 
 .wac-button-primary:hover {
-  background: linear-gradient(180deg, #b03030 0%, #982222 100%);
+  background: #b03030;
+  border-color: #b03030;
+  box-shadow: 0 6px 16px rgba(158, 36, 36, 0.4);
 }
 
 .wac-button-secondary {
   background: rgba(255, 248, 239, 0.03);
   color: var(--foreground);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  padding: 0.7rem 1.25rem;
+  font-weight: 600;
 }
 
 .wac-button-secondary:hover {
   border-color: var(--accent);
   color: var(--warm-ivory);
+}
+
+.wac-button-chip {
+  background: rgba(255, 248, 239, 0.03);
+  color: var(--foreground);
+  border: 1px solid rgba(176, 141, 87, 0.24);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.wac-button-chip:hover {
+  border-color: rgba(176, 141, 87, 0.5);
+  background: rgba(176, 141, 87, 0.08);
+  color: var(--warm-ivory);
+}
+
+.wac-button-chip-primary {
+  background: rgba(176, 141, 87, 0.12);
+  color: var(--warm-ivory);
+  border: 1px solid rgba(176, 141, 87, 0.45);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.wac-button-chip-primary:hover {
+  background: rgba(176, 141, 87, 0.18);
+  border-color: rgba(176, 141, 87, 0.6);
+}
+
+@keyframes pop-bounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4) translateY(-10%); }
+  60% { transform: scale(0.9) translateY(5%); }
+  80% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-pop-bounce {
+  animation: pop-bounce 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .wac-eyebrow {
@@ -180,5 +286,158 @@ button:active {
 }
 
 .wac-heritage-glow {
-  box-shadow: 0 0 0 1px rgba(176, 141, 87, 0.18), 0 10px 30px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    0 0 0 1px rgba(176, 141, 87, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.24);
+} /* Remove browser blue highlight from select options */
+select option:checked {
+  background: var(--accent);
+  color: var(--deep-charcoal);
+}
+
+select option:hover {
+  background: var(--accent);
+  color: var(--deep-charcoal);
+}
+
+/* Force highlight override (Chrome/Edge fix) */
+select option:checked:hover {
+  background: var(--accent);
+  color: var(--deep-charcoal);
+} /* Premium input feel */
+input,
+textarea,
+select {
+  backdrop-filter: blur(4px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Subtle hover state */
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: rgba(176, 141, 87, 0.45);
+}
+
+/* Google Translate UI Overrides */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame {
+  display: none !important;
+}
+iframe.goog-te-banner-frame {
+  display: none !important;
+}
+body {
+  top: 0px !important;
+  position: static !important;
+}
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+  visibility: hidden !important;
+}
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* =========================================
+   CUSTOM DROPDOWN CLASSES (.wac-select)
+   ========================================= */
+.wac-select-trigger {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  margin-top: 6px;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid var(--input);
+  background: rgba(255, 248, 239, 0.03);
+  position: relative;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.wac-select-trigger:hover:not(:disabled) {
+  border-color: rgba(176, 141, 87, 0.45);
+}
+
+.wac-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(176, 141, 87, 0.16);
+}
+
+.wac-select-content {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  z-index: 50;
+  padding: 8px;
+  border-radius: 14px;
+}
+
+.wac-select-list {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+/* Custom Scrollbar for dropdowns */
+.wac-select-list::-webkit-scrollbar {
+  width: 6px;
+}
+.wac-select-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+.wac-select-list::-webkit-scrollbar-thumb {
+  background: rgba(176, 141, 87, 0.25);
+  border-radius: 10px;
+}
+.wac-select-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(176, 141, 87, 0.5);
+}
+
+.wac-select-option {
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--foreground);
+  transition: all 0.15s ease;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+.wac-select-option:hover {
+  background: rgba(255, 248, 239, 0.04);
+}
+
+.wac-select-option[data-selected="true"] {
+  background: rgba(176, 141, 87, 0.12);
+  border-color: rgba(176, 141, 87, 0.3);
+  color: var(--warm-ivory);
+}
+
+.wac-select-search {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
+}
+.wac-select-search:focus {
+  border-color: rgba(176, 141, 87, 0.4);
 }

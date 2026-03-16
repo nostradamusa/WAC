@@ -1,0 +1,4309 @@
+﻿diff --git a/app/businesses/[slug]/page.tsx b/app/businesses/[slug]/page.tsx
+index 13dfdc7..c6c3c5b 100644
+--- a/app/businesses/[slug]/page.tsx
++++ b/app/businesses/[slug]/page.tsx
+@@ -1,6 +1,8 @@
+ import { notFound } from "next/navigation";
+ import { supabase } from "@/lib/supabase";
+ import { BusinessProfile } from "@/lib/types/business-directory";
++import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
++import WacReviewTrigger from "@/components/reviews/WacReviewTrigger";
+ 
+ export default async function BusinessProfilePage({
+   params,
+@@ -79,6 +81,25 @@ export default async function BusinessProfilePage({
+                     "Business"}
+                 </p>
+ 
++                {business.google_maps_url && typeof business.google_rating === 'number' && (
++                  <div className="mb-6">
++                    <GoogleRatingBadge
++                      rating={business.google_rating}
++                      reviewsCount={business.google_reviews_count || 0}
++                      mapsUrl={business.google_maps_url}
++                    />
++                  </div>
++                )}
++                <div className="mb-6">
++                  <WacReviewTrigger
++                    entityId={business.id}
++                    entityName={business.name}
++                    entityType="business"
++                    rating={business.wac_rating || 0}
++                    reviewsCount={business.wac_reviews_count || 0}
++                  />
++                </div>
++
+                 {(business.city || business.state || business.country) && (
+                   <div className="mb-8 flex items-center gap-2 text-sm opacity-80">
+                     <svg
+@@ -122,6 +143,30 @@ export default async function BusinessProfilePage({
+               <h2 className="mb-4 text-lg font-bold">Details</h2>
+ 
+               <dl className="space-y-4 text-sm">
++                {business.google_maps_url && typeof business.google_rating === 'number' && (
++                  <div>
++                    <dt className="text-xs opacity-60 mb-1">Google Rating</dt>
++                    <dd className="font-medium">
++                      <GoogleRatingBadge
++                        rating={business.google_rating}
++                        reviewsCount={business.google_reviews_count || 0}
++                        mapsUrl={business.google_maps_url}
++                      />
++                    </dd>
++                  </div>
++                )}
++                <div>
++                  <dt className="text-xs opacity-60 mb-1">WAC Member Rating</dt>
++                  <dd className="font-medium">
++                    <WacReviewTrigger
++                      entityId={business.id}
++                      entityName={business.name}
++                      entityType="business"
++                      rating={business.wac_rating || 0}
++                      reviewsCount={business.wac_reviews_count || 0}
++                    />
++                  </dd>
++                </div>
+                 {(business.hiring_status === "hiring" ||
+                   business.hiring_status === "actively_hiring") && (
+                   <div className="rounded-lg bg-green-500/10 p-3 border border-green-500/20">
+diff --git a/app/directory/page.tsx b/app/directory/page.tsx
+index 79eca66..91de273 100644
+--- a/app/directory/page.tsx
++++ b/app/directory/page.tsx
+@@ -1,22 +1,32 @@
+ import { Suspense } from "react";
+-import PeopleFilters from "@/components/people/filters/PeopleFilters";
+ import PeopleDirectoryLayout from "@/components/people/layout/PeopleDirectoryLayout";
+ import PeopleResults from "@/components/people/results/PeopleResults";
+ import PeopleSkeleton from "@/components/people/results/PeopleSkeleton";
+ import PeopleSearchBar from "@/components/people/search/PeopleSearchBar";
+ import DirectoryTabs from "@/components/directory/DirectoryTabs";
+-import { getPeopleDirectory } from "@/lib/services/searchService";
++import GlobalDirectoryFilters from "@/components/directory/GlobalDirectoryFilters";
++import EntitiesTab from "@/components/directory/EntitiesTab";
++import {
++  getPeopleDirectory,
++  getEntitiesCount,
++} from "@/lib/services/searchService";
+ import type {
+   EnrichedDirectoryPerson,
+   SearchFilters,
+ } from "@/lib/services/searchService";
+ 
+-export type PeoplePageFilters = SearchFilters;
++export type PeoplePageFilters = SearchFilters & {
++  tab?: string;
++  filter?: string; // Entities type
++  location?: string; // Entities location
++};
+ 
+ function buildActiveFilterPills(filters: PeoplePageFilters) {
+   const pills: Array<{ label: string; value: string }> = [];
+ 
+   if (filters.q) pills.push({ label: "Search", value: filters.q });
++
++  // People Filters
+   if (filters.country) pills.push({ label: "Country", value: filters.country });
+   if (filters.industry)
+     pills.push({ label: "Industry", value: filters.industry });
+@@ -24,6 +34,20 @@ function buildActiveFilterPills(filters: PeoplePageFilters) {
+     pills.push({ label: "Specialty", value: filters.specialty });
+   if (filters.mentorOnly)
+     pills.push({ label: "Mentor", value: "Open to mentoring" });
++  if (filters.openToWork)
++    pills.push({ label: "Status", value: "Open to Work" });
++  if (filters.openToHire) pills.push({ label: "Status", value: "Hiring" });
++
++  // Entity Filters
++  if (filters.filter && filters.filter !== "all") {
++    pills.push({
++      label: "Type",
++      value: filters.filter === "businesses" ? "Businesses" : "Organizations",
++    });
++  }
++  if (filters.location) {
++    pills.push({ label: "Location", value: filters.location });
++  }
+ 
+   return pills;
+ }
+@@ -33,23 +57,37 @@ export default async function PeoplePage({
+ }: {
+   searchParams: Promise<{
+     q?: string;
++    tab?: string;
+     country?: string;
+     industry?: string;
+     specialty?: string;
+     mentor?: string;
++    work?: string;
++    hire?: string;
++    filter?: string;
++    location?: string;
+   }>;
+ }) {
+   const params = await searchParams;
++  const activeTab = (params.tab as "people" | "entities") || "people";
+ 
+   const filters: PeoplePageFilters = {
+     q: params.q?.trim() ?? "",
++    tab: activeTab,
+     country: params.country?.trim() ?? "",
+     industry: params.industry?.trim() ?? "",
+     specialty: params.specialty?.trim() ?? "",
+     mentorOnly: params.mentor === "true",
++    openToWork: params.work === "true",
++    openToHire: params.hire === "true",
++    filter: params.filter?.trim() ?? "",
++    location: params.location?.trim() ?? "",
+   };
+ 
+   const { data: people, error } = await getPeopleDirectory(filters);
++  const entitiesCount = filters.q
++    ? await getEntitiesCount(filters.q)
++    : undefined;
+ 
+   if (error) {
+     return (
+@@ -68,9 +106,12 @@ export default async function PeoplePage({
+ 
+   return (
+     <div className="flex min-h-screen flex-col bg-[var(--background)]">
+-      <DirectoryTabs />
++      <DirectoryTabs
++        peopleCount={filters.q ? people.length : undefined}
++        entitiesCount={entitiesCount}
++      />
+       <main className="w-full max-w-[90rem] mx-auto px-4 pb-20">
+-        <PeopleSearchBar initialQuery={filters.q} />
++        <PeopleSearchBar initialQuery={filters.q} activeTab={activeTab} />
+ 
+         {activeFilterPills.length > 0 && (
+           <div className="mb-6 flex flex-wrap gap-2">
+@@ -85,22 +126,36 @@ export default async function PeoplePage({
+           </div>
+         )}
+ 
+-        <PeopleDirectoryLayout
+-          filters={
+-            <PeopleFilters
+-              country={filters.country}
+-              industry={filters.industry}
+-              specialty={filters.specialty}
+-              mentorOnly={filters.mentorOnly}
+-              totalResults={people.length}
+-            />
+-          }
+-          results={
+-            <Suspense fallback={<PeopleSkeleton />}>
+-              <PeopleResults people={people as EnrichedDirectoryPerson[]} />
+-            </Suspense>
+-          }
+-        />
++        {activeTab === "people" ? (
++          <PeopleDirectoryLayout
++            filters={
++              <GlobalDirectoryFilters
++                activeTab="people"
++                totalResults={people.length}
++              />
++            }
++            results={
++              <Suspense fallback={<PeopleSkeleton />}>
++                <PeopleResults people={people as EnrichedDirectoryPerson[]} />
++              </Suspense>
++            }
++          />
++        ) : (
++          <PeopleDirectoryLayout
++            filters={
++              <GlobalDirectoryFilters
++                activeTab="entities"
++                // Entity count is handled client-side in MVP, we just pass 0 for SSR initial render
++                totalResults={0}
++              />
++            }
++            results={
++              <Suspense fallback={<PeopleSkeleton />}>
++                <EntitiesTab />
++              </Suspense>
++            }
++          />
++        )}
+       </main>
+     </div>
+   );
+diff --git a/app/events/page.tsx b/app/events/page.tsx
+index 28f789b..66d2d29 100644
+--- a/app/events/page.tsx
++++ b/app/events/page.tsx
+@@ -23,11 +23,35 @@ export default function EventsDirectoryPage() {
+         {/* Filters Sidebar */}
+         <div className="w-full lg:w-1/4 shrink-0 space-y-6">
+           <div className="wac-card bg-[var(--surface)] p-6 rounded-2xl sticky top-24">
++            
++            {/* Calendar View Toggle */}
++            <div className="flex bg-black/40 rounded-xl p-1 mb-8 border border-white/10">
++              <button className="flex-1 py-2 px-4 rounded-lg bg-[var(--accent)] text-black font-bold text-sm shadow-md transition-all">
++                All Events
++              </button>
++              <button className="flex-1 py-2 px-4 rounded-lg text-white/70 hover:text-white font-medium text-sm transition-all flex items-center justify-center gap-2">
++                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
++                My Calendar
++              </button>
++            </div>
++
+             <h3 className="font-bold text-white mb-6 uppercase tracking-widest text-sm opacity-50">
+               Filter Events
+             </h3>
+ 
+             <div className="space-y-6">
++              
++              {/* Network Filter */}
++              <div>
++                <label className="block text-xs font-semibold text-white/70 mb-3">
++                  My Network
++                </label>
++                <label className="flex items-center gap-3 cursor-pointer group">
++                  <input type="checkbox" className="w-4 h-4 rounded border-[var(--border)] bg-[var(--background)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer" />
++                  <span className="text-sm opacity-80 group-hover:opacity-100 transition-opacity">Only from Followed Orgs</span>
++                </label>
++              </div>
++
+               <div>
+                 <label className="block text-xs font-semibold text-white/70 mb-2">
+                   Location
+@@ -35,7 +59,7 @@ export default function EventsDirectoryPage() {
+                 <input
+                   type="text"
+                   placeholder="City, State, or Country"
+-                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-white placeholder:text-white/30"
++                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] transition-all text-white placeholder:text-white/30"
+                 />
+               </div>
+ 
+@@ -43,7 +67,7 @@ export default function EventsDirectoryPage() {
+                 <label className="block text-xs font-semibold text-white/70 mb-2">
+                   Date Range
+                 </label>
+-                <select className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 text-white opacity-80 appearance-none">
++                <select className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--accent)] text-white opacity-80 appearance-none">
+                   <option>Anytime</option>
+                   <option>This Week</option>
+                   <option>This Weekend</option>
+@@ -70,7 +94,7 @@ export default function EventsDirectoryPage() {
+                     >
+                       <input
+                         type="checkbox"
+-                        className="w-4 h-4 rounded border-[var(--border)] bg-[var(--background)] text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
++                        className="w-4 h-4 rounded border-[var(--border)] bg-[var(--background)] text-[var(--accent)] focus:ring-[var(--accent)] focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
+                       />
+                       <span className="text-sm opacity-80 group-hover:opacity-100 transition-opacity">
+                         {type}
+diff --git a/app/globals.css b/app/globals.css
+index e282158..e813d2a 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -179,23 +179,28 @@ button:disabled {
+ }
+ 
+ .wac-button-primary {
+-  background: linear-gradient(180deg, #a92a2a 0%, #8e1f1f 100%);
++  background: var(--primary);
+   color: var(--primary-foreground);
+-  border: 1px solid #b33a3a;
+-  border-radius: 12px;
+-  padding: 0.7rem 1rem;
++  border: 1px solid var(--primary);
++  border-radius: 999px;
++  padding: 0.7rem 1.25rem;
++  font-weight: 600;
++  box-shadow: 0 4px 12px rgba(158, 36, 36, 0.25);
+ }
+ 
+ .wac-button-primary:hover {
+-  background: linear-gradient(180deg, #b03030 0%, #982222 100%);
++  background: #b03030;
++  border-color: #b03030;
++  box-shadow: 0 6px 16px rgba(158, 36, 36, 0.4);
+ }
+ 
+ .wac-button-secondary {
+   background: rgba(255, 248, 239, 0.03);
+   color: var(--foreground);
+   border: 1px solid var(--border);
+-  border-radius: 12px;
+-  padding: 0.7rem 1rem;
++  border-radius: 999px;
++  padding: 0.7rem 1.25rem;
++  font-weight: 600;
+ }
+ 
+ .wac-button-secondary:hover {
+@@ -268,7 +273,7 @@ button:disabled {
+   box-shadow:
+     0 0 0 1px rgba(176, 141, 87, 0.18),
+     0 10px 30px rgba(0, 0, 0, 0.24);
+-}/* Remove browser blue highlight from select options */
++} /* Remove browser blue highlight from select options */
+ select option:checked {
+   background: var(--accent);
+   color: var(--deep-charcoal);
+@@ -283,19 +288,140 @@ select option:hover {
+ select option:checked:hover {
+   background: var(--accent);
+   color: var(--deep-charcoal);
+-}/* Premium input feel */
++} /* Premium input feel */
+ input,
+ textarea,
+ select {
+   backdrop-filter: blur(4px);
+   box-shadow:
+-    inset 0 1px 0 rgba(255,255,255,0.05),
+-    0 2px 6px rgba(0,0,0,0.25);
++    inset 0 1px 0 rgba(255, 255, 255, 0.05),
++    0 2px 6px rgba(0, 0, 0, 0.25);
+ }
+ 
+ /* Subtle hover state */
+ input:hover,
+ textarea:hover,
+ select:hover {
+-  border-color: rgba(176,141,87,0.45);
+-}
+\ No newline at end of file
++  border-color: rgba(176, 141, 87, 0.45);
++}
++
++/* Google Translate UI Overrides */
++.goog-te-banner-frame.skiptranslate,
++.goog-te-banner-frame {
++  display: none !important;
++}
++iframe.goog-te-banner-frame {
++  display: none !important;
++}
++body {
++  top: 0px !important;
++  position: static !important;
++}
++.VIpgJd-ZVi9od-ORHb-OEVmcd,
++#goog-gt-tt,
++.goog-tooltip,
++.goog-tooltip:hover {
++  display: none !important;
++  visibility: hidden !important;
++}
++.goog-text-highlight {
++  background-color: transparent !important;
++  border: none !important;
++  box-shadow: none !important;
++}
++
++/* =========================================
++   CUSTOM DROPDOWN CLASSES (.wac-select)
++   ========================================= */
++.wac-select-trigger {
++  width: 100%;
++  padding: 12px 40px 12px 16px;
++  margin-top: 6px;
++  text-align: left;
++  border-radius: 12px;
++  border: 1px solid var(--input);
++  background: rgba(255, 248, 239, 0.03);
++  position: relative;
++  transition: all 0.2s ease;
++  backdrop-filter: blur(4px);
++  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 6px rgba(0, 0, 0, 0.25);
++}
++
++.wac-select-trigger:hover:not(:disabled) {
++  border-color: rgba(176, 141, 87, 0.45);
++}
++
++.wac-select-trigger:focus-visible {
++  outline: none;
++  border-color: var(--accent);
++  box-shadow: 0 0 0 3px rgba(176, 141, 87, 0.16);
++}
++
++.wac-select-content {
++  position: absolute;
++  top: calc(100% + 8px);
++  left: 0;
++  width: 100%;
++  z-index: 50;
++  padding: 8px;
++  border-radius: 14px;
++}
++
++.wac-select-list {
++  max-height: 260px;
++  overflow-y: auto;
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
++  padding-right: 4px;
++}
++
++/* Custom Scrollbar for dropdowns */
++.wac-select-list::-webkit-scrollbar {
++  width: 6px;
++}
++.wac-select-list::-webkit-scrollbar-track {
++  background: rgba(0, 0, 0, 0.1);
++  border-radius: 10px;
++}
++.wac-select-list::-webkit-scrollbar-thumb {
++  background: rgba(176, 141, 87, 0.25);
++  border-radius: 10px;
++}
++.wac-select-list::-webkit-scrollbar-thumb:hover {
++  background: rgba(176, 141, 87, 0.5);
++}
++
++.wac-select-option {
++  text-align: left;
++  padding: 10px 14px;
++  border-radius: 8px;
++  border: 1px solid transparent;
++  background: transparent;
++  color: var(--foreground);
++  transition: all 0.15s ease;
++  width: 100%;
++  font-size: 0.95rem;
++}
++
++.wac-select-option:hover {
++  background: rgba(255, 248, 239, 0.04);
++}
++
++.wac-select-option[data-selected="true"] {
++  background: rgba(176, 141, 87, 0.12);
++  border-color: rgba(176, 141, 87, 0.3);
++  color: var(--warm-ivory);
++}
++
++.wac-select-search {
++  width: 100%;
++  padding: 10px 14px;
++  margin-bottom: 8px;
++  border-radius: 10px;
++  border: 1px solid rgba(255, 255, 255, 0.06);
++  background: rgba(0, 0, 0, 0.2);
++}
++.wac-select-search:focus {
++  border-color: rgba(176, 141, 87, 0.4);
++}
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 363215b..4c8706b 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,5 +1,6 @@
+ import type { Metadata } from "next";
+ import { Geist, Geist_Mono } from "next/font/google";
++import Script from "next/script";
+ import "./globals.css";
+ 
+ const geistSans = Geist({
+@@ -19,6 +20,8 @@ export const metadata: Metadata = {
+ 
+ import Navbar from "@/components/layout/Navbar";
+ import Footer from "@/components/layout/Footer";
++import { ActorProvider } from "@/components/providers/ActorProvider";
++import FloatingMessagingIcon from "@/components/layout/FloatingMessagingIcon";
+ 
+ export default function RootLayout({
+   children,
+@@ -26,15 +29,36 @@ export default function RootLayout({
+   children: React.ReactNode;
+ }>) {
+   return (
+-    <html lang="en">
++    <html lang="en" suppressHydrationWarning>
+       <body
+         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[var(--background)] flex flex-col`}
++        suppressHydrationWarning
+       >
+-        <div className="flex min-h-screen flex-col">
+-          <Navbar />
+-          <main className="flex-1">{children}</main>
+-          <Footer />
+-        </div>
++        <div id="google_translate_element" className="hidden"></div>
++        <Script
++          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
++          strategy="afterInteractive"
++        />
++        <Script id="google-translate-config" strategy="afterInteractive">
++          {`
++            function googleTranslateElementInit() {
++              new google.translate.TranslateElement({
++                pageLanguage: 'en',
++                includedLanguages: 'sq,en',
++                autoDisplay: false
++              }, 'google_translate_element');
++            }
++          `}
++        </Script>
++
++        <ActorProvider>
++          <div className="flex min-h-screen flex-col">
++            <Navbar />
++            <main className="flex-1">{children}</main>
++            <FloatingMessagingIcon />
++            <Footer />
++          </div>
++        </ActorProvider>
+       </body>
+     </html>
+   );
+diff --git a/app/organizations/[slug]/OrganizationTabs.tsx b/app/organizations/[slug]/OrganizationTabs.tsx
+index 0468397..b0a23fa 100644
+--- a/app/organizations/[slug]/OrganizationTabs.tsx
++++ b/app/organizations/[slug]/OrganizationTabs.tsx
+@@ -3,6 +3,8 @@
+ import { useState } from "react";
+ import { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
+ import OrganizationEventsTab from "./OrganizationEventsTab";
++import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
++import WacReviewTrigger from "@/components/reviews/WacReviewTrigger";
+ 
+ type TabType = "Overview" | "Posts" | "Events" | "Members" | "Community";
+ 
+@@ -61,6 +63,26 @@ export function OrganizationTabs({
+                 </h3>
+ 
+                 <ul className="space-y-5">
++                  {organization.google_maps_url && typeof organization.google_rating === 'number' && (
++                    <li className="mb-2">
++                       <div className="text-xs opacity-50 mb-1">Google Rating</div>
++                       <GoogleRatingBadge 
++                          rating={organization.google_rating} 
++                          reviewsCount={organization.google_reviews_count || 0} 
++                          mapsUrl={organization.google_maps_url} 
++                       />
++                    </li>
++                  )}
++                  <li className="mb-2">
++                    <div className="text-xs opacity-50 mb-1">WAC Member Rating</div>
++                    <WacReviewTrigger
++                      entityId={organization.id}
++                      entityName={organization.name}
++                      entityType="organization"
++                      rating={organization.wac_rating || 0}
++                      reviewsCount={organization.wac_reviews_count || 0}
++                    />
++                  </li>
+                   {organization.leader_name && (
+                     <li>
+                       <div className="text-xs opacity-50 mb-1">
+diff --git a/app/organizations/[slug]/page.tsx b/app/organizations/[slug]/page.tsx
+index a4adddc..abbb426 100644
+--- a/app/organizations/[slug]/page.tsx
++++ b/app/organizations/[slug]/page.tsx
+@@ -4,6 +4,8 @@ import Link from "next/link";
+ import { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
+ import { OrganizationTabs } from "./OrganizationTabs";
+ import { OrganizationActionButtons } from "./OrganizationActionButtons";
++import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
++import WacReviewTrigger from "@/components/reviews/WacReviewTrigger";
+ 
+ export const revalidate = 60; // Revalidate every minute
+ 
+@@ -109,6 +111,24 @@ export default async function OrganizationDetailsPage({
+                     Verified
+                   </span>
+                 )}
++                {organization.google_maps_url && typeof organization.google_rating === 'number' && (
++                   <div className="ml-2">
++                      <GoogleRatingBadge 
++                         rating={organization.google_rating} 
++                         reviewsCount={organization.google_reviews_count || 0} 
++                         mapsUrl={organization.google_maps_url} 
++                      />
++                   </div>
++                )}
++                <div className="ml-2">
++                  <WacReviewTrigger
++                    entityId={organization.id}
++                    entityName={organization.name}
++                    entityType="organization"
++                    rating={organization.wac_rating || 0}
++                    reviewsCount={organization.wac_reviews_count || 0}
++                  />
++                </div>
+               </div>
+ 
+               <div className="text-lg opacity-80 font-medium flex items-center gap-2 mb-6">
+diff --git a/app/page.tsx b/app/page.tsx
+index bce7059..e0ad1c1 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -59,12 +59,12 @@ export default function Home() {
+       {/* Narrative Architectural Scroll */}
+       <main className="flex-1 w-full flex flex-col pt-10">
+         <Hero />
+-        <WhyItExists />
+         <EcosystemHub />
+         <HomeFeedPreview />
+         <NetworkIntelligence userId={userId} />
+         <LivingNetwork />
+         <MembersPreview />
++        <WhyItExists />
+         <Vision />
+         <JoinNetwork userId={userId} />
+       </main>
+diff --git a/app/profile/page.tsx b/app/profile/page.tsx
+index b14eb74..1a36708 100644
+--- a/app/profile/page.tsx
++++ b/app/profile/page.tsx
+@@ -8,6 +8,7 @@ import ProfileExperienceSection from "@/components/profile/ProfileExperienceSect
+ import ProfileLocationSection from "@/components/profile/ProfileLocationSection";
+ import ProfileSectionCard from "@/components/profile/ProfileSectionCard";
+ import ProfileSkillsSection from "@/components/profile/ProfileSkillsSection";
++import ManagedEntitiesTab from "@/components/profile/ManagedEntitiesTab";
+ 
+ type Industry = {
+   id: string;
+@@ -60,6 +61,9 @@ type ProfileFieldTarget =
+   | "experience";
+ 
+ export default function ProfilePage() {
++  const [activeTab, setActiveTab] = useState<
++    "personal" | "entities" | "settings"
++  >("personal");
+   const [userId, setUserId] = useState<string | null>(null);
+ 
+   const [fullName, setFullName] = useState("");
+@@ -547,293 +551,326 @@ export default function ProfilePage() {
+         Complete your World Albanian Congress profile.
+       </p>
+ 
+-      <div
+-        style={{
+-          display: "grid",
+-          gridTemplateColumns: "minmax(0, 1fr) 320px",
+-          gap: 24,
+-          alignItems: "start",
+-          marginTop: 24,
+-        }}
+-      >
+-        <form onSubmit={handleSave} style={{ display: "grid", gap: 20 }}>
+-          <div style={getWrapperStyle(["fullName", "username", "bio"])}>
+-            <ProfileSectionCard
+-              title="Profile"
+-              description="Basic public information"
+-            >
+-              <div style={{ display: "grid", gap: 16 }}>
+-                <div id="profile-field-fullName">
+-                  <label htmlFor="fullName">Full Name</label>
+-                  <br />
+-                  <input
+-                    id="fullName"
+-                    value={fullName}
+-                    onChange={(e) => setFullName(e.target.value)}
+-                    style={{ width: "100%", padding: 10, marginTop: 6 }}
+-                  />
+-                </div>
++      <div className="flex border-b border-[var(--border)] mb-10 w-full overflow-x-auto no-scrollbar">
++        <button
++          onClick={() => setActiveTab("personal")}
++          className={`pb-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
++            activeTab === "personal"
++              ? "border-[var(--accent)] text-[var(--accent)]"
++              : "border-transparent opacity-60 hover:opacity-100"
++          }`}
++        >
++          Personal Profile
++        </button>
++        <button
++          onClick={() => setActiveTab("entities")}
++          className={`pb-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
++            activeTab === "entities"
++              ? "border-[var(--accent)] text-[var(--accent)]"
++              : "border-transparent opacity-60 hover:opacity-100"
++          }`}
++        >
++          Managed Entities
++        </button>
++        <button
++          onClick={() => setActiveTab("settings")}
++          className={`pb-4 px-6 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap ${
++            activeTab === "settings"
++              ? "border-[var(--accent)] text-[var(--accent)]"
++              : "border-transparent opacity-60 hover:opacity-100"
++          }`}
++        >
++          Account Settings
++        </button>
++      </div>
+ 
+-                <div id="profile-field-username">
+-                  <label htmlFor="username">Username</label>
+-                  <br />
+-                  <input
+-                    id="username"
+-                    value={username}
+-                    onChange={(e) => setUsername(e.target.value)}
+-                    placeholder="yourpublicname"
+-                    style={{ width: "100%", padding: 10, marginTop: 6 }}
+-                  />
+-                </div>
++      {activeTab === "personal" && (
++        <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
++          <form onSubmit={handleSave} className="grid gap-5">
++            <div style={getWrapperStyle(["fullName", "username", "bio"])}>
++              <ProfileSectionCard
++                title="Profile"
++                description="Basic public information"
++              >
++                <div className="grid gap-4">
++                  <div id="profile-field-fullName">
++                    <label htmlFor="fullName">Full Name</label>
++                    <br />
++                    <input
++                      id="fullName"
++                      value={fullName}
++                      onChange={(e) => setFullName(e.target.value)}
++                      className="w-full p-2.5 mt-1.5"
++                    />
++                  </div>
+ 
+-                <div id="profile-field-bio">
+-                  <label htmlFor="bio">Bio</label>
+-                  <br />
+-                  <textarea
+-                    id="bio"
+-                    value={bio}
+-                    onChange={(e) => setBio(e.target.value)}
+-                    rows={5}
+-                    style={{ width: "100%", padding: 10, marginTop: 6 }}
+-                  />
++                  <div id="profile-field-username">
++                    <label htmlFor="username">Username</label>
++                    <br />
++                    <input
++                      id="username"
++                      value={username}
++                      onChange={(e) => setUsername(e.target.value)}
++                      placeholder="yourpublicname"
++                      className="w-full p-2.5 mt-1.5"
++                    />
++                  </div>
++
++                  <div id="profile-field-bio">
++                    <label htmlFor="bio">Bio</label>
++                    <br />
++                    <textarea
++                      id="bio"
++                      value={bio}
++                      onChange={(e) => setBio(e.target.value)}
++                      rows={5}
++                      className="w-full p-2.5 mt-1.5"
++                    />
++                  </div>
++
++                  {(currentCompany || currentTitle) && (
++                    <div className="p-3 rounded-xl border border-[rgba(176,141,87,0.25)] bg-[rgba(176,141,87,0.06)] grid gap-1.5">
++                      <div className="text-xs opacity-70 tracking-wider font-semibold uppercase">
++                        CURRENT ROLE
++                      </div>
++                      {currentTitle ? (
++                        <div className="text-base font-semibold">
++                          {currentTitle}
++                        </div>
++                      ) : null}
++                      {currentCompany ? (
++                        <div className="opacity-90">{currentCompany}</div>
++                      ) : null}
++                    </div>
++                  )}
+                 </div>
++              </ProfileSectionCard>
++            </div>
+ 
+-                {(currentCompany || currentTitle) && (
+-                  <div
+-                    style={{
+-                      padding: 12,
+-                      borderRadius: 10,
+-                      border: "1px solid rgba(176, 141, 87, 0.25)",
+-                      background: "rgba(176, 141, 87, 0.06)",
+-                      display: "grid",
+-                      gap: 6,
+-                    }}
+-                  >
+-                    <div
+-                      style={{ fontSize: 12, opacity: 0.7, letterSpacing: 0.4 }}
+-                    >
+-                      CURRENT ROLE
++            <div
++              style={getWrapperStyle([
++                "headline",
++                "industryId",
++                "professionId",
++                "specialtyId",
++              ])}
++            >
++              <div id="profile-field-headline">
++                <div id="profile-field-industryId">
++                  <div id="profile-field-professionId">
++                    <div id="profile-field-specialtyId">
++                      <ProfileSectionCard
++                        title="Profession"
++                        description="Your professional path and focus"
++                      >
++                        <ProfileCareerSection
++                          headline={headline}
++                          setHeadline={setHeadline}
++                          industryId={industryId}
++                          handleIndustryChange={handleIndustryChange}
++                          industries={industries}
++                          professionId={professionId}
++                          handleProfessionChange={handleProfessionChange}
++                          filteredProfessions={filteredProfessions}
++                          selectedIndustryName={selectedIndustryName}
++                          specialtyId={specialtyId}
++                          setSpecialtyId={setSpecialtyId}
++                          filteredSpecialties={filteredSpecialties}
++                        />
++                      </ProfileSectionCard>
+                     </div>
+-                    {currentTitle ? (
+-                      <div style={{ fontSize: 16, fontWeight: 600 }}>
+-                        {currentTitle}
+-                      </div>
+-                    ) : null}
+-                    {currentCompany ? (
+-                      <div style={{ opacity: 0.9 }}>{currentCompany}</div>
+-                    ) : null}
+-                  </div>
+-                )}
+-              </div>
+-            </ProfileSectionCard>
+-          </div>
+-
+-          <div
+-            style={getWrapperStyle([
+-              "headline",
+-              "industryId",
+-              "professionId",
+-              "specialtyId",
+-            ])}
+-          >
+-            <div id="profile-field-headline">
+-              <div id="profile-field-industryId">
+-                <div id="profile-field-professionId">
+-                  <div id="profile-field-specialtyId">
+-                    <ProfileSectionCard
+-                      title="Profession"
+-                      description="Your professional path and focus"
+-                    >
+-                      <ProfileCareerSection
+-                        headline={headline}
+-                        setHeadline={setHeadline}
+-                        industryId={industryId}
+-                        handleIndustryChange={handleIndustryChange}
+-                        industries={industries}
+-                        professionId={professionId}
+-                        handleProfessionChange={handleProfessionChange}
+-                        filteredProfessions={filteredProfessions}
+-                        selectedIndustryName={selectedIndustryName}
+-                        specialtyId={specialtyId}
+-                        setSpecialtyId={setSpecialtyId}
+-                        filteredSpecialties={filteredSpecialties}
+-                      />
+-                    </ProfileSectionCard>
+                   </div>
+                 </div>
+               </div>
+             </div>
+-          </div>
+ 
+-          <div style={getWrapperStyle(["skills"])}>
+-            <div id="profile-field-skills">
+-              <ProfileSectionCard
+-                title="Skills & Expertise"
+-                description="What you know and do well"
+-              >
+-                <ProfileSkillsSection
+-                  industryId={industryId}
+-                  professionId={professionId}
+-                  filteredSkills={filteredSkills}
+-                  selectedSkillIds={selectedSkillIds}
+-                  setSelectedSkillIds={setSelectedSkillIds}
+-                />
+-              </ProfileSectionCard>
++            <div style={getWrapperStyle(["skills"])}>
++              <div id="profile-field-skills">
++                <ProfileSectionCard
++                  title="Skills & Expertise"
++                  description="What you know and do well"
++                >
++                  <ProfileSkillsSection
++                    industryId={industryId}
++                    professionId={professionId}
++                    filteredSkills={filteredSkills}
++                    allSkills={skills}
++                    selectedSkillIds={selectedSkillIds}
++                    setSelectedSkillIds={setSelectedSkillIds}
++                  />
++                </ProfileSectionCard>
++              </div>
+             </div>
+-          </div>
+ 
+-          <div style={getWrapperStyle(["experience"])}>
+-            <div id="profile-field-experience">
+-              <ProfileSectionCard
+-                title="Experience"
+-                description="Your professional track record"
+-              >
+-                <div
+-                  style={{
+-                    marginBottom: 12,
+-                    padding: 12,
+-                    borderRadius: 10,
+-                    border: "1px dashed #555",
+-                    opacity: 0.85,
+-                    fontSize: 14,
+-                  }}
++            <div style={getWrapperStyle(["experience"])}>
++              <div id="profile-field-experience">
++                <ProfileSectionCard
++                  title="Experience"
++                  description="Your professional track record"
+                 >
+-                  Your current company and title are derived automatically from
+-                  your active experience entry.
+-                </div>
++                  <div className="mb-3 p-3 rounded-xl border border-dashed border-[#555] opacity-85 text-sm">
++                    Your current company and title are derived automatically
++                    from your active experience entry.
++                  </div>
+ 
+-                <ProfileExperienceSection
+-                  onHasExperienceChange={setHasExperience}
+-                />
+-              </ProfileSectionCard>
++                  <ProfileExperienceSection
++                    onHasExperienceChange={setHasExperience}
++                  />
++                </ProfileSectionCard>
++              </div>
+             </div>
+-          </div>
+-
+-          <div
+-            style={getWrapperStyle([
+-              "country",
+-              "stateRegion",
+-              "city",
+-              "ancestryCity",
+-            ])}
+-          >
+-            <div id="profile-field-country">
+-              <div id="profile-field-stateRegion">
+-                <div id="profile-field-city">
+-                  <div id="profile-field-ancestryCity">
+-                    <ProfileSectionCard
+-                      title="Location & Roots"
+-                      description="Where you are and where your roots are"
+-                    >
+-                      <ProfileLocationSection
+-                        country={country}
+-                        setCountry={setCountry}
+-                        stateRegion={stateRegion}
+-                        setStateRegion={setStateRegion}
+-                        city={city}
+-                        setCity={setCity}
+-                        ancestryCity={ancestryCity}
+-                        setAncestryCity={setAncestryCity}
+-                      />
+-                    </ProfileSectionCard>
++
++            <div
++              style={getWrapperStyle([
++                "country",
++                "stateRegion",
++                "city",
++                "ancestryCity",
++              ])}
++            >
++              <div id="profile-field-country">
++                <div id="profile-field-stateRegion">
++                  <div id="profile-field-city">
++                    <div id="profile-field-ancestryCity">
++                      <ProfileSectionCard
++                        title="Location & Roots"
++                        description="Where you are and where your roots are"
++                      >
++                        <ProfileLocationSection
++                          country={country}
++                          setCountry={setCountry}
++                          stateRegion={stateRegion}
++                          setStateRegion={setStateRegion}
++                          city={city}
++                          setCity={setCity}
++                          ancestryCity={ancestryCity}
++                          setAncestryCity={setAncestryCity}
++                        />
++                      </ProfileSectionCard>
++                    </div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+-          </div>
+ 
+-          <ProfileSectionCard
+-            title="Network Intent"
+-            description="How others can connect with you"
+-          >
+-            <div style={{ display: "grid", gap: 10 }}>
+-              <label>
+-                <input
+-                  type="checkbox"
+-                  checked={openToWork}
+-                  onChange={(e) => setOpenToWork(e.target.checked)}
+-                />{" "}
+-                Work
+-              </label>
+-
+-              <label>
+-                <input
+-                  type="checkbox"
+-                  checked={openToHire}
+-                  onChange={(e) => setOpenToHire(e.target.checked)}
+-                />{" "}
+-                Hiring
+-              </label>
+-
+-              <label>
+-                <input
+-                  type="checkbox"
+-                  checked={openToMentor}
+-                  onChange={(e) => setOpenToMentor(e.target.checked)}
+-                />{" "}
+-                Mentoring
+-              </label>
+-
+-              <label>
+-                <input
+-                  type="checkbox"
+-                  checked={openToInvest}
+-                  onChange={(e) => setOpenToInvest(e.target.checked)}
+-                />{" "}
+-                Investing
+-              </label>
+-
+-              <label>
+-                <input
+-                  type="checkbox"
+-                  checked={openToCollaborate}
+-                  onChange={(e) => setOpenToCollaborate(e.target.checked)}
+-                />{" "}
+-                Collaborating
+-              </label>
+-            </div>
+-          </ProfileSectionCard>
++            <ProfileSectionCard
++              title="Network Intent"
++              description="How others can connect with you"
++            >
++              <div style={{ display: "grid", gap: 10 }}>
++                <label>
++                  <input
++                    type="checkbox"
++                    checked={openToWork}
++                    onChange={(e) => setOpenToWork(e.target.checked)}
++                  />{" "}
++                  Work
++                </label>
++
++                <label>
++                  <input
++                    type="checkbox"
++                    checked={openToHire}
++                    onChange={(e) => setOpenToHire(e.target.checked)}
++                  />{" "}
++                  Hiring
++                </label>
++
++                <label>
++                  <input
++                    type="checkbox"
++                    checked={openToMentor}
++                    onChange={(e) => setOpenToMentor(e.target.checked)}
++                  />{" "}
++                  Mentoring
++                </label>
++
++                <label>
++                  <input
++                    type="checkbox"
++                    checked={openToInvest}
++                    onChange={(e) => setOpenToInvest(e.target.checked)}
++                  />{" "}
++                  Investing
++                </label>
++
++                <label>
++                  <input
++                    type="checkbox"
++                    checked={openToCollaborate}
++                    onChange={(e) => setOpenToCollaborate(e.target.checked)}
++                  />{" "}
++                  Collaborating
++                </label>
++              </div>
++            </ProfileSectionCard>
++
++            <button
++              type="submit"
++              style={{
++                padding: "12px 20px",
++                fontSize: "16px",
++                cursor: "pointer",
++                width: 180,
++              }}
++            >
++              Save Profile
++            </button>
++
++            {message && <p style={{ marginTop: 4 }}>{message}</p>}
++          </form>
+ 
+-          <button
+-            type="submit"
++          <aside
+             style={{
+-              padding: "12px 20px",
+-              fontSize: "16px",
+-              cursor: "pointer",
+-              width: 180,
++              position: "sticky",
++              top: 24,
++              alignSelf: "start",
+             }}
+           >
+-            Save Profile
+-          </button>
+-
+-          {message && <p style={{ marginTop: 4 }}>{message}</p>}
+-        </form>
+-
+-        <aside
+-          style={{
+-            position: "sticky",
+-            top: 24,
+-            alignSelf: "start",
+-          }}
+-        >
+-          <ProfileCompletionCard
+-            fullName={fullName}
+-            username={username}
+-            headline={headline}
+-            industryId={industryId}
+-            professionId={professionId}
+-            specialtyId={specialtyId}
+-            country={country}
+-            stateRegion={stateRegion}
+-            city={city}
+-            ancestryCity={ancestryCity}
+-            bio={bio}
+-            selectedSkillIds={selectedSkillIds}
+-            hasExperience={hasExperience}
+-            onJumpToField={handleJumpToField}
+-          />
+-        </aside>
+-      </div>
++            <ProfileCompletionCard
++              fullName={fullName}
++              username={username}
++              headline={headline}
++              industryId={industryId}
++              professionId={professionId}
++              specialtyId={specialtyId}
++              country={country}
++              stateRegion={stateRegion}
++              city={city}
++              ancestryCity={ancestryCity}
++              bio={bio}
++              selectedSkillIds={selectedSkillIds}
++              hasExperience={hasExperience}
++              onJumpToField={handleJumpToField}
++            />
++          </aside>
++        </div>
++      )}
++
++      {activeTab === "entities" && userId && (
++        <ManagedEntitiesTab userId={userId} />
++      )}
++
++      {activeTab === "settings" && userId && (
++        <div className="max-w-2xl mx-auto space-y-6 pt-8">
++           <ProfileSectionCard title="Calendar Preferences" description="Manage how events from organizations you follow appear on your personal calendar.">
++              <div className="flex items-start justify-between gap-6 p-4 rounded-xl border border-white/10 bg-black/20">
++                 <div>
++                    <h4 className="font-bold text-[var(--accent)] mb-1">Auto-Sync Followed Events</h4>
++                    <p className="text-sm opacity-70 leading-relaxed">When you follow an organization, automatically push their events to your "My Calendar" feed so you never miss an update.</p>
++                 </div>
++                 <label className="relative inline-flex items-center cursor-pointer mt-1">
++                    <input type="checkbox" className="sr-only peer" defaultChecked />
++                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]"></div>
++                 </label>
++              </div>
++           </ProfileSectionCard>
++
++           <div className="opacity-40 text-center py-12 text-sm mt-8 border-t border-white/5">
++             More account settings (email, notifications, privacy) coming soon.
++           </div>
++        </div>
++      )}
+     </div>
+   );
+ }
+diff --git a/app/search/page.tsx b/app/search/page.tsx
+deleted file mode 100644
+index c9df448..0000000
+--- a/app/search/page.tsx
++++ /dev/null
+@@ -1,13 +0,0 @@
+-import { redirect } from "next/navigation";
+-
+-export default async function SearchRedirect({
+-  searchParams,
+-}: {
+-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+-}) {
+-  const params = await searchParams;
+-  const queryString = new URLSearchParams(
+-    params as Record<string, string>,
+-  ).toString();
+-  redirect(`/directory${queryString ? `?${queryString}` : ""}`);
+-}
+diff --git a/components/businesses/results/BusinessCard.tsx b/components/businesses/results/BusinessCard.tsx
+index ad3f53f..cd63cb5 100644
+--- a/components/businesses/results/BusinessCard.tsx
++++ b/components/businesses/results/BusinessCard.tsx
+@@ -1,5 +1,8 @@
+ import Link from "next/link";
+ import { BusinessProfile } from "@/lib/types/business-directory";
++import VerifiedBadge from "@/components/ui/VerifiedBadge";
++import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
++import WacRatingBadge from "@/components/ui/WacRatingBadge";
+ 
+ export default function BusinessCard({
+   business,
+@@ -29,19 +32,31 @@ export default function BusinessCard({
+           </div>
+         </div>
+ 
+-        <div className="mb-2 flex items-center gap-2">
+-          <h2 className="text-xl font-bold group-hover:text-[var(--accent)]">
+-            {business.name}
+-          </h2>
+-          {business.is_verified && (
+-            <svg
+-              className="h-5 w-5 text-blue-400"
+-              fill="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.9 14.7L6 12.6l1.5-1.5 2.6 2.6 6.4-6.4 1.5 1.5-8.1 8.1z" />
+-            </svg>
+-          )}
++        <div className="mb-2 flex flex-col">
++          <div className="flex items-center gap-2">
++            <span className="font-semibold text-white/90 truncate text-xl group-hover:text-[var(--accent)]">
++              {business.name}
++            </span>
++            {business.is_verified && <VerifiedBadge type="business" />}
++          </div>
++
++          {(business.google_maps_url && typeof business.google_rating === 'number') || (typeof business.wac_rating === 'number') ? (
++            <div className="mt-1 flex items-center gap-2 flex-wrap">
++              {business.google_maps_url && typeof business.google_rating === 'number' && (
++                <GoogleRatingBadge
++                  rating={business.google_rating}
++                  reviewsCount={business.google_reviews_count || 0}
++                  mapsUrl={business.google_maps_url}
++                />
++              )}
++              {typeof business.wac_rating === 'number' && (
++                <WacRatingBadge
++                  rating={business.wac_rating}
++                  reviewsCount={business.wac_reviews_count || 0}
++                />
++              )}
++            </div>
++          ) : null}
+         </div>
+ 
+         <div className="mb-4 text-sm font-medium text-[var(--accent)] opacity-90 overflow-hidden text-ellipsis whitespace-nowrap">
+diff --git a/components/community/CommunityHub.tsx b/components/community/CommunityHub.tsx
+index 5b30412..39fb638 100644
+--- a/components/community/CommunityHub.tsx
++++ b/components/community/CommunityHub.tsx
+@@ -1,577 +1,113 @@
+ "use client";
+ 
+-import { useState, useEffect } from "react";
++import { useState } from "react";
+ import Link from "next/link";
+-import { useSearchParams, useRouter } from "next/navigation";
++import React from "react";
+ import {
+-  ChevronRight,
+-  CalendarDays,
+-  Users,
+-  BookOpen,
+-  Plane,
+   Briefcase,
+-  GraduationCap,
+-  Baby,
++  Users,
++  User,
++  Hash,
+ } from "lucide-react";
+ 
+-type HubTab = "teens" | "parents" | "careers" | "travelers";
++import CreatePostBox from "@/components/feed/CreatePostBox";
++import FeedList from "@/components/feed/FeedList";
+ 
+ export default function CommunityHub() {
+-  const searchParams = useSearchParams();
+-  const router = useRouter();
+-
+-  const [activeTab, setActiveTab] = useState<HubTab>("teens");
+-
+-  // Sync state with URL parameter on mount/change
+-  useEffect(() => {
+-    const tabParam = searchParams.get("tab");
+-    if (
+-      tabParam &&
+-      ["teens", "parents", "careers", "travelers"].includes(tabParam)
+-    ) {
+-      setActiveTab(tabParam as HubTab);
+-    }
+-  }, [searchParams]);
+-
+-  const handleTabChange = (tab: HubTab) => {
+-    setActiveTab(tab);
+-    // Update the URL without a full page reload so it stays deep-linkable
+-    router.push(`/community?tab=${tab}`, { scroll: false });
+-  };
+-
+   return (
+-    <div className="w-full relative z-20">
+-      {/* QUICK NAV PILLS */}
+-      <div className="bg-[var(--foreground)]/5 border-b border-[var(--foreground)]/10">
+-        <div className="max-w-[75rem] mx-auto px-4 py-4 flex flex-wrap gap-3 overflow-x-auto no-scrollbar">
+-          <button
+-            onClick={() => handleTabChange("teens")}
+-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
+-              activeTab === "teens"
+-                ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+-                : "bg-transparent text-[var(--foreground)]/70 border-[var(--foreground)]/20 hover:border-[var(--foreground)]/40 hover:text-[var(--foreground)]"
+-            }`}
+-          >
+-            <GraduationCap className="w-4 h-4" />
+-            Emerging Talent
+-          </button>
+-
+-          <button
+-            onClick={() => handleTabChange("parents")}
+-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
+-              activeTab === "parents"
+-                ? "bg-purple-600 text-white border-purple-600"
+-                : "bg-transparent text-[var(--foreground)]/70 border-[var(--foreground)]/20 hover:border-[var(--foreground)]/40 hover:text-[var(--foreground)]"
+-            }`}
+-          >
+-            <Baby className="w-4 h-4" />
+-            Family Roots
+-          </button>
+-
+-          <button
+-            onClick={() => handleTabChange("careers")}
+-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
+-              activeTab === "careers"
+-                ? "bg-blue-600 text-white border-blue-600"
+-                : "bg-transparent text-[var(--foreground)]/70 border-[var(--foreground)]/20 hover:border-[var(--foreground)]/40 hover:text-[var(--foreground)]"
+-            }`}
+-          >
+-            <Briefcase className="w-4 h-4" />
+-            Up and Comers
+-          </button>
+-
+-          <button
+-            onClick={() => handleTabChange("travelers")}
+-            className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-200 border ${
+-              activeTab === "travelers"
+-                ? "bg-emerald-600 text-white border-emerald-600"
+-                : "bg-transparent text-[var(--foreground)]/70 border-[var(--foreground)]/20 hover:border-[var(--foreground)]/40 hover:text-[var(--foreground)]"
+-            }`}
+-          >
+-            <Plane className="w-4 h-4" />
+-            Travelers
+-          </button>
++    <div className="w-full bg-[var(--background)] py-8 relative z-20">
++      <div className="max-w-[80rem] mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
++        
++        {/* LEFT & CENTER COLUMN: THE PULSE STAGE */}
++        <div className="col-span-1 lg:col-span-8">
++          <PulseHub />
+         </div>
+-      </div>
+-
+-      {/* HUB CONTENT SECTIONS */}
+-      <div className="max-w-[75rem] mx-auto px-4 py-12">
+-        {activeTab === "teens" && <TeensHub />}
+-        {activeTab === "parents" && <ParentsHub />}
+-        {activeTab === "careers" && <CareersHub />}
+-        {activeTab === "travelers" && <TravelersHub />}
+-      </div>
+-    </div>
+-  );
+-}
+ 
+-// ----------------------------------------------------------------------
+-// TEENS HUB
+-// ----------------------------------------------------------------------
+-function TeensHub() {
+-  return (
+-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+-      <div className="mb-12 border-l-4 border-[var(--accent)] pl-6">
+-        <h2 className="text-3xl font-extrabold mb-3">
+-          College Prep & Future Planning
+-        </h2>
+-        <p className="text-lg opacity-70 max-w-2xl">
+-          Whether youΓÇÖre aiming for a 4-year university, a trade school, or
+-          exploring your options ΓÇö we have mentors, timelines, and resources to
+-          help you get there with your Albanian identity front and center.
+-        </p>
+-      </div>
+-
+-      <div className="grid md:grid-cols-3 gap-8">
+-        <div className="md:col-span-2 space-y-8">
+-          <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8">
+-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+-              <BookOpen className="w-5 h-5 text-[var(--accent)]" />
+-              Your College Roadmap
+-            </h3>
+-
+-            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[var(--border)] before:to-transparent">
+-              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+-                <div className="flex items-center justify-center w-8 h-8 rounded-full border-4 border-[var(--background)] bg-[var(--accent)] text-white text-xs font-bold shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow">
+-                  9
+-                </div>
+-                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-[var(--foreground)]/10 bg-[var(--background)]">
+-                  <h4 className="font-bold mb-1">
+-                    Freshman Year ΓÇö Build Your Foundation
+-                  </h4>
+-                  <p className="text-sm opacity-70 leading-relaxed">
+-                    Focus on grades and join at least 2 extracurriculars. Start
+-                    exploring what subjects interest you. Attend a WAC college
+-                    info session.
+-                  </p>
++        {/* RIGHT COLUMN: DISCOVER (Sticky) */}
++        <div className="hidden lg:block lg:col-span-4">
++          <div className="sticky top-24 space-y-4">
++            <div className="wac-card p-5">
++              <h3 className="font-serif font-bold text-lg text-[var(--accent)] flex items-center gap-2 mb-4">
++                <Hash className="w-4 h-4" />
++                Trending
++              </h3>
++              <div className="space-y-4">
++                <div>
++                  <div className="text-xs opacity-60">Global Summit 2026</div>
++                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">#WAC2026 London Registration Open</div>
+                 </div>
+-              </div>
+-              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+-                <div className="flex items-center justify-center w-8 h-8 rounded-full border-4 border-[var(--background)] bg-[var(--foreground)]/20 text-[var(--foreground)] text-xs font-bold shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow">
+-                  10
++                <div>
++                  <div className="text-xs opacity-60">Mentorship Network</div>
++                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">Spring Cohort Applications Live</div>
+                 </div>
+-                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-[var(--foreground)]/10 bg-[var(--background)]">
+-                  <h4 className="font-bold mb-1">
+-                    Sophomore Year ΓÇö Explore & Test
+-                  </h4>
+-                  <p className="text-sm opacity-70 leading-relaxed">
+-                    Take a PSAT for practice. Research colleges online. Consider
+-                    a WAC-sponsored job shadow with an Albanian professional in
+-                    your field.
+-                  </p>
++                <div>
++                  <div className="text-xs opacity-60">Tech Diaspora</div>
++                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">Albanian AI Startup Funding Round</div>
+                 </div>
+               </div>
+             </div>
+ 
+-            <div className="mt-8 text-center">
+-              <button className="text-[var(--accent)] font-bold text-sm uppercase tracking-wider hover:underline">
+-                View Full Roadmap ΓåÆ
+-              </button>
+-            </div>
+-          </div>
+-
+-          <div className="grid sm:grid-cols-2 gap-4">
+-            <Link
+-              href="/directory?type=person&mentor=true"
+-              className="wac-card p-6 group hover:border-[var(--accent)] transition-colors"
+-            >
+-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mb-4">
+-                <Users className="w-5 h-5" />
+-              </div>
+-              <h4 className="font-bold mb-2">Find a Mentor</h4>
+-              <p className="text-sm opacity-70">
+-                Connect with Albanian professionals in the industry you want to
+-                enter.
+-              </p>
+-            </Link>
+-            <div className="wac-card p-6 group cursor-not-allowed opacity-80">
+-              <div className="w-10 h-10 rounded-full bg-[var(--foreground)]/10 text-[var(--foreground)] flex items-center justify-center mb-4">
+-                <GraduationCap className="w-5 h-5" />
+-              </div>
+-              <h4 className="font-bold mb-2">WAC Scholarships</h4>
+-              <p className="text-sm opacity-70">
+-                Annual scholarship for Albanian-American students.{" "}
+-                <span className="text-[var(--accent)]">Opens May 2026</span>.
++            <div className="wac-card p-5 bg-gradient-to-br from-[#111] to-[rgba(212,175,55,0.05)] border-[var(--accent)]/20">
++              <h3 className="font-serif font-bold text-[var(--accent)] mb-2">Build Your Network</h3>
++              <p className="text-xs opacity-70 mb-4 leading-relaxed">
++                Connect with professionals sharing your roots. Manage your profile to get discovered.
+               </p>
+-            </div>
+-          </div>
+-        </div>
+-
+-        <div className="space-y-6">
+-          <div className="wac-card border-[var(--accent)]/30 border p-6">
+-            <h3 className="font-serif italic text-xl mb-4 tracking-wide">
+-              Register a Teen
+-            </h3>
+-            <p className="text-sm opacity-70 mb-6">
+-              Register to receive updates, invites to teen events, and connect
+-              with advisors and tutors.
+-            </p>
+-            <form className="space-y-4">
+-              <div>
+-                <label className="block text-xs font-bold uppercase tracking-wider mb-2 opacity-60">
+-                  Teen's Name
+-                </label>
+-                <input
+-                  type="text"
+-                  className="w-full bg-[var(--background)] border border-[var(--foreground)]/20 rounded p-3 text-sm focus:border-[var(--accent)] focus:outline-none transition-colors"
+-                  placeholder="First Last"
+-                />
+-              </div>
+-              <div>
+-                <label className="block text-xs font-bold uppercase tracking-wider mb-2 opacity-60">
+-                  Interests
+-                </label>
+-                <select className="w-full bg-[var(--background)] border border-[var(--foreground)]/20 rounded p-3 text-sm focus:border-[var(--accent)] focus:outline-none transition-colors">
+-                  <option>College Prep</option>
+-                  <option>Trade / Vocational</option>
+-                  <option>Entrepreneurship</option>
+-                </select>
+-              </div>
+-              <button
+-                type="button"
+-                className="w-full bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 font-bold uppercase tracking-wider text-sm p-3 rounded transition-colors"
+-              >
+-                Register Now
+-              </button>
+-            </form>
+-          </div>
+-
+-          <div>
+-            <div className="flex items-center justify-between mb-4">
+-              <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 opacity-80">
+-                <CalendarDays className="w-4 h-4" /> Upcoming Teen Events
+-              </h3>
+-              <Link
+-                href="/events"
+-                className="text-xs text-[var(--accent)] hover:underline"
+-              >
+-                View Calendar
++              <Link href="/profile" className="block w-full text-center py-2 rounded-full border border-[var(--accent)]/50 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors">
++                Update Profile
+               </Link>
+             </div>
+-            <div className="space-y-3">
+-              <div className="p-4 border border-[var(--foreground)]/10 rounded-lg hover:bg-[var(--foreground)]/5 transition-colors cursor-pointer">
+-                <div className="flex justify-between items-start mb-1">
+-                  <h4 className="font-bold text-sm">SAT Prep Boot Camp</h4>
+-                  <span className="text-[var(--accent)] text-xs font-bold">
+-                    Mar 22
+-                  </span>
+-                </div>
+-                <p className="text-xs opacity-60">Hosted by AACC Riverdale</p>
+-              </div>
+-              <div className="p-4 border border-[var(--foreground)]/10 rounded-lg hover:bg-[var(--foreground)]/5 transition-colors cursor-pointer">
+-                <div className="flex justify-between items-start mb-1">
+-                  <h4 className="font-bold text-sm">College Essay Workshop</h4>
+-                  <span className="text-[var(--accent)] text-xs font-bold">
+-                    Apr 05
+-                  </span>
+-                </div>
+-                <p className="text-xs opacity-60">Virtual ΓÇö Zoom</p>
+-              </div>
+-            </div>
+           </div>
+         </div>
+-      </div>
+-    </div>
+-  );
+-}
+ 
+-// ----------------------------------------------------------------------
+-// PARENTS HUB
+-// ----------------------------------------------------------------------
+-function ParentsHub() {
+-  return (
+-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+-      <div className="mb-12 border-l-4 border-purple-600 pl-6">
+-        <h2 className="text-3xl font-extrabold mb-3">Parent Connect</h2>
+-        <p className="text-lg opacity-70 max-w-2xl">
+-          Raising the next generation. Connect with other Albanian parents, find
+-          local Shkolla Shqipe programs, daycares, and organize weekend
+-          playdates.
+-        </p>
+-      </div>
+-
+-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
+-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
+-            <BookOpen className="w-6 h-6" />
+-          </div>
+-          <h3 className="text-xl font-bold mb-2">Shkolla Shqipe</h3>
+-          <p className="text-sm opacity-70 mb-4">
+-            Find weekend Albanian language schools and cultural programs for
+-            children ages 4-12 in your area.
+-          </p>
+-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
+-            Find a School ΓåÆ
+-          </span>
+-        </div>
+-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
+-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
+-            <Baby className="w-6 h-6" />
+-          </div>
+-          <h3 className="text-xl font-bold mb-2">Daycare Network</h3>
+-          <p className="text-sm opacity-70 mb-4">
+-            A directory of Albanian-owned daycares and childcare providers for
+-            working parents.
+-          </p>
+-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
+-            Search Map ΓåÆ
+-          </span>
+-        </div>
+-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
+-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
+-            <Users className="w-6 h-6" />
+-          </div>
+-          <h3 className="text-xl font-bold mb-2">Regional Playdates</h3>
+-          <p className="text-sm opacity-70 mb-4">
+-            Join local WhatsApp groups to coordinate weekend park meetups and
+-            family dinners.
+-          </p>
+-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
+-            Join a Group ΓåÆ
+-          </span>
+-        </div>
+-      </div>
+-
+-      <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8 flex flex-col md:flex-row items-center gap-8">
+-        <div className="flex-1">
+-          <h3 className="text-2xl font-bold mb-3">Family Events Calendar</h3>
+-          <p className="opacity-70 text-sm mb-6 max-w-lg">
+-            See all kid-friendly events, cultural festivals, and language school
+-            registrations across multiple organizations in one place.
+-          </p>
+-          <button className="bg-purple-600 text-white hover:bg-purple-700 font-bold uppercase tracking-wider text-sm px-6 py-3 rounded transition-colors">
+-            Subscribe to Parent Calendar
+-          </button>
+-        </div>
+-        <div className="w-full md:w-80 bg-[var(--background)] border border-[var(--foreground)]/10 rounded-xl p-5 shadow-lg">
+-          <div className="flex items-center gap-3 mb-4 border-b border-[var(--foreground)]/10 pb-4">
+-            <div className="bg-purple-500 text-white text-center rounded overflow-hidden w-12 pb-1 shrink-0">
+-              <div className="text-[10px] uppercase font-bold bg-white/20 py-0.5">
+-                Apr
+-              </div>
+-              <div className="text-lg font-bold">12</div>
+-            </div>
+-            <div>
+-              <h4 className="font-bold text-sm">Spring Family Picnic</h4>
+-              <p className="text-xs opacity-60">Van Cortlandt Park, NY</p>
+-            </div>
+-          </div>
+-          <div className="flex items-center gap-3">
+-            <div className="bg-purple-500 text-white text-center rounded overflow-hidden w-12 pb-1 shrink-0">
+-              <div className="text-[10px] uppercase font-bold bg-white/20 py-0.5">
+-                May
+-              </div>
+-              <div className="text-lg font-bold">03</div>
+-            </div>
+-            <div>
+-              <h4 className="font-bold text-sm">Shkolla Shqipe Grad</h4>
+-              <p className="text-xs opacity-60">AACC Riverdale</p>
+-            </div>
+-          </div>
+-        </div>
+       </div>
+     </div>
+   );
+ }
+ 
+ // ----------------------------------------------------------------------
+-// CAREERS HUB
++// PULSE HUB (THE FEED)
+ // ----------------------------------------------------------------------
+-function CareersHub() {
+-  return (
+-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+-      <div className="mb-12 border-l-4 border-blue-600 pl-6">
+-        <h2 className="text-3xl font-extrabold mb-3">Career Growers</h2>
+-        <p className="text-lg opacity-70 max-w-2xl">
+-          For professionals in their 30s and 40s scaling their impact. Expand
+-          your network, find investment opportunities, or give back by mentoring
+-          the next generation.
+-        </p>
+-      </div>
++function PulseHub() {
++  const [refreshTrigger, setRefreshTrigger] = useState(0);
+ 
+-      <div className="grid md:grid-cols-12 gap-8">
+-        <div className="md:col-span-8 space-y-6">
+-          <div className="wac-card p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center group hover:border-blue-500 transition-colors cursor-pointer">
+-            <div className="w-16 h-16 shrink-0 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
+-              <Briefcase className="w-8 h-8" />
+-            </div>
+-            <div>
+-              <h3 className="text-xl font-bold mb-2">
+-                Albanian American Business Association
+-              </h3>
+-              <p className="text-sm opacity-70 mb-3">
+-                Join the premier network of Albanian corporate professionals and
+-                entrepreneurs. Access exclusive networking events and B2B
+-                directories.
+-              </p>
+-              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
+-                Explore AABA <ChevronRight className="w-4 h-4" />
+-              </span>
+-            </div>
+-          </div>
+-
+-          <div className="wac-card p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center group hover:border-blue-500 transition-colors cursor-pointer">
+-            <div className="w-16 h-16 shrink-0 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
+-              <Users className="w-8 h-8" />
+-            </div>
+-            <div>
+-              <h3 className="text-xl font-bold mb-2">Mentorship Program</h3>
+-              <p className="text-sm opacity-70 mb-3">
+-                You've made it. Now lay the ladder down. Opt-in to the WAC
+-                directory as "Open to Mentoring" to guide college students and
+-                recent grads.
+-              </p>
+-              <Link
+-                href="/profile"
+-                className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all"
+-              >
+-                Update Your Profile <ChevronRight className="w-4 h-4" />
+-              </Link>
+-            </div>
+-          </div>
+-        </div>
+-
+-        <div className="md:col-span-4">
+-          <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-6 h-full">
+-            <h3 className="font-bold uppercase tracking-wider text-sm mb-4 opacity-80 flex items-center gap-2 border-b border-[var(--foreground)]/10 pb-3">
+-              <Briefcase className="w-4 h-4" /> Latest Opportunities
+-            </h3>
+-
+-            <div className="space-y-4">
+-              <Link href="#" className="block group">
+-                <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-1">
+-                  Board Seat Open
+-                </div>
+-                <h4 className="font-bold text-sm group-hover:text-blue-500 transition-colors">
+-                  WAC Strategy Council
+-                </h4>
+-                <p className="text-xs opacity-60 mt-1 line-clamp-2">
+-                  Seeking experienced executives to help guide the 2027 roadmap
+-                  for diaspora engagement.
+-                </p>
+-              </Link>
+-              <Link href="#" className="block group">
+-                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
+-                  Investment Group
+-                </div>
+-                <h4 className="font-bold text-sm group-hover:text-blue-500 transition-colors">
+-                  Real Estate Syndicate: NYC
+-                </h4>
+-                <p className="text-xs opacity-60 mt-1 line-clamp-2">
+-                  Monthly meetup for commercial real estate investors looking to
+-                  pool resources.
+-                </p>
+-              </Link>
+-            </div>
+-
+-            <button className="w-full mt-6 border border-blue-500 text-blue-500 hover:bg-blue-500/10 font-bold uppercase tracking-wider text-xs p-3 rounded transition-colors">
+-              View Job Board
+-            </button>
+-          </div>
+-        </div>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-// ----------------------------------------------------------------------
+-// TRAVELERS HUB
+-// ----------------------------------------------------------------------
+-function TravelersHub() {
+   return (
+-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+-      <div className="mb-12 border-l-4 border-emerald-600 pl-6">
+-        <h2 className="text-3xl font-extrabold mb-3">
+-          Travelers & Summer Eagles
+-        </h2>
+-        <p className="text-lg opacity-70 max-w-2xl">
+-          Connect with the homeland. Whether you're a young adult experiencing
+-          the Balkans for the first time with OriginAL, or a retired "Summer
+-          Eagle" spending months back home.
+-        </p>
++    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full rounded-xl overflow-hidden shadow-2xl">
++      
++      {/* Persistent Pulse Banner */}
++      <div className="bg-[#111] border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 mb-6 shadow-md">
++         <div className="flex items-center gap-4 text-sm font-bold">
++            <Link href="/jobs" className="flex items-center gap-2 hover:text-[var(--accent)] transition px-2">
++               <Briefcase className="w-4 h-4 text-[var(--accent)]" /> 
++               Job Board <span className="text-[10px] bg-[var(--accent)] text-black rounded px-1.5 py-0.5 ml-1">+12 New</span>
++            </Link>
++            <div className="w-px h-4 bg-white/20"></div>
++            <Link href="/talent-bench" className="flex items-center gap-2 hover:text-[var(--accent)] transition px-2">
++               <Users className="w-4 h-4 text-emerald-400" />
++               Talent Bench
++            </Link>
++         </div>
++         <div className="flex items-center gap-3">
++            <Link href="/messages" className="flex items-center gap-2 text-sm font-bold hover:text-[var(--accent)] transition px-3 py-1.5 rounded-full bg-white/5 border border-white/10 relative">
++               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6"/><path d="M9 10h6"/></svg>
++               Inbox
++               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border border-black text-[8px] flex items-center justify-center text-white">2</span>
++            </Link>
++            <Link href="/network" className="flex items-center gap-2 text-sm font-bold hover:text-[var(--accent)] transition">
++               <User className="w-4 h-4 opacity-70" />
++               Connections
++            </Link>
++         </div>
+       </div>
+ 
+-      <div className="grid md:grid-cols-2 gap-8 mb-10">
+-        <div className="relative overflow-hidden rounded-xl border border-[var(--foreground)]/10 group cursor-pointer h-64">
+-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 to-emerald-950"></div>
+-          <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[url('https://images.unsplash.com/photo-1542478421-4ea2e16c802f?q=80&w=1200')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105"></div>
+-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+-          <div className="absolute bottom-0 left-0 p-6 z-10 w-full">
+-            <div className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">
+-              Age 18-24
+-            </div>
+-            <h3 className="text-2xl font-bold text-white mb-2">
+-              OriginAL Birthright Trip
+-            </h3>
+-            <p className="text-sm text-white/80 line-clamp-2 pr-4">
+-              A free volunteer and cultural immersion trip to Albania and Kosovo
+-              for young diaspora adults.
+-            </p>
+-          </div>
+-        </div>
+-
+-        <Link
+-          href="/guide/travel"
+-          className="relative overflow-hidden block rounded-xl border border-[var(--foreground)]/10 group cursor-pointer h-64"
+-        >
+-          <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-stone-900"></div>
+-          <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[url('https://images.unsplash.com/photo-1590022216657-3f8ca622eff7?q=80&w=1200')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105"></div>
+-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+-          <div className="absolute bottom-0 left-0 p-6 z-10 w-full">
+-            <div className="text-xs font-bold uppercase tracking-widest text-stone-300 mb-2">
+-              Cultural Hub
+-            </div>
+-            <h3 className="text-2xl font-bold text-white mb-2">
+-              Struga Basecamp Guide
+-            </h3>
+-            <p className="text-sm text-white/80 line-clamp-2 pr-4">
+-              The strategic travel guide for Albanian diaspora visiting the
+-              Balkans. Reach 4 countries from one lake stay.
+-            </p>
+-          </div>
+-        </Link>
++      <div className="bg-[#111] border border-[var(--border)] rounded-xl overflow-hidden mb-6">
++        <CreatePostBox onPostCreated={() => setRefreshTrigger((prev) => prev + 1)} />
+       </div>
+-
+-      <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8">
+-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+-          <div>
+-            <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
+-              <Plane className="w-5 h-5 text-emerald-500" />
+-              Summer Eagles Network
+-            </h3>
+-            <p className="text-sm opacity-70">
+-              For diaspora members spending 1-5 months in the Balkans each year.
+-            </p>
+-          </div>
+-          <button className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold uppercase tracking-wider text-xs px-5 py-2.5 rounded transition-colors shrink-0">
+-            Join the Network
+-          </button>
+-        </div>
+-
+-        <div className="grid sm:grid-cols-3 gap-6">
+-          <div className="space-y-2">
+-            <h4 className="font-bold text-sm">Property Management</h4>
+-            <p className="text-xs opacity-70 leading-relaxed">
+-              Connect with vetted local services to manage your apartment or
+-              house while you're back in the States.
+-            </p>
+-          </div>
+-          <div className="space-y-2">
+-            <h4 className="font-bold text-sm">Long-Stay Logistics</h4>
+-            <p className="text-xs opacity-70 leading-relaxed">
+-              Guides on banking, healthcare access, and residency permits for
+-              extended summer stays.
+-            </p>
+-          </div>
+-          <div className="space-y-2">
+-            <h4 className="font-bold text-sm">Local Meetups</h4>
+-            <p className="text-xs opacity-70 leading-relaxed">
+-              Weekly coffee gatherings in Tirana, Prishtina, and Struga
+-              organized specifically for diaspora visitors.
+-            </p>
+-          </div>
+-        </div>
++      
++      <div className="mt-2">
++        <FeedList refreshTrigger={refreshTrigger} />
+       </div>
+     </div>
+   );
+ }
++
++
+diff --git a/components/dashboard/RecommendedProfiles.tsx b/components/dashboard/RecommendedProfiles.tsx
+index 13b3679..2ff6fde 100644
+--- a/components/dashboard/RecommendedProfiles.tsx
++++ b/components/dashboard/RecommendedProfiles.tsx
+@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
+ import { supabase } from "@/lib/supabase";
+ import Link from "next/link";
+ import Image from "next/image";
++import VerifiedBadge from "@/components/ui/VerifiedBadge";
+ 
+ type RecommendedProfile = {
+   id: string;
+@@ -126,15 +127,7 @@ export default function RecommendedProfiles({
+                 <h3 className="font-semibold group-hover:text-[var(--accent)]">
+                   {profile.full_name}
+                 </h3>
+-                {profile.is_verified && (
+-                  <svg
+-                    className="h-4 w-4 text-blue-400"
+-                    fill="currentColor"
+-                    viewBox="0 0 24 24"
+-                  >
+-                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.9 14.7L6 12.6l1.5-1.5 2.6 2.6 6.4-6.4 1.5 1.5-8.1 8.1z" />
+-                  </svg>
+-                )}
++                {profile.is_verified && <VerifiedBadge type="person" />}
+               </div>
+ 
+               {profile.headline ? (
+diff --git a/components/directory/DirectoryTabs.tsx b/components/directory/DirectoryTabs.tsx
+index fdee106..7cf0e71 100644
+--- a/components/directory/DirectoryTabs.tsx
++++ b/components/directory/DirectoryTabs.tsx
+@@ -1,19 +1,31 @@
+ "use client";
+ import Link from "next/link";
+-import { usePathname } from "next/navigation";
++import { useSearchParams } from "next/navigation";
+ 
+-export default function DirectoryTabs() {
+-  const pathname = usePathname();
+-  const isEntities =
+-    pathname === "/entities" ||
+-    pathname === "/businesses" ||
+-    pathname === "/organizations";
++type DirectoryTabsProps = {
++  peopleCount?: number;
++  entitiesCount?: number;
++};
++
++export default function DirectoryTabs({
++  peopleCount,
++  entitiesCount,
++}: DirectoryTabsProps) {
++  const searchParams = useSearchParams();
++  const currentTab = searchParams.get("tab") || "people";
++  const isEntities = currentTab === "entities";
++
++  // Preserve the search query when switching tabs
++  const q = searchParams.get("q");
++  const baseQuery = q ? `&q=${encodeURIComponent(q)}` : "";
+ 
+   return (
+     <div className="pt-32 pb-8 bg-[var(--background)] border-b border-white/5 mb-8">
+       <div className="mx-auto max-w-[90rem] px-4">
+         <div className="mb-10 text-center">
+-          <span className="wac-eyebrow mb-2 inline-block">Global Network</span>
++          <span className="wac-eyebrow mb-2 inline-block">
++            Global Discovery Engine
++          </span>
+           <h1 className="text-4xl sm:text-6xl font-serif tracking-tight leading-tight text-white">
+             The{" "}
+             <span className="text-[#D4AF37] italic font-light opacity-90">
+@@ -25,16 +37,30 @@ export default function DirectoryTabs() {
+         {/* Tab Navigation */}
+         <div className="flex items-center justify-center gap-4">
+           <Link
+-            href="/directory"
+-            className={`px-8 py-3 rounded-full font-bold transition ${!isEntities ? "bg-[var(--accent)] text-black" : "bg-[rgba(255,255,255,0.05)] border border-[var(--border)] hover:border-[var(--accent)]/50 text-white"}`}
++            href={`/directory?tab=people${baseQuery}`}
++            className={`px-8 py-3 rounded-full font-bold transition flex items-center gap-2 ${!isEntities ? "bg-[var(--accent)] text-black" : "bg-[rgba(255,255,255,0.05)] border border-[var(--border)] hover:border-[var(--accent)]/50 text-white"}`}
+           >
+-            People
++            People{" "}
++            {q && peopleCount !== undefined && (
++              <span
++                className={`px-2 py-0.5 rounded-full text-xs font-medium ${!isEntities ? "bg-black/20" : "bg-white/10"}`}
++              >
++                {peopleCount}
++              </span>
++            )}
+           </Link>
+           <Link
+-            href="/entities"
+-            className={`px-8 py-3 rounded-full font-bold transition ${isEntities ? "bg-[var(--accent)] text-black" : "bg-[rgba(255,255,255,0.05)] border border-[var(--border)] hover:border-[var(--accent)]/50 text-white"}`}
++            href={`/directory?tab=entities${baseQuery}`}
++            className={`px-8 py-3 rounded-full font-bold transition flex items-center gap-2 ${isEntities ? "bg-[var(--accent)] text-black" : "bg-[rgba(255,255,255,0.05)] border border-[var(--border)] hover:border-[var(--accent)]/50 text-white"}`}
+           >
+-            Entities
++            Entities{" "}
++            {q && entitiesCount !== undefined && (
++              <span
++                className={`px-2 py-0.5 rounded-full text-xs font-medium ${isEntities ? "bg-black/20" : "bg-white/10"}`}
++              >
++                {entitiesCount}
++              </span>
++            )}
+           </Link>
+         </div>
+       </div>
+diff --git a/components/directory/EntitiesTab.tsx b/components/directory/EntitiesTab.tsx
+index ea545ac..a5f74c7 100644
+--- a/components/directory/EntitiesTab.tsx
++++ b/components/directory/EntitiesTab.tsx
+@@ -11,9 +11,9 @@ import OrganizationCard from "@/components/organizations/results/OrganizationCar
+ export default function EntitiesTab() {
+   const searchParams = useSearchParams();
+   const q = searchParams.get("q")?.toLowerCase() || "";
+-  const initialFilter = searchParams.get("filter") || "all";
++  const filter = searchParams.get("filter") || "all";
++  const location = searchParams.get("location")?.toLowerCase() || "";
+ 
+-  const [filter, setFilter] = useState(initialFilter); // 'all', 'businesses', 'organizations'
+   const [businesses, setBusinesses] = useState<BusinessProfile[]>([]);
+   const [organizations, setOrganizations] = useState<
+     OrganizationDirectoryEntry[]
+@@ -44,20 +44,34 @@ export default function EntitiesTab() {
+ 
+     if (filter === "all" || filter === "businesses") {
+       const bFiltered = businesses.filter((b) => {
+-        if (!q) return true;
+-        const searchString =
+-          `${b.name || ""} ${b.description || ""} ${b.industry_name || ""} ${b.city || ""} ${b.country || ""}`.toLowerCase();
+-        return searchString.includes(q);
++        let matches = true;
++        if (q) {
++          const searchString =
++            `${b.name || ""} ${b.description || ""} ${b.industry_name || ""} ${b.city || ""} ${b.country || ""}`.toLowerCase();
++          matches = searchString.includes(q);
++        }
++        if (matches && location) {
++          const locString = `${b.city || ""} ${b.country || ""}`.toLowerCase();
++          matches = locString.includes(location);
++        }
++        return matches;
+       });
+       bFiltered.forEach((b) => result.push({ type: "business", data: b }));
+     }
+ 
+     if (filter === "all" || filter === "organizations") {
+       const oFiltered = organizations.filter((o) => {
+-        if (!q) return true;
+-        const searchString =
+-          `${o.name || ""} ${o.description || ""} ${o.organization_type || ""} ${o.city || ""} ${o.country || ""}`.toLowerCase();
+-        return searchString.includes(q);
++        let matches = true;
++        if (q) {
++          const searchString =
++            `${o.name || ""} ${o.description || ""} ${o.organization_type || ""} ${o.city || ""} ${o.country || ""}`.toLowerCase();
++          matches = searchString.includes(q);
++        }
++        if (matches && location) {
++          const locString = `${o.city || ""} ${o.country || ""}`.toLowerCase();
++          matches = locString.includes(location);
++        }
++        return matches;
+       });
+       oFiltered.forEach((o) => result.push({ type: "organization", data: o }));
+     }
+@@ -70,60 +84,7 @@ export default function EntitiesTab() {
+ 
+   return (
+     <div className="w-full">
+-      {/* Search and Filters */}
+-      <div className="mb-8 flex flex-col md:flex-row gap-4 items-center justify-between">
+-        <div className="relative w-full max-w-md">
+-          <svg
+-            xmlns="http://www.w3.org/2000/svg"
+-            width="20"
+-            height="20"
+-            viewBox="0 0 24 24"
+-            fill="none"
+-            stroke="currentColor"
+-            strokeWidth="2"
+-            strokeLinecap="round"
+-            strokeLinejoin="round"
+-            className="absolute left-4 top-3 text-[var(--accent)] opacity-80"
+-          >
+-            <circle cx="11" cy="11" r="8" />
+-            <path d="m21 21-4.3-4.3" />
+-          </svg>
+-          <input
+-            type="text"
+-            placeholder="Search entities..."
+-            defaultValue={q}
+-            onChange={(e) => {
+-              const val = e.target.value;
+-              const url = new URL(window.location.href);
+-              if (val) url.searchParams.set("q", val);
+-              else url.searchParams.delete("q");
+-              window.history.replaceState({}, "", url.toString());
+-            }}
+-            className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] py-2.5 pl-12 pr-4 text-sm shadow-inner outline-none transition focus:border-[var(--accent)]"
+-          />
+-        </div>
+-
+-        <div className="flex gap-2 p-1 bg-[rgba(255,255,255,0.05)] rounded-full border border-[var(--border)]">
+-          <button
+-            onClick={() => setFilter("all")}
+-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${filter === "all" ? "bg-white text-black" : "opacity-70 hover:opacity-100"}`}
+-          >
+-            All Entities
+-          </button>
+-          <button
+-            onClick={() => setFilter("businesses")}
+-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${filter === "businesses" ? "bg-blue-500 text-black" : "opacity-70 hover:opacity-100"}`}
+-          >
+-            Businesses
+-          </button>
+-          <button
+-            onClick={() => setFilter("organizations")}
+-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${filter === "organizations" ? "bg-emerald-500 text-black" : "opacity-70 hover:opacity-100"}`}
+-          >
+-            Organizations
+-          </button>
+-        </div>
+-      </div>
++      {/* Search and Filters are now handled globally by GlobalDirectoryFilters and PeopleSearchBar */}
+ 
+       {loading ? (
+         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+diff --git a/components/events/EventCard.tsx b/components/events/EventCard.tsx
+index 0c9bd21..98e05d9 100644
+--- a/components/events/EventCard.tsx
++++ b/components/events/EventCard.tsx
+@@ -15,6 +15,7 @@ export interface EventEntry {
+   end_time: string;
+   event_type: string | null;
+   visibility: string;
++  co_hosts?: { name: string; image?: string; id: string }[];
+ }
+ 
+ export default function EventCard({ event }: { event: EventEntry }) {
+@@ -42,12 +43,27 @@ export default function EventCard({ event }: { event: EventEntry }) {
+       className="wac-card group flex flex-col p-6 transition-transform hover:-translate-y-1 block h-full text-left relative overflow-hidden"
+     >
+       {isPast && (
+-        <div className="absolute top-0 right-0 bg-[var(--surface-2)] text-white/50 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-bl-lg border-b border-l border-[var(--border)]">
++        <div className="absolute top-0 right-0 bg-[var(--surface-2)] text-white/50 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-bl-lg border-b border-l border-[var(--border)] z-10">
+           Past Event
+         </div>
+       )}
+ 
+-      <div className="h-40 rounded-xl bg-amber-500/10 mb-5 flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/40 transition shrink-0 relative">
++      {/* Co-Hosts Avatar Stack */}
++      {event.co_hosts && event.co_hosts.length > 0 && (
++         <div className="absolute top-4 right-4 flex -space-x-3 z-10" title={`Co-hosted by ${event.co_hosts.map(h => h.name).join(', ')}`}>
++            {event.co_hosts.map((host, i) => (
++               <div key={host.id} className="w-8 h-8 rounded-full border-2 border-[var(--surface)] bg-[var(--background)] flex items-center justify-center overflow-hidden relative shadow-md" style={{ zIndex: event.co_hosts!.length - i }}>
++                  {host.image ? (
++                     <img src={host.image} alt={host.name} className="w-full h-full object-cover" />
++                  ) : (
++                     <span className="text-[10px] font-bold text-amber-500">{host.name.charAt(0)}</span>
++                  )}
++               </div>
++            ))}
++         </div>
++      )}
++
++      <div className="h-40 rounded-xl bg-amber-500/10 mb-5 flex items-center justify-center border border-amber-500/20 group-hover:border-amber-500/40 transition shrink-0 relative overflow-hidden">
+         <svg
+           xmlns="http://www.w3.org/2000/svg"
+           width="40"
+diff --git a/components/feed/CreatePostBox.tsx b/components/feed/CreatePostBox.tsx
+index 6210ec0..9be7848 100644
+--- a/components/feed/CreatePostBox.tsx
++++ b/components/feed/CreatePostBox.tsx
+@@ -1,138 +1,132 @@
+ "use client";
+ 
+-import { useState } from "react";
++import { useState, useRef, useEffect } from "react";
+ import { supabase } from "@/lib/supabase";
+-import { useRouter } from "next/navigation";
++import { useActor } from "@/components/providers/ActorProvider";
++import { Image, Send, Loader2 } from "lucide-react";
+ 
+-export default function CreatePostBox({ userId }: { userId: string | null }) {
++export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () => void }) {
++  const { currentActor, isLoading } = useActor();
+   const [content, setContent] = useState("");
+-  const [postType, setPostType] = useState<"general" | "opportunity" | "ask">(
+-    "general",
+-  );
+   const [isSubmitting, setIsSubmitting] = useState(false);
+-  const router = useRouter();
++  const [error, setError] = useState("");
++  const textareaRef = useRef<HTMLTextAreaElement>(null);
++
++  const adjustTextareaHeight = () => {
++    if (textareaRef.current) {
++      textareaRef.current.style.height = 'auto';
++      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
++    }
++  };
+ 
+-  if (!userId) {
++  useEffect(() => {
++    adjustTextareaHeight();
++  }, [content]);
++
++  if (isLoading) {
+     return (
+-      <div className="wac-card p-6 text-center border-dashed border-white/10 mb-8 opacity-70">
+-        <div className="mb-4 flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+-          <svg
+-            xmlns="http://www.w3.org/2000/svg"
+-            width="24"
+-            height="24"
+-            viewBox="0 0 24 24"
+-            fill="none"
+-            stroke="currentColor"
+-            strokeWidth="2"
+-            strokeLinecap="round"
+-            strokeLinejoin="round"
+-          >
+-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+-          </svg>
+-        </div>
+-        <h3 className="text-xl font-bold text-white mb-2">
+-          Join the Conversation
+-        </h3>
+-        <p className="mb-4">
+-          Log in to post updates, ask questions, and share opportunities with
+-          the network.
+-        </p>
+-        <button
+-          onClick={() => document.getElementById("wac-global-login")?.click()}
+-          className="wac-button-primary bg-white text-black hover:bg-gray-200"
+-        >
+-          Sign In
+-        </button>
++      <div className="wac-card p-4 animate-pulse">
++        <div className="h-10 bg-[rgba(255,255,255,0.05)] rounded-md mb-2"></div>
++      </div>
++    );
++  }
++
++  if (!currentActor) {
++    return (
++      <div className="wac-card p-4 text-center opacity-70 text-sm">
++        Sign in to post to the network feed.
+       </div>
+     );
+   }
+ 
+-  async function handleSubmit() {
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
+     if (!content.trim()) return;
+ 
+     setIsSubmitting(true);
++    setError("");
++
+     try {
+-      const { error } = await supabase.from("network_posts").insert({
+-        author_id: userId,
++      const { data: { user } } = await supabase.auth.getUser();
++      if (!user) throw new Error("Not authenticated");
++
++      // Construct the payload based on current actor
++      const payload: any = {
++        submitted_by: user.id,
+         content: content.trim(),
+-        post_type: postType,
+-      });
++        post_type: 'general',
++      };
++
++      if (currentActor?.type === 'person') {
++        payload.author_profile_id = currentActor.id;
++      } else if (currentActor?.type === 'business') {
++        payload.author_business_id = currentActor.id;
++      } else if (currentActor?.type === 'organization') {
++        payload.author_organization_id = currentActor.id;
++      }
+ 
+-      if (error) throw error;
++      const { error: insertError } = await supabase
++        .from("feed_posts")
++        .insert(payload);
+ 
+-      setContent("");
+-      setPostType("general");
+-      router.refresh(); // Refresh server components to pull the new post
+-    } catch (err) {
+-      console.error("Error creating post:", err);
+-      alert("Failed to create post. Please try again.");
++      if (insertError) throw insertError;
++
++      setContent(""); // Clear input
++      if (onPostCreated) onPostCreated(); // Refresh feed
++    } catch (err: any) {
++      console.error("Failed to post:", err);
++      setError(err.message || "Failed to post");
+     } finally {
+       setIsSubmitting(false);
+     }
+   }
+ 
+   return (
+-    <div className="wac-card p-4 sm:p-6 mb-8 border-purple-500/20 relative overflow-hidden">
+-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(168,85,247,0.05)_0%,transparent_60%)] pointer-events-none" />
+-
+-      <div className="relative z-10 flex flex-col gap-4">
+-        <textarea
+-          value={content}
+-          onChange={(e) => setContent(e.target.value)}
+-          placeholder="Share an update, ask a question, or post an opportunity..."
+-          className="w-full bg-[rgba(0,0,0,0.2)] border border-[var(--border)] rounded-xl p-4 text-[var(--foreground)] placeholder:opacity-50 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 resize-none min-h-[100px]"
+-        />
+-
+-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
++    <div className="wac-card p-5 mb-6 shadow-xl relative overflow-hidden">
++      <div className="absolute top-0 left-0 w-1 bg-[var(--accent)] h-full opacity-60"></div>
++
++      <form onSubmit={handleSubmit}>
++        <div className="flex gap-4 items-start">
++          <div className="w-10 h-10 mt-1 rounded-full bg-[rgba(255,255,255,0.1)] flex-shrink-0 flex items-center justify-center font-bold text-[#D4AF37]">
++            {currentActor.name.charAt(0).toUpperCase()}
++          </div>
++          <div className="flex-1">
++            <textarea
++              ref={textareaRef}
++              value={content}
++              onChange={(e) => setContent(e.target.value)}
++              placeholder={`Share an update as ${currentActor.name}...`}
++              rows={1}
++              className="w-full bg-black/20 border border-[var(--border)] rounded-xl px-4 py-3 text-base focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden"
++              disabled={isSubmitting}
++            />
++          </div>
++        </div>
++
++        {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
++
++        <div className="flex items-center justify-between mt-3 pt-3 border-t border-[var(--border)]">
+           <div className="flex items-center gap-2">
+-            <span className="text-sm opacity-60 font-medium">Post type:</span>
+-            <div className="flex bg-[rgba(255,255,255,0.05)] rounded-lg p-1 border border-[var(--border)]">
+-              <button
+-                onClick={() => setPostType("general")}
+-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${postType === "general" ? "bg-white text-black shadow-sm" : "opacity-60 hover:opacity-100"}`}
+-              >
+-                General
+-              </button>
+-              <button
+-                onClick={() => setPostType("ask")}
+-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${postType === "ask" ? "bg-purple-500 text-white shadow-sm" : "opacity-60 hover:opacity-100"}`}
+-              >
+-                Ask Network
+-              </button>
+-              <button
+-                onClick={() => setPostType("opportunity")}
+-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-1 ${postType === "opportunity" ? "bg-emerald-500 text-white shadow-sm" : "opacity-60 hover:opacity-100"}`}
+-              >
+-                <svg
+-                  xmlns="http://www.w3.org/2000/svg"
+-                  width="12"
+-                  height="12"
+-                  viewBox="0 0 24 24"
+-                  fill="none"
+-                  stroke="currentColor"
+-                  strokeWidth="2"
+-                  strokeLinecap="round"
+-                  strokeLinejoin="round"
+-                >
+-                  <path d="m11 17 2 2a1 1 0 1 0 3-3" />
+-                  <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" />
+-                  <path d="m21 3-6 6" />
+-                  <path d="M8.4 2.8A3 3 0 0 0 3 6v15l5.24-4.88c.84-.78 1.95-1.12 3.06-1.12h4.51c2.19 0 3.75-1.89 3.06-3.99A4 4 0 0 0 15 8h-4.3l-2.3-2.3Z" />
+-                </svg>
+-                Opportunity
+-              </button>
+-            </div>
++            <button
++              type="button"
++              className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.05)] transition text-[var(--accent)] opacity-80 hover:opacity-100"
++              title="Upload Image (Coming Soon)"
++            >
++              <Image size={18} />
++            </button>
++            <span className="text-xs opacity-50">Posting as: <strong className="text-[var(--accent)] opacity-90">{currentActor.name}</strong></span>
+           </div>
+ 
+           <button
+-            onClick={handleSubmit}
++            type="submit"
+             disabled={!content.trim() || isSubmitting}
+-            className="wac-button-primary bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.3)] border-purple-400/30 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto mt-2 sm:mt-0"
++            className="wac-button-primary py-1.5 px-4 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+           >
+-            {isSubmitting ? "Posting..." : "Post to Network"}
++            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
++            Post
+           </button>
+         </div>
+-      </div>
++      </form>
+     </div>
+   );
+ }
+diff --git a/components/home/EcosystemHub.tsx b/components/home/EcosystemHub.tsx
+index 200994f..938bfac 100644
+--- a/components/home/EcosystemHub.tsx
++++ b/components/home/EcosystemHub.tsx
+@@ -22,17 +22,17 @@ export default function EcosystemHub() {
+           </p>
+         </div>
+ 
+-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 mb-6">
++        <div className="grid gap-4 md:grid-cols-2 max-w-5xl mx-auto mb-6">
+           {/* Directory */}
+           <Link
+             href="/directory"
+-            className="wac-card group flex flex-col p-6 transition-transform hover:-translate-y-1 block h-full text-left"
++            className="wac-card group flex items-start gap-5 p-6 transition-transform hover:-translate-y-1 block text-left"
+           >
+-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
++            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
+               <svg
+                 xmlns="http://www.w3.org/2000/svg"
+-                width="20"
+-                height="20"
++                width="24"
++                height="24"
+                 viewBox="0 0 24 24"
+                 fill="none"
+                 stroke="currentColor"
+@@ -46,25 +46,26 @@ export default function EcosystemHub() {
+                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+               </svg>
+             </div>
+-            <h3 className="text-xl font-bold mb-2 group-hover:text-[var(--accent)] transition-colors">
+-              Directory
+-            </h3>
+-            <p className="text-sm opacity-70 mt-auto leading-relaxed">
+-              Find professionals, businesses, and organizations across the
+-              diaspora.
+-            </p>
++            <div>
++              <h3 className="text-xl font-bold mb-1 group-hover:text-[var(--accent)] transition-colors">
++                The Directory
++              </h3>
++              <p className="text-sm opacity-70 leading-relaxed">
++                Connect with professionals, businesses, and organizations driving the diaspora forward.
++              </p>
++            </div>
+           </Link>
+ 
+-          {/* Events */}
++          {/* Events & Workshops */}
+           <Link
+             href="/events"
+-            className="wac-card group flex flex-col p-6 transition-transform hover:-translate-y-1 block h-full text-left"
++            className="wac-card group flex items-start gap-5 p-6 transition-transform hover:-translate-y-1 block text-left"
+           >
+-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
++            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
+               <svg
+                 xmlns="http://www.w3.org/2000/svg"
+-                width="20"
+-                height="20"
++                width="24"
++                height="24"
+                 viewBox="0 0 24 24"
+                 fill="none"
+                 stroke="currentColor"
+@@ -78,12 +79,80 @@ export default function EcosystemHub() {
+                 <line x1="3" y1="10" x2="21" y2="10" />
+               </svg>
+             </div>
+-            <h3 className="text-xl font-bold mb-2 group-hover:text-[var(--accent)] transition-colors">
+-              Events
+-            </h3>
+-            <p className="text-sm opacity-70 mt-auto leading-relaxed">
+-              Find diaspora events, summits, and gatherings.
+-            </p>
++            <div>
++              <h3 className="text-xl font-bold mb-1 group-hover:text-[var(--accent)] transition-colors">
++                Events & Workshops
++              </h3>
++              <p className="text-sm opacity-70 leading-relaxed">
++                Attend masterclasses, galas, and formal summits designed for growth and connection.
++              </p>
++            </div>
++          </Link>
++
++          {/* Professional Development */}
++          <Link
++            href="/events"
++            className="wac-card group flex items-start gap-5 p-6 transition-transform hover:-translate-y-1 block text-left"
++          >
++            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
++              <svg
++                xmlns="http://www.w3.org/2000/svg"
++                width="24"
++                height="24"
++                viewBox="0 0 24 24"
++                fill="none"
++                stroke="currentColor"
++                strokeWidth="2"
++                strokeLinecap="round"
++                strokeLinejoin="round"
++              >
++                <path d="M12 2v20" />
++                <path d="m17 5-5-3-5 3" />
++                <path d="m17 19-5 3-5-3" />
++                <path d="M2 12h20" />
++                <path d="m5 7 3-5 3 5" />
++                <path d="m5 17 3 5 3-5" />
++              </svg>
++            </div>
++            <div>
++              <h3 className="text-xl font-bold mb-1 group-hover:text-[var(--accent)] transition-colors">
++                Professional Growth
++              </h3>
++              <p className="text-sm opacity-70 leading-relaxed">
++                Access mentorship networks, interview prep, and corporate pathways.
++              </p>
++            </div>
++          </Link>
++
++          {/* Homeland Living */}
++          <Link
++            href="/guide/living"
++            className="wac-card group flex items-start gap-5 p-6 transition-transform hover:-translate-y-1 block text-left"
++          >
++            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors duration-300">
++              <svg
++                xmlns="http://www.w3.org/2000/svg"
++                width="24"
++                height="24"
++                viewBox="0 0 24 24"
++                fill="none"
++                stroke="currentColor"
++                strokeWidth="2"
++                strokeLinecap="round"
++                strokeLinejoin="round"
++              >
++                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
++                <polyline points="9 22 9 12 15 12 15 22" />
++              </svg>
++            </div>
++            <div>
++              <h3 className="text-xl font-bold mb-1 group-hover:text-[var(--accent)] transition-colors">
++                Homeland Living Hub
++              </h3>
++              <p className="text-sm opacity-70 leading-relaxed">
++                The ultimate guide for visiting, relocating, raising families, and rooting back home.
++              </p>
++            </div>
+           </Link>
+         </div>
+       </div>
+diff --git a/components/home/Hero.tsx b/components/home/Hero.tsx
+index 7c65570..3871bc2 100644
+--- a/components/home/Hero.tsx
++++ b/components/home/Hero.tsx
+@@ -51,8 +51,8 @@ export default function Hero() {
+         <p className="mx-auto max-w-2xl text-lg opacity-80 sm:text-2xl mb-16 font-medium">
+           The ultimate global network{" "}
+           <span className="italic font-serif text-white/90">connecting</span>{" "}
+-          the Albanian diaspora. Find professionals, organizations, and events
+-          worldwide.
++          the Albanian diaspora. Find professionals, organizations, and
++          businesses worldwide.
+         </p>
+ 
+         {/* Integrated Search Bar */}
+@@ -78,7 +78,7 @@ export default function Hero() {
+               name="q"
+               value={query}
+               onChange={(e) => setQuery(e.target.value)}
+-              placeholder="Search people, businesses, organizations, or cities"
++              placeholder="e.g., 'Software Engineers from Tirana living in New York open to mentoring...'"
+               autoComplete="off"
+               spellCheck="false"
+               className="w-full rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-14 pr-36 text-lg shadow-2xl backdrop-blur-md outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 [&:-webkit-autofill]:bg-[rgba(0,0,0,0.4)] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[transition:background-color_5000s_ease-in-out_0s]"
+@@ -95,16 +95,12 @@ export default function Hero() {
+             {isSignCheckComplete && !isLoggedIn && (
+               <div className="text-sm text-white/50 animate-in fade-in duration-500">
+                 Not part of the network yet?{" "}
+-                <button
+-                  onClick={() => {
+-                    const loginBtn =
+-                      document.getElementById("wac-global-login");
+-                    if (loginBtn) loginBtn.click();
+-                  }}
++                <Link
++                  href="/login"
+                   className="text-[#D4AF37] hover:underline opacity-90 transition font-medium"
+                 >
+                   Create your profile
+-                </button>
++                </Link>
+               </div>
+             )}
+           </div>
+diff --git a/components/home/HomeFeedPreview.tsx b/components/home/HomeFeedPreview.tsx
+index 72f4bfc..d73761d 100644
+--- a/components/home/HomeFeedPreview.tsx
++++ b/components/home/HomeFeedPreview.tsx
+@@ -126,7 +126,7 @@ export default function HomeFeedPreview() {
+               <div className="grid sm:grid-cols-2 gap-4 flex-1">
+                 {/* Teens & College Card */}
+                 <Link
+-                  href="/community?tab=teens"
++                  href="/groups?tab=teens"
+                   className="wac-card p-6 group hover:border-[var(--accent)] transition-all h-full flex flex-col"
+                 >
+                   <div className="w-10 h-10 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mb-4 shrink-0 transition-transform group-hover:scale-110">
+@@ -144,7 +144,7 @@ export default function HomeFeedPreview() {
+ 
+                 {/* Parent Connect Card */}
+                 <Link
+-                  href="/community?tab=parents"
++                  href="/groups?tab=parents"
+                   className="wac-card p-6 group hover:border-purple-500 transition-all h-full flex flex-col"
+                 >
+                   <div className="w-10 h-10 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 shrink-0 transition-transform group-hover:scale-110">
+@@ -163,7 +163,7 @@ export default function HomeFeedPreview() {
+ 
+               {/* Career Growers Wide Card */}
+               <Link
+-                href="/community?tab=careers"
++                href="/groups?tab=careers"
+                 className="wac-card p-6 group hover:border-blue-500 transition-all flex flex-col sm:flex-row gap-6 items-start sm:items-center"
+               >
+                 <div className="w-16 h-16 shrink-0 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center transition-transform group-hover:scale-110">
+diff --git a/components/home/JoinNetwork.tsx b/components/home/JoinNetwork.tsx
+index 161a0a2..a100692 100644
+--- a/components/home/JoinNetwork.tsx
++++ b/components/home/JoinNetwork.tsx
+@@ -31,13 +31,13 @@ export default function JoinNetwork({ userId }: { userId: string | null }) {
+ 
+         <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-6">
+           <Link
+-            href="/profile"
++            href="/login"
+             className="wac-button-primary inline-flex items-center justify-center px-10 py-5 text-xl font-bold rounded-full shadow-2xl transition-transform hover:-translate-y-1"
+           >
+             Create Your Profile
+           </Link>
+           <Link
+-            href="/search"
++            href="/login"
+             className="wac-button-secondary inline-flex items-center justify-center px-10 py-5 text-xl font-bold rounded-full transition hover:bg-[rgba(255,255,255,0.05)] border border-[var(--border)]"
+           >
+             Join the Network
+diff --git a/components/layout/Footer.tsx b/components/layout/Footer.tsx
+index 8f7f81c..dacdfc4 100644
+--- a/components/layout/Footer.tsx
++++ b/components/layout/Footer.tsx
+@@ -19,8 +19,8 @@ export default function Footer() {
+                 />
+               </div>
+               <div className="flex flex-col">
+-                <span className="text-xl font-extrabold leading-none tracking-tight text-white">
+-                  World <span className="text-[var(--accent)]">Albanian</span>{" "}
++                <span className="text-xl font-serif tracking-tight text-white">
++                  World <span className="text-[var(--accent)] italic font-light opacity-90">Albanian</span>{" "}
+                   Congress
+                 </span>
+               </div>
+@@ -98,6 +98,14 @@ export default function Footer() {
+                     Network Feed
+                   </Link>
+                 </li>
++                <li>
++                  <Link
++                    href="/groups"
++                    className="transition hover:text-[var(--accent)]"
++                  >
++                    Network Groups
++                  </Link>
++                </li>
+               </ul>
+             </div>
+ 
+@@ -172,9 +180,9 @@ export default function Footer() {
+             <a href="#" className="transition hover:text-white">
+               Privacy Policy
+             </a>
+-            <a href="#" className="transition hover:text-white">
++            <Link href="/terms" className="transition hover:text-white">
+               Terms of Service
+-            </a>
++            </Link>
+             <a href="#" className="transition hover:text-white">
+               Cookie Guidelines
+             </a>
+diff --git a/components/layout/Navbar.tsx b/components/layout/Navbar.tsx
+index fead537..03715b8 100644
+--- a/components/layout/Navbar.tsx
++++ b/components/layout/Navbar.tsx
+@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
+ import { supabase } from "@/lib/supabase";
+ import Link from "next/link";
+ import { usePathname } from "next/navigation";
++import LanguageToggle from "./LanguageToggle";
++import { useActor } from "@/components/providers/ActorProvider";
+ 
+ export default function Navbar() {
+   const [userEmail, setUserEmail] = useState<string | null>(null);
++  const [isActorDropdownOpen, setIsActorDropdownOpen] = useState(false);
++  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+   const pathname = usePathname();
++  const { currentActor, setCurrentActor, ownedEntities } = useActor();
+ 
+   useEffect(() => {
+     async function loadUser() {
+@@ -56,7 +61,10 @@ export default function Navbar() {
+           <Link
+             href="/"
+             onClick={(e) => {
+-              if (pathname === "/") {
++              if (window.innerWidth < 768) {
++                e.preventDefault();
++                setIsMobileMenuOpen(!isMobileMenuOpen);
++              } else if (pathname === "/") {
+                 e.preventDefault();
+                 window.scrollTo({ top: 0, behavior: "smooth" });
+               }
+@@ -98,7 +106,13 @@ export default function Navbar() {
+               href="/community"
+               className="px-3 py-1.5 rounded-full border border-transparent transition-all duration-300 hover:bg-[#D4AF37]/5 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"
+             >
+-              Community
++              The Pulse
++            </Link>
++            <Link
++              href="/groups"
++              className="px-3 py-1.5 rounded-full border border-transparent transition-all duration-300 hover:bg-[#D4AF37]/5 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]"
++            >
++              Groups
+             </Link>
+             <Link
+               href="/#vision"
+@@ -110,10 +124,11 @@ export default function Navbar() {
+         </div>
+ 
+         <div className="flex items-center gap-2 sm:gap-4">
++          <LanguageToggle />
+           <Link
+             href="/directory"
+             className="rounded-full bg-[rgba(255,255,255,0.05)] p-2 transition-all duration-300 hover:bg-[rgba(255,255,255,0.1)] hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] mr-1"
+-            aria-label="Global Search"
++            aria-label="Global Directory Search"
+           >
+             <svg
+               xmlns="http://www.w3.org/2000/svg"
+@@ -132,7 +147,63 @@ export default function Navbar() {
+           </Link>
+ 
+           {userEmail ? (
+-            <div className="flex items-center gap-2 sm:gap-4">
++            <div className="flex items-center gap-2 sm:gap-4 relative">              {currentActor && ownedEntities.length > 1 && (
++                <div className="relative hidden sm:block">
++                  <button
++                    onClick={() => setIsActorDropdownOpen(!isActorDropdownOpen)}
++                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] text-xs font-medium hover:border-[var(--accent)] transition"
++                  >
++                    <span className="opacity-60">Acting as:</span>
++                    <span className="text-[var(--accent)] truncate max-w-[120px] font-bold">
++                      {currentActor.name}
++                    </span>
++                    <svg
++                      xmlns="http://www.w3.org/2000/svg"
++                      width="12"
++                      height="12"
++                      viewBox="0 0 24 24"
++                      fill="none"
++                      stroke="currentColor"
++                      strokeWidth="2"
++                      strokeLinecap="round"
++                      strokeLinejoin="round"
++                      className={`transition-transform opacity-60 ${isActorDropdownOpen ? "rotate-180" : ""}`}
++                    >
++                      <path d="m6 9 6 6 6-6" />
++                    </svg>
++                  </button>
++
++                  {isActorDropdownOpen && (
++                    <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-[var(--border)] bg-[#111] shadow-2xl overflow-hidden py-1 z-[100]">
++                      <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider opacity-50 border-b border-white/5 mb-1">
++                        Select Identity
++                      </div>
++                      {ownedEntities.map((entity) => (
++                        <button
++                          key={entity.id}
++                          onClick={() => {
++                            setCurrentActor(entity);
++                            setIsActorDropdownOpen(false);
++                          }}
++                          className={`w-full text-left px-4 py-2.5 text-xs transition flex flex-col gap-0.5 hover:bg-[rgba(255,255,255,0.05)] ${
++                            currentActor.id === entity.id
++                              ? "bg-[rgba(212,175,55,0.08)] text-[var(--accent)]"
++                              : "text-white/80"
++                          }`}
++                        >
++                          <span className="font-bold truncate">
++                            {entity.name}
++                          </span>
++                          <span className="text-[9px] opacity-60 uppercase tracking-wider">
++                            {entity.type}
++                          </span>
++                        </button>
++                      ))}
++                    </div>
++                  )}
++                </div>
++              )}
++
+               <Link
+                 href="/profile"
+                 className="px-3 py-1.5 rounded-full border border-transparent text-sm font-medium transition-all duration-300 hover:bg-[#D4AF37]/5 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] hidden sm:inline-block"
+@@ -147,14 +218,26 @@ export default function Navbar() {
+               </button>
+             </div>
+           ) : (
+-            <button
+-              onClick={signInWithGoogle}
++            <Link
++              href="/login"
+               className="rounded-full bg-[rgba(255,255,255,0.05)] px-4 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-bold text-[#D4AF37] border border-[rgba(255,255,255,0.1)] transition hover:bg-[rgba(255,255,255,0.1)] hover:border-[#D4AF37]/50"
+             >
+               Log In
+-            </button>
++            </Link>
+           )}
+         </div>
++
++        {/* Mobile Dropdown Menu */}
++        {isMobileMenuOpen && (
++          <div className="md:hidden absolute top-full left-0 right-0 bg-[var(--surface)] border-b border-white/5 shadow-2xl py-6 px-6 flex flex-col gap-5 z-40">
++            <Link href="/directory" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium transition hover:text-[var(--accent)]">Global Directory</Link>
++            <Link href="/community" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium text-[var(--accent)]">The Pulse</Link>
++            <Link href="/groups" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium transition hover:text-[var(--accent)]">Groups</Link>
++            <Link href="/events" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium transition hover:text-[var(--accent)]">Events</Link>
++            <Link href="/guide/living" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium transition hover:text-[var(--accent)]">Homeland Living & Travel</Link>
++            <Link href="/#vision" onClick={() => setIsMobileMenuOpen(false)} className="text-lg font-medium transition hover:text-[var(--accent)]">Vision</Link>
++          </div>
++        )}
+       </header>
+     </>
+   );
+diff --git a/components/organizations/results/OrganizationCard.tsx b/components/organizations/results/OrganizationCard.tsx
+index ea19f4b..2915a66 100644
+--- a/components/organizations/results/OrganizationCard.tsx
++++ b/components/organizations/results/OrganizationCard.tsx
+@@ -2,6 +2,9 @@
+ 
+ import Link from "next/link";
+ import { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
++import VerifiedBadge from "@/components/ui/VerifiedBadge";
++import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
++import WacRatingBadge from "@/components/ui/WacRatingBadge";
+ 
+ export default function OrganizationCard({
+   organization,
+@@ -22,28 +25,6 @@ export default function OrganizationCard({
+       href={`/organizations/${organization.slug}`}
+       className="wac-card group relative overflow-hidden flex flex-col p-6 transition-transform hover:-translate-y-1 block h-full"
+     >
+-      <div className="absolute top-0 right-0 p-4">
+-        {organization.is_verified && (
+-          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-1 rounded-full border border-[var(--accent)]/30">
+-            <svg
+-              xmlns="http://www.w3.org/2000/svg"
+-              width="12"
+-              height="12"
+-              viewBox="0 0 24 24"
+-              fill="none"
+-              stroke="currentColor"
+-              strokeWidth="2"
+-              strokeLinecap="round"
+-              strokeLinejoin="round"
+-            >
+-              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+-              <path d="m9 12 2 2 4-4" />
+-            </svg>
+-            Verified
+-          </span>
+-        )}
+-      </div>
+-
+       <div className="mb-4 flex items-center gap-4">
+         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
+           <svg
+@@ -63,11 +44,32 @@ export default function OrganizationCard({
+             <path d="M2 7a5 5 0 0 0 5 5h4a5 5 0 0 0 5-5V2H2v5Z" />
+           </svg>
+         </div>
+-        <div>
+-          <h3 className="font-bold text-xl group-hover:text-emerald-400 transition-colors line-clamp-1">
+-            {organization.name}
+-          </h3>
+-          <p className="text-sm opacity-60 flex items-center gap-1.5 mt-1">
++        <div className="flex-1">
++          <div className="flex items-center gap-2">
++            <h3 className="text-xl font-bold group-hover:text-[var(--accent)] transition-colors truncate">
++              {organization.name}
++            </h3>
++            {organization.is_verified && <VerifiedBadge type="organization" />}
++          </div>
++            {(organization.google_maps_url && typeof organization.google_rating === 'number') || (typeof organization.wac_rating === 'number') ? (
++              <div className="mt-1 mb-1 flex items-center gap-2 flex-wrap">
++                {organization.google_maps_url && typeof organization.google_rating === 'number' && (
++                  <GoogleRatingBadge 
++                    rating={organization.google_rating} 
++                    reviewsCount={organization.google_reviews_count || 0} 
++                    mapsUrl={organization.google_maps_url} 
++                  />
++                )}
++                {typeof organization.wac_rating === 'number' && (
++                  <WacRatingBadge 
++                    rating={organization.wac_rating || 0} 
++                    reviewsCount={organization.wac_reviews_count || 0} 
++                  />
++                )}
++              </div>
++            ) : null}
++
++            <p className="text-sm opacity-60 flex items-center gap-1.5 mt-1">
+             <svg
+               xmlns="http://www.w3.org/2000/svg"
+               width="14"
+diff --git a/components/people/filters/PeopleFilters.tsx b/components/people/filters/PeopleFilters.tsx
+index 7133909..2a981a1 100644
+--- a/components/people/filters/PeopleFilters.tsx
++++ b/components/people/filters/PeopleFilters.tsx
+@@ -3,6 +3,8 @@ type PeopleFiltersProps = {
+   industry?: string;
+   specialty?: string;
+   mentorOnly?: boolean;
++  openToWork?: boolean;
++  openToHire?: boolean;
+   totalResults?: number;
+ };
+ 
+@@ -11,6 +13,8 @@ export default function PeopleFilters({
+   industry = "",
+   specialty = "",
+   mentorOnly = false,
++  openToWork = false,
++  openToHire = false,
+   totalResults = 0,
+ }: PeopleFiltersProps) {
+   return (
+@@ -75,7 +79,27 @@ export default function PeopleFilters({
+           Open to mentoring only
+         </label>
+ 
+-        <div className="flex gap-3 pt-2">
++        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm">
++          <input
++            type="checkbox"
++            name="work"
++            value="true"
++            defaultChecked={openToWork}
++          />
++          Open to work
++        </label>
++
++        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm">
++          <input
++            type="checkbox"
++            name="hire"
++            value="true"
++            defaultChecked={openToHire}
++          />
++          Open to hire
++        </label>
++
++        <div className="flex gap-3 pt-4">
+           <button type="submit" className="wac-button-primary w-full">
+             Apply Filters
+           </button>
+diff --git a/components/people/results/PersonCard.tsx b/components/people/results/PersonCard.tsx
+index 3724eaf..2682f15 100644
+--- a/components/people/results/PersonCard.tsx
++++ b/components/people/results/PersonCard.tsx
+@@ -1,5 +1,10 @@
++"use client";
++
++import { useState } from "react";
+ import Link from "next/link";
++import { Bookmark, Share, Briefcase, UserPlus } from "lucide-react";
+ import type { PersonDirectoryRow } from "@/lib/types/person-directory";
++import VerifiedBadge from "@/components/ui/VerifiedBadge";
+ 
+ type DirectoryPerson = PersonDirectoryRow & {
+   current_title?: string | null;
+@@ -91,6 +96,9 @@ function buildRoots(person: DirectoryPerson) {
+ }
+ 
+ export default function PersonCard({ person }: PersonCardProps) {
++  const [isSaved, setIsSaved] = useState(false);
++  const [showToast, setShowToast] = useState(false);
++
+   const displayName = person.full_name || person.username || "Unnamed Member";
+   const profileHref = person.username ? `/people/${person.username}` : "#";
+   const initials = getInitials(person);
+@@ -99,9 +107,46 @@ export default function PersonCard({ person }: PersonCardProps) {
+   const location = buildLocation(person);
+   const roots = buildRoots(person);
+ 
++  function handleShare(e: React.MouseEvent) {
++    e.preventDefault();
++    e.stopPropagation();
++    const url = `${window.location.origin}${profileHref}`;
++    navigator.clipboard.writeText(url);
++    setShowToast(true);
++    setTimeout(() => setShowToast(false), 2000);
++  }
++
++  function handleSave(e: React.MouseEvent) {
++    e.preventDefault();
++    e.stopPropagation();
++    setIsSaved(!isSaved);
++  }
++
+   return (
+-    <article className="wac-card h-full overflow-hidden p-0 transition hover:-translate-y-0.5">
++    <article className="wac-card group h-full overflow-hidden p-0 transition hover:-translate-y-0.5 relative">
+       <div className="relative h-28 overflow-hidden">
++        {/* Action Bar (Share/Save) */}
++        <div className="absolute top-3 right-3 flex items-center gap-2 z-20 transition-opacity opacity-0 group-hover:opacity-100 sm:opacity-100">
++          <button
++            onClick={handleSave}
++            title={isSaved ? "Remove bookmark" : "Save for later"}
++            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-white transition hover:bg-black/60"
++          >
++            <Bookmark
++              size={15}
++              className={
++                isSaved ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white"
++              }
++            />
++          </button>
++          <button
++            onClick={handleShare}
++            title="Share profile"
++            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-white transition hover:bg-black/60"
++          >
++            <Share size={15} />
++          </button>
++        </div>
+         {/* @ts-expect-error banner_url isn't in schema but seems to exist in real data sometimes based on previous code */}
+         {person.banner_url ? (
+           <>
+@@ -134,16 +179,12 @@ export default function PersonCard({ person }: PersonCardProps) {
+       </div>
+ 
+       <div className="px-6 pb-5 pt-5 text-center">
+-        <div className="flex items-start justify-center gap-2">
++        <div className="flex items-start justify-center gap-1.5">
+           <h2 className="line-clamp-2 break-words text-xl font-semibold leading-tight">
+             {displayName}
+           </h2>
+ 
+-          {person.is_verified && (
+-            <span className="mt-1 shrink-0 rounded-full border border-[var(--accent)] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+-              Verified
+-            </span>
+-          )}
++          {person.is_verified && <VerifiedBadge className="mt-0.5" />}
+         </div>
+ 
+         {primaryLine && (
+@@ -170,19 +211,43 @@ export default function PersonCard({ person }: PersonCardProps) {
+           </p>
+         )}
+ 
+-        <div className="mt-4">
++        <div className="mt-4 flex flex-col gap-3">
++          {(person.open_to_work || person.open_to_hire) && (
++            <div className="flex flex-wrap justify-center gap-2">
++              {person.open_to_work && (
++                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-green-400 border border-green-500/20">
++                  <Briefcase size={12} /> Open to Work
++                </span>
++              )}
++              {person.open_to_hire && (
++                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-purple-400 border border-purple-500/20">
++                  <UserPlus size={12} /> Hiring
++                </span>
++              )}
++            </div>
++          )}
++
+           {person.username ? (
+             <Link
+               href={profileHref}
+-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(255,255,255,0.03)]"
++              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(255,255,255,0.03)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50"
+             >
+               View Profile
+             </Link>
+           ) : (
+-            <span className="text-sm opacity-60">No username yet</span>
++            <span className="flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--border)] px-5 py-3 text-sm font-semibold opacity-50 bg-[rgba(255,255,255,0.02)]">
++              No username yet
++            </span>
+           )}
+         </div>
+       </div>
++
++      {/* Toast Notification for Share */}
++      <div
++        className={`absolute bottom-6 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-black px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all duration-300 ${showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}
++      >
++        Link copied!
++      </div>
+     </article>
+   );
+ }
+diff --git a/components/people/search/PeopleSearchBar.tsx b/components/people/search/PeopleSearchBar.tsx
+index bb7bf83..71284f0 100644
+--- a/components/people/search/PeopleSearchBar.tsx
++++ b/components/people/search/PeopleSearchBar.tsx
+@@ -1,9 +1,11 @@
+ type PeopleSearchBarProps = {
+   initialQuery?: string;
++  activeTab?: "people" | "entities";
+ };
+ 
+ export default function PeopleSearchBar({
+   initialQuery = "",
++  activeTab = "people",
+ }: PeopleSearchBarProps) {
+   return (
+     <section className="wac-card mb-6 p-5">
+@@ -12,16 +14,25 @@ export default function PeopleSearchBar({
+           type="text"
+           name="q"
+           defaultValue={initialQuery}
+-          placeholder="Search name, profession, company, specialty, city..."
++          placeholder={
++            activeTab === "people"
++              ? "e.g., 'Software Engineers from Tirana living in New York open to mentoring...'"
++              : "e.g., 'Tech Startups in Pristina looking for investors...'"
++          }
+           className="rounded-2xl border border-[var(--border)] bg-transparent px-4 py-3 outline-none transition focus:border-[var(--accent)]"
+         />
+ 
++        <input type="hidden" name="tab" value={activeTab} />
++
+         <div className="flex gap-3">
+           <button type="submit" className="wac-button-primary">
+             Search
+           </button>
+ 
+-          <a href="/people" className="wac-button-secondary">
++          <a
++            href={`/directory${activeTab === "entities" ? "?tab=entities" : ""}`}
++            className="wac-button-secondary"
++          >
+             Clear
+           </a>
+         </div>
+diff --git a/components/profile/ProfileCareerSection.tsx b/components/profile/ProfileCareerSection.tsx
+index db9cda6..3653e29 100644
+--- a/components/profile/ProfileCareerSection.tsx
++++ b/components/profile/ProfileCareerSection.tsx
+@@ -62,7 +62,7 @@ export default function ProfileCareerSection({
+   }));
+ 
+   return (
+-    <div style={{ display: "grid", gap: 16 }}>
++    <div className="grid gap-4">
+       <div>
+         <label htmlFor="headline">Headline</label>
+         <br />
+@@ -71,7 +71,7 @@ export default function ProfileCareerSection({
+           value={headline}
+           onChange={(e) => setHeadline(e.target.value)}
+           placeholder="Founder of the World Albanian Congress / Pharmaceutical Sales Professional"
+-          style={{ width: "100%", padding: 10, marginTop: 6 }}
++          className="w-full p-2.5 mt-1.5"
+         />
+       </div>
+ 
+diff --git a/components/profile/ProfileExperienceSection.tsx b/components/profile/ProfileExperienceSection.tsx
+index d303ff6..fa3b9db 100644
+--- a/components/profile/ProfileExperienceSection.tsx
++++ b/components/profile/ProfileExperienceSection.tsx
+@@ -282,7 +282,7 @@ export default function ProfileExperienceSection({
+   }
+ 
+   return (
+-    <div style={{ display: "grid", gap: 16 }}>
++    <div className="grid gap-4">
+       {isLoading ? (
+         <div
+           style={{
+@@ -300,24 +300,10 @@ export default function ProfileExperienceSection({
+       {experiences.map((experience, index) => (
+         <div
+           key={experience.id}
+-          style={{
+-            border: "1px solid #555",
+-            borderRadius: 12,
+-            padding: 16,
+-            display: "grid",
+-            gap: 14,
+-            background: "rgba(255,255,255,0.02)",
+-          }}
++          className="rounded-xl border border-[#555] p-4 grid gap-3.5 bg-[rgba(255,255,255,0.02)]"
+         >
+-          <div
+-            style={{
+-              display: "flex",
+-              justifyContent: "space-between",
+-              alignItems: "center",
+-              gap: 12,
+-            }}
+-          >
+-            <h4 style={{ margin: 0, fontSize: 16 }}>Job #{index + 1}</h4>
++          <div className="flex justify-between items-center gap-3">
++            <h4 className="m-0 text-base font-semibold">Job #{index + 1}</h4>
+ 
+             <button
+               type="button"
+@@ -336,8 +322,7 @@ export default function ProfileExperienceSection({
+               onChange={(e) =>
+                 updateExperience(experience.id, "company", e.target.value)
+               }
+-              placeholder="AbbVie"
+-              style={{ width: "100%", padding: 10, marginTop: 6 }}
++              className="w-full p-2.5 mt-1.5"
+             />
+           </div>
+ 
+@@ -349,8 +334,7 @@ export default function ProfileExperienceSection({
+               onChange={(e) =>
+                 updateExperience(experience.id, "title", e.target.value)
+               }
+-              placeholder="Sr. Specialty GI Representative"
+-              style={{ width: "100%", padding: 10, marginTop: 6 }}
++              className="w-full p-2.5 mt-1.5"
+             />
+           </div>
+ 
+@@ -362,8 +346,7 @@ export default function ProfileExperienceSection({
+               onChange={(e) =>
+                 updateExperience(experience.id, "industryTag", e.target.value)
+               }
+-              placeholder="Pharmaceutical Sales"
+-              style={{ width: "100%", padding: 10, marginTop: 6 }}
++              className="w-full p-2.5 mt-1.5"
+             />
+           </div>
+ 
+@@ -376,8 +359,7 @@ export default function ProfileExperienceSection({
+               onChange={(e) =>
+                 updateExperience(experience.id, "website", e.target.value)
+               }
+-              placeholder="https://www.abbvie.com"
+-              style={{ width: "100%", padding: 10, marginTop: 6 }}
++              className="w-full p-2.5 mt-1.5"
+             />
+           </div>
+ 
+@@ -417,8 +399,7 @@ export default function ProfileExperienceSection({
+                     e.target.value.replace(/[^\d]/g, "").slice(0, 4),
+                   )
+                 }
+-                placeholder="2019"
+-                style={{ width: "100%", padding: 10, marginTop: 6 }}
++                className="w-full p-2.5 mt-1.5"
+               />
+             </div>
+ 
+@@ -439,18 +420,12 @@ export default function ProfileExperienceSection({
+                   )
+                 }
+                 disabled={experience.isCurrent}
+-                placeholder="2024"
+-                style={{
+-                  width: "100%",
+-                  padding: 10,
+-                  marginTop: 6,
+-                  opacity: experience.isCurrent ? 0.6 : 1,
+-                }}
++                className={`w-full p-2.5 mt-1.5 ${experience.isCurrent ? "opacity-60" : "opacity-100"}`}
+               />
+             </div>
+           </div>
+ 
+-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
++          <label className="flex items-center gap-2.5">
+             <input
+               type="checkbox"
+               checked={experience.isCurrent}
+@@ -470,14 +445,13 @@ export default function ProfileExperienceSection({
+                 updateExperience(experience.id, "description", e.target.value)
+               }
+               rows={5}
+-              placeholder="Describe your role, responsibilities, impact, territory, or achievements."
+-              style={{ width: "100%", padding: 10, marginTop: 6 }}
++              className="w-full p-2.5 mt-1.5"
+             />
+           </div>
+         </div>
+       ))}
+ 
+-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
++      <div className="flex gap-3 flex-wrap">
+         <button
+           type="button"
+           onClick={addExperience}
+@@ -487,15 +461,7 @@ export default function ProfileExperienceSection({
+         </button>
+       </div>
+ 
+-      <div
+-        style={{
+-          padding: 12,
+-          borderRadius: 10,
+-          border: "1px dashed #555",
+-          opacity: 0.85,
+-          fontSize: 14,
+-        }}
+-      >
++      <div className="p-3 rounded-xl dashed-border border-[#555] opacity-85 text-sm">
+         {saveState === "saving" && "Saving experience..."}
+         {saveState === "saved" && "Experience saved."}
+         {saveState === "error" &&
+diff --git a/components/profile/ProfileSkillsSection.tsx b/components/profile/ProfileSkillsSection.tsx
+index fe4270a..935cbaa 100644
+--- a/components/profile/ProfileSkillsSection.tsx
++++ b/components/profile/ProfileSkillsSection.tsx
+@@ -1,3 +1,5 @@
++import SearchableSelect from "./SearchableSelect";
++
+ type Skill = {
+   id: string;
+   name: string;
+@@ -8,6 +10,7 @@ type ProfileSkillsSectionProps = {
+   industryId: string;
+   professionId: string;
+   filteredSkills: Skill[];
++  allSkills: Skill[];
+   selectedSkillIds: string[];
+   setSelectedSkillIds: React.Dispatch<React.SetStateAction<string[]>>;
+ };
+@@ -16,127 +19,121 @@ export default function ProfileSkillsSection({
+   industryId,
+   professionId,
+   filteredSkills,
++  allSkills,
+   selectedSkillIds,
+   setSelectedSkillIds,
+ }: ProfileSkillsSectionProps) {
++  // Create a fast lookup for suggested skills
++  const suggestedSkillIds = new Set(filteredSkills.map((s) => s.id));
++
++  // Sort: Suggestions first, then alphabetically by name
++  const sortedGlobalSkills = [...allSkills].sort((a, b) => {
++    const aIsSuggested = suggestedSkillIds.has(a.id);
++    const bIsSuggested = suggestedSkillIds.has(b.id);
++
++    if (aIsSuggested && !bIsSuggested) return -1;
++    if (!aIsSuggested && bIsSuggested) return 1;
++
++    return a.name.localeCompare(b.name);
++  });
++
+   return (
+     <div>
+       <label>Skills</label>
+       <br />
+ 
+-      {!industryId ? (
+-        <div
+-          style={{
+-            width: "100%",
+-            padding: 12,
+-            marginTop: 6,
+-            border: "1px solid #444",
+-            borderRadius: 8,
+-            opacity: 0.8,
+-          }}
+-        >
+-          Select an industry first.
+-        </div>
+-      ) : !professionId ? (
+-        <div
+-          style={{
+-            width: "100%",
+-            padding: 12,
+-            marginTop: 6,
+-            border: "1px solid #444",
+-            borderRadius: 8,
+-            opacity: 0.8,
+-          }}
+-        >
+-          Select a profession first.
+-        </div>
+-      ) : filteredSkills.length === 0 ? (
+-        <div
+-          style={{
+-            width: "100%",
+-            padding: 12,
+-            marginTop: 6,
+-            border: "1px solid #444",
+-            borderRadius: 8,
+-            opacity: 0.8,
+-          }}
+-        >
+-          No skills found for this profession yet.
++      <div className="space-y-6 mt-2">
++        <div className="relative">
++          <SearchableSelect
++            value=""
++            onChange={(skillId) => {
++              if (skillId && !selectedSkillIds.includes(skillId)) {
++                setSelectedSkillIds((prev) => [...prev, skillId]);
++              }
++            }}
++            options={sortedGlobalSkills
++              .filter((s) => !selectedSkillIds.includes(s.id))
++              .map((s) => ({
++                value: s.id,
++                label: suggestedSkillIds.has(s.id)
++                  ? `Γÿà ${s.name} (Suggested)`
++                  : s.name,
++              }))}
++            placeholder="Search thousands of skills..."
++            searchPlaceholder="Type to search global skills..."
++            emptyMessage="No skills found matching your search."
++          />
+         </div>
+-      ) : (
+-        <>
+-          <div style={{ marginTop: 10, marginBottom: 12 }}>
+-            <strong>Selected Skills:</strong>
+-            <div
+-              style={{
+-                display: "flex",
+-                flexWrap: "wrap",
+-                gap: 8,
+-                marginTop: 10,
+-              }}
+-            >
+-              {selectedSkillIds.length === 0 ? (
+-                <span style={{ opacity: 0.75 }}>No skills selected yet.</span>
+-              ) : (
+-                filteredSkills
+-                  .filter((skill) => selectedSkillIds.includes(skill.id))
+-                  .map((skill) => (
+-                    <span
+-                      key={skill.id}
+-                      style={{
+-                        padding: "6px 10px",
+-                        borderRadius: 999,
+-                        border: "1px solid #666",
+-                        background: "rgba(255,255,255,0.06)",
+-                      }}
+-                    >
++
++        <div className="bg-[rgba(255,248,239,0.02)] border border-[var(--border)] rounded-2xl p-6 min-h-[120px]">
++          <h4 className="wac-eyebrow mb-4">Your Expertises</h4>
++
++          <div className="flex flex-wrap gap-3">
++            {selectedSkillIds.length === 0 ? (
++              <div className="text-sm opacity-50 w-full text-center py-4">
++                Add skills above to highlight your expertise.
++              </div>
++            ) : (
++              allSkills
++                .filter((skill) => selectedSkillIds.includes(skill.id))
++                .map((skill) => (
++                  <div
++                    key={skill.id}
++                    className="group flex flex-wrap items-center gap-2 bg-[rgba(176,141,87,0.12)] border border-[rgba(176,141,87,0.3)] text-white px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:border-[rgba(176,141,87,0.6)]"
++                  >
++                    <span className="max-w-[calc(100vw-8rem)] truncate">
+                       {skill.name}
+                     </span>
+-                  ))
+-              )}
+-            </div>
++                    <button
++                      type="button"
++                      onClick={() =>
++                        setSelectedSkillIds((prev) =>
++                          prev.filter((id) => id !== skill.id),
++                        )
++                      }
++                      className="opacity-50 hover:opacity-100 hover:text-red-400 focus:outline-none transition-colors ml-1 p-0.5"
++                      aria-label={`Remove ${skill.name}`}
++                    >
++                      <svg
++                        xmlns="http://www.w3.org/2000/svg"
++                        width="14"
++                        height="14"
++                        viewBox="0 0 24 24"
++                        fill="none"
++                        stroke="currentColor"
++                        strokeWidth="2.5"
++                        strokeLinecap="round"
++                        strokeLinejoin="round"
++                      >
++                        <path d="M18 6 6 18" />
++                        <path d="m6 6 12 12" />
++                      </svg>
++                    </button>
++                  </div>
++                ))
++            )}
+           </div>
+ 
+-          <div
+-            style={{
+-              border: "1px solid #444",
+-              borderRadius: 12,
+-              padding: 16,
+-              display: "grid",
+-              gap: 10,
+-              marginTop: 6,
+-            }}
+-          >
+-            {filteredSkills.map((skill) => (
+-              <label
+-                key={skill.id}
+-                style={{
+-                  display: "flex",
+-                  alignItems: "center",
+-                  gap: 10,
+-                }}
+-              >
+-                <input
+-                  type="checkbox"
+-                  checked={selectedSkillIds.includes(skill.id)}
+-                  onChange={() => {
+-                    setSelectedSkillIds((prev) =>
+-                      prev.includes(skill.id)
+-                        ? prev.filter((id) => id !== skill.id)
+-                        : [...prev, skill.id],
+-                    );
+-                  }}
+-                />
+-                <span>{skill.name}</span>
+-              </label>
+-            ))}
++          <div className="mt-6 flex items-center gap-2 text-xs opacity-50">
++            <svg
++              xmlns="http://www.w3.org/2000/svg"
++              width="14"
++              height="14"
++              viewBox="0 0 24 24"
++              fill="none"
++              stroke="currentColor"
++              strokeWidth="2"
++              strokeLinecap="round"
++              strokeLinejoin="round"
++            >
++              <circle cx="12" cy="12" r="10" />
++              <path d="M12 16v-4" />
++              <path d="M12 8h.01" />
++            </svg>
++            These skills power your visibility in the Global Directory Search.
+           </div>
+-
+-          <p style={{ marginTop: 8, fontSize: 13, opacity: 0.8 }}>
+-            Tap or click to select multiple skills.
+-          </p>
+-        </>
+-      )}
++        </div>
++      </div>
+     </div>
+   );
+ }
+diff --git a/components/profile/SearchableSelect.tsx b/components/profile/SearchableSelect.tsx
+index fdbf5bc..bdb5b91 100644
+--- a/components/profile/SearchableSelect.tsx
++++ b/components/profile/SearchableSelect.tsx
+@@ -108,80 +108,44 @@ export default function SearchableSelect({
+         type="button"
+         onClick={handleToggle}
+         disabled={disabled}
+-        style={{
+-          width: "100%",
+-          padding: "10px 40px 10px 12px",
+-          marginTop: 6,
+-          textAlign: "left",
+-          borderRadius: 12,
+-          border: "1px solid var(--input)",
+-          background: "rgba(255, 248, 239, 0.03)",
+-          color: value ? "var(--foreground)" : "#a99986",
+-          position: "relative",
+-        }}
++        className="wac-select-trigger"
++        style={{ color: value ? "var(--foreground)" : "#a99986" }}
+       >
+         {selectedOption ? selectedOption.label : placeholder}
+ 
+         <span
+           style={{
+             position: "absolute",
+-            right: 12,
++            right: 16,
+             top: "50%",
+             transform: "translateY(-50%)",
+             color: "var(--accent)",
+             fontSize: 12,
+             pointerEvents: "none",
++            transition: "transform 0.2s ease",
+           }}
++          className={isOpen ? "rotate-180" : ""}
+         >
+           Γû╝
+         </span>
+       </button>
+ 
+       {isOpen ? (
+-        <div
+-          className="wac-card"
+-          style={{
+-            position: "absolute",
+-            top: "calc(100% + 8px)",
+-            left: 0,
+-            width: "100%",
+-            zIndex: 50,
+-            padding: 10,
+-            borderRadius: 14,
+-            maxHeight: 280,
+-            overflow: "hidden",
+-          }}
+-        >
++        <div className="wac-card wac-select-content">
+           <input
+             ref={searchInputRef}
+             value={searchTerm}
+             onChange={(e) => setSearchTerm(e.target.value)}
+             placeholder={searchPlaceholder}
+-            style={{
+-              width: "100%",
+-              padding: 10,
+-              marginBottom: 10,
+-            }}
++            className="wac-select-search outline-none"
+           />
+ 
+-          <div
+-            style={{
+-              maxHeight: 200,
+-              overflowY: "auto",
+-              display: "grid",
+-              gap: 6,
+-              paddingRight: 2,
+-            }}
+-          >
++          <div className="wac-select-list">
+             <button
+               type="button"
+               onClick={() => handleSelect("")}
+-              className="wac-button-secondary"
+-              style={{
+-                textAlign: "left",
+-                padding: "10px 12px",
+-                borderRadius: 10,
+-              }}
++              className="wac-select-option"
++              data-selected={!value}
+             >
+               {placeholder}
+             </button>
+@@ -189,12 +153,9 @@ export default function SearchableSelect({
+             {filteredOptions.length === 0 ? (
+               <div
+                 style={{
+-                  padding: "10px 12px",
+-                  borderRadius: 10,
++                  padding: "10px 14px",
+                   fontSize: 14,
+-                  opacity: 0.75,
+-                  border: "1px solid var(--border)",
+-                  background: "rgba(255,248,239,0.02)",
++                  opacity: 0.6,
+                 }}
+               >
+                 {emptyMessage}
+@@ -208,18 +169,8 @@ export default function SearchableSelect({
+                     key={option.value}
+                     type="button"
+                     onClick={() => handleSelect(option.value)}
+-                    style={{
+-                      textAlign: "left",
+-                      padding: "10px 12px",
+-                      borderRadius: 10,
+-                      border: isSelected
+-                        ? "1px solid rgba(176, 141, 87, 0.55)"
+-                        : "1px solid var(--border)",
+-                      background: isSelected
+-                        ? "rgba(176, 141, 87, 0.12)"
+-                        : "rgba(255,248,239,0.02)",
+-                      color: "var(--foreground)",
+-                    }}
++                    className="wac-select-option"
++                    data-selected={isSelected}
+                   >
+                     {option.label}
+                   </button>
+diff --git a/components/search/GlobalSearchBar.tsx b/components/search/GlobalSearchBar.tsx
+deleted file mode 100644
+index 038c225..0000000
+--- a/components/search/GlobalSearchBar.tsx
++++ /dev/null
+@@ -1,218 +0,0 @@
+-"use client";
+-
+-import { useRouter, useSearchParams } from "next/navigation";
+-import { FormEvent, useEffect, useState, useRef, useTransition } from "react";
+-import Link from "next/link";
+-
+-type GlobalSearchBarProps = {
+-  initialQuery?: string;
+-  autoFocus?: boolean;
+-};
+-
+-type SearchResult = {
+-  id: string;
+-  full_name: string;
+-  headline?: string;
+-  profession_name?: string;
+-  avatar_url?: string;
+-  username: string;
+-};
+-
+-export default function GlobalSearchBar({
+-  initialQuery = "",
+-  autoFocus = false,
+-}: GlobalSearchBarProps) {
+-  const router = useRouter();
+-  const searchParams = useSearchParams();
+-  const [query, setQuery] = useState(initialQuery);
+-  const [isFocused, setIsFocused] = useState(false);
+-  const [results, setResults] = useState<SearchResult[]>([]);
+-  const [isLoading, setIsLoading] = useState(false);
+-  const [isPending, startTransition] = useTransition();
+-  const flyoutRef = useRef<HTMLDivElement>(null);
+-
+-  // Sync URL query state
+-  useEffect(() => {
+-    const urlQuery = searchParams.get("q");
+-    if (urlQuery !== null && urlQuery !== query) {
+-      setQuery(urlQuery);
+-    }
+-  }, [searchParams]);
+-
+-  // Handle clicking outside to close flyout
+-  useEffect(() => {
+-    function handleClickOutside(event: MouseEvent) {
+-      if (
+-        flyoutRef.current &&
+-        !flyoutRef.current.contains(event.target as Node)
+-      ) {
+-        setIsFocused(false);
+-      }
+-    }
+-    document.addEventListener("mousedown", handleClickOutside);
+-    return () => document.removeEventListener("mousedown", handleClickOutside);
+-  }, []);
+-
+-  // Fetch instant results
+-  useEffect(() => {
+-    const fetchResults = async () => {
+-      if (!query.trim() || query.trim().length < 2) {
+-        setResults([]);
+-        return;
+-      }
+-
+-      setIsLoading(true);
+-      try {
+-        const response = await fetch(
+-          `/api/search/instant?q=${encodeURIComponent(query)}`,
+-        );
+-        if (response.ok) {
+-          const data = await response.json();
+-          setResults(data.results || []);
+-        }
+-      } catch (err) {
+-        console.error("Flyout search error:", err);
+-      } finally {
+-        setIsLoading(false);
+-      }
+-    };
+-
+-    const timer = setTimeout(fetchResults, 300); // 300ms debounce
+-    return () => clearTimeout(timer);
+-  }, [query]);
+-
+-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+-    e.preventDefault();
+-    const formData = new FormData(e.currentTarget);
+-    const q = formData.get("q")?.toString().trim();
+-
+-    setIsFocused(false);
+-
+-    startTransition(() => {
+-      if (q) {
+-        router.push(`/directory?q=${encodeURIComponent(q)}`);
+-      } else {
+-        router.push(`/directory`);
+-      }
+-    });
+-  }
+-
+-  const showFlyout = isFocused && query.trim().length >= 2;
+-
+-  return (
+-    <div className="relative w-full" ref={flyoutRef}>
+-      <form
+-        onSubmit={handleSubmit}
+-        className={`flex w-full items-center rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.03)] transition-all ${
+-          isFocused
+-            ? "border-[var(--accent)] bg-[rgba(255,255,255,0.05)] shadow-[0_0_15px_rgba(200,16,46,0.15)]"
+-            : ""
+-        } ${showFlyout ? "rounded-b-none border-b-transparent" : ""}`}
+-      >
+-        <div className="flex h-12 w-12 items-center justify-center opacity-50">
+-          <svg
+-            xmlns="http://www.w3.org/2000/svg"
+-            width="20"
+-            height="20"
+-            viewBox="0 0 24 24"
+-            fill="none"
+-            stroke="currentColor"
+-            strokeWidth="2"
+-            strokeLinecap="round"
+-            strokeLinejoin="round"
+-          >
+-            <circle cx="11" cy="11" r="8"></circle>
+-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+-          </svg>
+-        </div>
+-
+-        <input
+-          type="search"
+-          name="q"
+-          value={query}
+-          onChange={(e) => setQuery(e.target.value)}
+-          onFocus={() => setIsFocused(true)}
+-          autoFocus={autoFocus}
+-          placeholder="Search people, professions, locations..."
+-          className="h-12 w-full bg-transparent pr-5 text-sm outline-none placeholder:text-[var(--foreground)] placeholder:opacity-50"
+-          autoComplete="off"
+-        />
+-
+-        <button
+-          type="submit"
+-          disabled={isPending}
+-          className="mr-1 hidden h-10 items-center justify-center rounded-full bg-[var(--accent)] px-6 text-sm font-semibold text-white transition hover:opacity-90 sm:flex disabled:opacity-50"
+-        >
+-          {isPending ? "Searching..." : "Search"}
+-        </button>
+-      </form>
+-
+-      {/* Flyout Results Dropdown */}
+-      {showFlyout && (
+-        <div className="absolute left-0 right-0 top-full z-50 flex max-h-[400px] flex-col overflow-y-auto rounded-b-2xl border border-t-0 border-[var(--border)] bg-[var(--background)] shadow-2xl backdrop-blur-xl">
+-          <div className="p-2">
+-            {isLoading ? (
+-              <div className="flex items-center justify-center py-8 opacity-50">
+-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent"></div>
+-              </div>
+-            ) : results.length > 0 ? (
+-              <div className="flex flex-col gap-1">
+-                <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+-                  People
+-                </div>
+-                {results.slice(0, 5).map((person) => (
+-                  <Link
+-                    key={person.id}
+-                    href={`/people/${person.username}`}
+-                    onClick={() => setIsFocused(false)}
+-                    className="flex items-center gap-3 rounded-xl p-2 transition hover:bg-[rgba(255,255,255,0.05)]"
+-                  >
+-                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--border)]">
+-                      {person.avatar_url ? (
+-                        <img
+-                          src={person.avatar_url}
+-                          alt=""
+-                          className="h-full w-full object-cover"
+-                        />
+-                      ) : (
+-                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[var(--accent)] to-rose-900 text-sm font-bold text-white">
+-                          {person.full_name.charAt(0)}
+-                        </div>
+-                      )}
+-                    </div>
+-                    <div className="flex flex-col overflow-hidden">
+-                      <span className="truncate text-sm font-medium text-[var(--foreground)]">
+-                        {person.full_name}
+-                      </span>
+-                      <span className="truncate text-xs opacity-60">
+-                        {person.headline ||
+-                          person.profession_name ||
+-                          "Community Member"}
+-                      </span>
+-                    </div>
+-                  </Link>
+-                ))}
+-
+-                {results.length > 5 && (
+-                  <button
+-                    onClick={(e) => {
+-                      e.preventDefault();
+-                      document.forms[0]?.requestSubmit();
+-                    }}
+-                    className="mt-2 w-full rounded-lg p-2 text-center text-xs font-medium text-[var(--accent)] transition hover:bg-[rgba(255,255,255,0.05)]"
+-                  >
+-                    View all {results.length} results
+-                  </button>
+-                )}
+-              </div>
+-            ) : (
+-              <div className="py-8 text-center text-sm opacity-50">
+-                No results found for "{query}"
+-              </div>
+-            )}
+-          </div>
+-        </div>
+-      )}
+-    </div>
+-  );
+-}
+diff --git a/index.html b/index.html
+index abc9a39..1e3934e 100644
+--- a/index.html
++++ b/index.html
+@@ -1075,7 +1075,7 @@
+   .freq-btn.active { background: var(--charcoal); color: white; }
+   .donate-form-fields { display: flex; flex-direction: column; gap: 16px; }
+   .donate-form-fields .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+-  .impact-sidebar { }
++
+   .impact-card {
+     background: var(--charcoal);
+     color: white;
+diff --git a/lib/services/searchService.ts b/lib/services/searchService.ts
+index bd18666..f6703db 100644
+--- a/lib/services/searchService.ts
++++ b/lib/services/searchService.ts
+@@ -19,6 +19,8 @@ export type SearchFilters = {
+   industry?: string;
+   specialty?: string;
+   mentorOnly?: boolean;
++  openToWork?: boolean;
++  openToHire?: boolean;
+ };
+ 
+ const STATE_MAP: Record<string, string[]> = {
+@@ -81,13 +83,13 @@ const STATE_MAP: Record<string, string[]> = {
+  * the exact fuzzy matching behavior as before. For now, we pull the unified view and apply the logic,
+  * eliminating the N+1 experience fetch entirely.
+  */
+-export async function getPeopleDirectory(
+-  filters: SearchFilters
+-): Promise<{ data: EnrichedDirectoryPerson[]; error: Error | null; count: number }> {
++export async function getPeopleDirectory(filters: SearchFilters): Promise<{
++  data: EnrichedDirectoryPerson[];
++  error: Error | null;
++  count: number;
++}> {
+   try {
+-    let query = supabase
+-      .from("v_people_directory_enriched")
+-      .select("*");
++    let query = supabase.from("v_people_directory_enriched").select("*");
+ 
+     // Push strict filters to DB
+     if (filters.country) {
+@@ -96,17 +98,29 @@ export async function getPeopleDirectory(
+ 
+     if (filters.industry) {
+       // Handles both industry_name and industry_slug matching via OR in DB
+-      query = query.or(`industry_name.ilike.%${filters.industry}%,industry_slug.ilike.%${filters.industry}%`);
++      query = query.or(
++        `industry_name.ilike.%${filters.industry}%,industry_slug.ilike.%${filters.industry}%`,
++      );
+     }
+ 
+     if (filters.specialty) {
+-      query = query.or(`specialty_name.ilike.%${filters.specialty}%,specialty_slug.ilike.%${filters.specialty}%`);
++      query = query.or(
++        `specialty_name.ilike.%${filters.specialty}%,specialty_slug.ilike.%${filters.specialty}%`,
++      );
+     }
+ 
+     if (filters.mentorOnly) {
+       query = query.eq("open_to_mentor", true);
+     }
+ 
++    if (filters.openToWork) {
++      query = query.eq("open_to_work", true);
++    }
++
++    if (filters.openToHire) {
++      query = query.eq("open_to_hire", true);
++    }
++
+     // Always sort by name initially
+     query = query.order("full_name", { ascending: true });
+ 
+@@ -114,11 +128,11 @@ export async function getPeopleDirectory(
+ 
+     if (error) throw error;
+ 
+-    let people = (data as EnrichedDirectoryPerson[]).map(p => ({
++    let people = (data as EnrichedDirectoryPerson[]).map((p) => ({
+       ...p,
+       // Map the coalesced values back to standard prop names expected by UI components
+       company: p.current_company_coalesced,
+-      current_title: p.current_title_coalesced
++      current_title: p.current_title_coalesced,
+     }));
+ 
+     // If there's a custom text query (Global Search logic), perform final in-memory filter
+@@ -173,3 +187,45 @@ function matchesSearch(person: EnrichedDirectoryPerson, q: string) {
+     return expansions.some((exp) => haystack.includes(exp));
+   });
+ }
++
++/**
++ * Quick server-side count for cross-tab badges.
++ */
++export async function getEntitiesCount(q: string): Promise<number> {
++  if (!q) return 0;
++
++  try {
++    const [bizRes, orgRes] = await Promise.all([
++      supabase
++        .from("businesses_directory_v1")
++        .select("name, description, industry_name, city, country"),
++      supabase
++        .from("organizations_directory_v1")
++        .select("name, description, organization_type, city, country"),
++    ]);
++
++    const qLower = q.toLowerCase();
++    let count = 0;
++
++    if (bizRes.data) {
++      count += bizRes.data.filter((b: any) => {
++        const searchString =
++          `${b.name || ""} ${b.description || ""} ${b.industry_name || ""} ${b.city || ""} ${b.country || ""}`.toLowerCase();
++        return searchString.includes(qLower);
++      }).length;
++    }
++
++    if (orgRes.data) {
++      count += orgRes.data.filter((o: any) => {
++        const searchString =
++          `${o.name || ""} ${o.description || ""} ${o.organization_type || ""} ${o.city || ""} ${o.country || ""}`.toLowerCase();
++        return searchString.includes(qLower);
++      }).length;
++    }
++
++    return count;
++  } catch (err) {
++    console.error("Error getting entities count:", err);
++    return 0;
++  }
++}
+diff --git a/lib/types/business-directory.ts b/lib/types/business-directory.ts
+index 91384f1..7c49507 100644
+--- a/lib/types/business-directory.ts
++++ b/lib/types/business-directory.ts
+@@ -23,6 +23,12 @@ export type BusinessDirectoryRow = {
+   is_verified: boolean;
+   created_at: string;
+   updated_at: string;
++  logo_url?: string | null;
++  google_maps_url?: string | null;
++  google_rating?: number | null;
++  google_reviews_count?: number | null;
++  wac_rating?: number | null;
++  wac_reviews_count?: number | null;
+ };
+ 
+ export type BusinessProfile = BusinessDirectoryRow;
+diff --git a/lib/types/network-feed.ts b/lib/types/network-feed.ts
+index 6f604c5..09bcbd0 100644
+--- a/lib/types/network-feed.ts
++++ b/lib/types/network-feed.ts
+@@ -1,8 +1,14 @@
+-import { PersonDirectoryRow } from "./person-directory"
++// Types for the Interactive Network Feed
++
+ 
+ export interface NetworkPost {
+   id: string
+-  author_id: string
++  submitted_by: string
++  
++  author_profile_id: string | null
++  author_business_id: string | null
++  author_organization_id: string | null
++  
+   content: string
+   post_type: 'general' | 'opportunity' | 'ask'
+   image_url: string | null
+@@ -11,26 +17,37 @@ export interface NetworkPost {
+   created_at: string
+   updated_at: string
+   
+-  // Joined relation
+-  author?: PersonDirectoryRow
++  // Joined relations
++  author_profile?: { full_name: string | null; username: string | null; headline: string | null; avatar_url: string | null; is_verified: boolean }
++  author_business?: { name: string; slug: string; business_type: string | null; logo_url: string | null; is_verified: boolean }
++  author_organization?: { name: string; slug: string; organization_type: string | null; logo_url: string | null; is_verified: boolean }
++  
+   // Client state
+-  user_has_liked?: boolean
++  user_reaction_type?: 'like' | 'heart' | 'laugh' | 'applause' | null
+ }
+ 
+ export interface NetworkComment {
+   id: string
+   post_id: string
+-  author_id: string
++  submitted_by: string
++  
++  author_profile_id: string | null
++  author_business_id: string | null
++  author_organization_id: string | null
++  
+   content: string
+   created_at: string
++  updated_at: string
+   
+-  // Joined relation
+-  author?: PersonDirectoryRow
++  // Joined relations
++  author_profile?: { full_name: string | null; username: string | null; headline: string | null; avatar_url: string | null; is_verified: boolean }
++  author_business?: { name: string; slug: string; business_type: string | null; logo_url: string | null; is_verified: boolean }
++  author_organization?: { name: string; slug: string; organization_type: string | null; logo_url: string | null; is_verified: boolean }
+ }
+ 
+ export interface NetworkLike {
+   id: string
+   post_id: string
+-  user_id: string
++  profile_id: string
+   created_at: string
+ }
+diff --git a/lib/types/organization-directory.ts b/lib/types/organization-directory.ts
+index 0e978c2..6eb920f 100644
+--- a/lib/types/organization-directory.ts
++++ b/lib/types/organization-directory.ts
+@@ -12,4 +12,10 @@ export interface OrganizationDirectoryEntry {
+   leader_name: string | null;
+   is_verified: boolean;
+   created_at: string;
++  logo_url?: string | null;
++  google_maps_url?: string | null;
++  google_rating?: number | null;
++  google_reviews_count?: number | null;
++  wac_rating?: number | null;
++  wac_reviews_count?: number | null;
+ }
+diff --git a/next.config.ts b/next.config.ts
+index e9ffa30..b6318ef 100644
+--- a/next.config.ts
++++ b/next.config.ts
+@@ -1,7 +1,22 @@
+ import type { NextConfig } from "next";
+ 
+ const nextConfig: NextConfig = {
+-  /* config options here */
++  images: {
++    remotePatterns: [
++      {
++        protocol: "https",
++        hostname: "i.postimg.cc",
++      },
++      {
++        protocol: "https",
++        hostname: "images.unsplash.com",
++      },
++      {
++        protocol: "https",
++        hostname: "i.pravatar.cc",
++      },
++    ],
++  },
+ };
+ 
+ export default nextConfig;

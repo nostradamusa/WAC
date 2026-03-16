@@ -1,0 +1,34 @@
+export type BusinessDirectoryRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  industry_id: string | null;
+  industry_name: string | null;
+  industry_slug: string | null;
+  business_type: string | null;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  website: string | null;
+  linkedin: string | null;
+  instagram: string | null;
+  phone: string | null;
+  email: string | null;
+  employee_count_range: string | null;
+  founded_year: number | null;
+  hiring_status: string | null;
+  is_public: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+  logo_url?: string | null;
+  google_maps_url?: string | null;
+  google_rating?: number | null;
+  google_reviews_count?: number | null;
+  wac_rating?: number | null;
+  wac_reviews_count?: number | null;
+};
+
+export type BusinessProfile = BusinessDirectoryRow;
