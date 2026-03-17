@@ -19,9 +19,10 @@ interface ReactionIconProps {
   onClick?: (e: React.MouseEvent) => void;
   title?: string;
   animateOnClick?: boolean;
+  showTooltip?: boolean;
 }
 
-export function ReactionIcon({ type, size = 16, className = "", active = false, onClick, title, animateOnClick = true }: ReactionIconProps) {
+export function ReactionIcon({ type, size = 16, className = "", active = false, onClick, title, animateOnClick = true, showTooltip = true }: ReactionIconProps) {
   const [isAnimating, setIsAnimating] = useState(false);
 
   // Fallbacks for mapping existing string emojis to our standard system
@@ -41,10 +42,10 @@ export function ReactionIcon({ type, size = 16, className = "", active = false, 
     if (onClick) onClick(e);
   };
 
-  const scaleClass = active ? "scale-[1.15] drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]" : "opacity-80";
-  const hoverAnimClass = "hover:scale-[1.8] hover:-translate-y-1.5 origin-bottom hover:opacity-100 hover:drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)] z-0 hover:z-50";
+  const scaleClass = active ? "scale-[1.15] drop-shadow-[0_0_10px_rgba(255,255,255,0.6)] opacity-100" : "opacity-80";
+  const hoverAnimClass = "group-hover/reaction:scale-[1.8] group-hover/reaction:-translate-y-1.5 origin-bottom group-hover/reaction:opacity-100 group-hover/reaction:drop-shadow-[0_8px_16px_rgba(0,0,0,0.5)] z-10 group-hover/reaction:z-50";
   const animClass = isAnimating ? "animate-pop-bounce" : "";
-  const baseClasses = `relative transition-all duration-300 transform inline-flex items-center justify-center ${scaleClass} ${hoverAnimClass} ${animClass} group ${className}`;
+  const baseClasses = `relative inline-flex items-center justify-center group/reaction ${className}`;
 
   const renderIcon = () => {
     const defaultEmoji = '👍';
@@ -63,17 +64,19 @@ export function ReactionIcon({ type, size = 16, className = "", active = false, 
       className={`inline-flex cursor-pointer select-none leading-none ${baseClasses}`}
       style={{ fontSize: `${size}px` }}
     >
-      <span className="relative z-10 transition-transform duration-300 ease-out flex items-center justify-center">
+      <span className={`relative transition-all duration-300 ease-out flex items-center justify-center transform ${scaleClass} ${hoverAnimClass} ${animClass}`}>
         {emoji}
       </span>
       
       {/* LinkedIn-style Gorgeous Tooltip */}
-      <div 
-        className="absolute -top-[1.75rem] left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 text-white text-[10px] font-bold px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 delay-100 scale-75 group-hover:scale-100 whitespace-nowrap pointer-events-none shadow-xl z-50 flex items-center justify-center pt-1.5"
-        style={{ fontSize: '0.6rem' }}
-      >
-         {title || label}
-      </div>
+      {showTooltip && (
+        <div 
+          className="absolute -top-[1.75rem] left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 text-white text-[10px] font-bold px-2 py-1 rounded-full opacity-0 group-hover/reaction:opacity-100 transition-all duration-200 delay-100 scale-75 group-hover/reaction:scale-100 whitespace-nowrap pointer-events-none shadow-xl z-50 flex items-center justify-center pt-1.5"
+          style={{ fontSize: '0.6rem' }}
+        >
+           {title || label}
+        </div>
+      )}
     </span>
   );
 }

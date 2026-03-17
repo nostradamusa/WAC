@@ -48,7 +48,7 @@ export default function WacSelect({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] text-left flex justify-between items-center"
+        className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] text-left flex justify-between items-center"
       >
         <span className={!selectedOption ? "opacity-60" : ""}>
           {selectedOption ? selectedOption.label : placeholder}

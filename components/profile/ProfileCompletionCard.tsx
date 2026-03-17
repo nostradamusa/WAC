@@ -1,4 +1,4 @@
-type ProfileFieldTarget =
+export type ProfileFieldTarget =
   | "fullName"
   | "username"
   | "headline"
@@ -9,9 +9,18 @@ type ProfileFieldTarget =
   | "stateRegion"
   | "city"
   | "ancestryCity"
+  | "tagline"
+  | "streetAddress"
+  | "addressLine2"
+  | "zipCode"
+  | "mapVisibility"
+  | "dateOfBirth"
+  | "gender"
   | "bio"
   | "skills"
-  | "experience";
+  | "experience"
+  | "personalDetails"
+  | "birthdayVisibility";
 
 type ProfileCompletionCardProps = {
   fullName: string;
@@ -25,6 +34,11 @@ type ProfileCompletionCardProps = {
   city: string;
   ancestryCity: string;
   bio: string;
+  tagline?: string;
+  streetAddress?: string;
+  zipCode?: string;
+  dateOfBirth?: string;
+  gender?: string;
   selectedSkillIds: string[];
   hasExperience: boolean;
   onJumpToField?: (field: ProfileFieldTarget) => void;
@@ -55,6 +69,11 @@ export default function ProfileCompletionCard({
   city,
   ancestryCity,
   bio,
+  tagline = "",
+  streetAddress = "",
+  zipCode = "",
+  dateOfBirth = "",
+  gender = "",
   selectedSkillIds,
   hasExperience,
   onJumpToField,
@@ -125,6 +144,36 @@ export default function ProfileCompletionCard({
       completed: bio.trim().length > 0,
       required: true,
       target: "bio",
+    },
+    {
+      label: "Tagline",
+      completed: tagline.trim().length > 0,
+      required: false,
+      target: "tagline",
+    },
+    {
+      label: "Street Address",
+      completed: streetAddress.trim().length > 0,
+      required: true,
+      target: "streetAddress",
+    },
+    {
+      label: "ZIP Code",
+      completed: zipCode.trim().length > 0,
+      required: true,
+      target: "zipCode",
+    },
+    {
+      label: "Date of Birth",
+      completed: dateOfBirth.trim().length > 0,
+      required: true,
+      target: "dateOfBirth",
+    },
+    {
+      label: "Gender",
+      completed: gender.trim().length > 0,
+      required: true,
+      target: "gender",
     },
     {
       label: "Skills",

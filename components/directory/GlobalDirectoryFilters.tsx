@@ -1,267 +1,177 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { FormEvent, useState, useEffect } from "react";
-import WacSelect, { WacSelectOption } from "@/components/ui/WacSelect";
+import { FormEvent } from "react";
+import { ChevronDown } from "lucide-react";
 
 type GlobalDirectoryFiltersProps = {
-  activeTab: "people" | "entities";
   totalResults: number;
+  scope: "all" | "people" | "businesses" | "groups" | "events";
 };
 
 export default function GlobalDirectoryFilters({
-  activeTab,
   totalResults,
+  scope,
 }: GlobalDirectoryFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // People Filters
-  const [country, setCountry] = useState(searchParams.get("country") || "");
-  const [industry, setIndustry] = useState(searchParams.get("industry") || "");
-  const [specialty, setSpecialty] = useState(
-    searchParams.get("specialty") || "",
-  );
-  const [mentorOnly, setMentorOnly] = useState(
-    searchParams.get("mentor") === "true",
-  );
-  const [openToWork, setOpenToWork] = useState(
-    searchParams.get("work") === "true",
-  );
-  const [openToHire, setOpenToHire] = useState(
-    searchParams.get("hire") === "true",
-  );
-
-  // Entity Filters (Currently client-side handled in EntitiesTab, but we manage state here)
-  const [entityType, setEntityType] = useState(
-    searchParams.get("filter") || "all",
-  );
-  const [entityLocation, setEntityLocation] = useState(
-    searchParams.get("location") || "",
-  );
-
-  const entityOptions: WacSelectOption[] = [
-    { value: "all", label: "All Entities" },
-    { value: "businesses", label: "Businesses" },
-    { value: "organizations", label: "Organizations" },
-  ];
-
-  // Keep state in sync if URL changes externally (e.g. going back)
-  useEffect(() => {
-    setCountry(searchParams.get("country") || "");
-    setIndustry(searchParams.get("industry") || "");
-    setSpecialty(searchParams.get("specialty") || "");
-    setMentorOnly(searchParams.get("mentor") === "true");
-    setOpenToWork(searchParams.get("work") === "true");
-    setOpenToHire(searchParams.get("hire") === "true");
-    setEntityType(searchParams.get("filter") || "all");
-    setEntityLocation(searchParams.get("location") || "");
-  }, [searchParams]);
-
-  function handleApplyFilters(e: FormEvent) {
+  function handleApplyFilters(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     const params = new URLSearchParams(searchParams.toString());
 
-    if (activeTab === "people") {
-      if (country) params.set("country", country);
-      else params.delete("country");
+    const country = formData.get("country") as string;
+    const industry = formData.get("industry") as string;
+    const specialty = formData.get("specialty") as string;
+    const mentorOnly = formData.get("mentor") === "true";
+    const openToWork = formData.get("work") === "true";
+    const openToHire = formData.get("hire") === "true";
+    const invest = formData.get("invest") === "true";
+    const collab = formData.get("collab") === "true";
+    const scopeVal = formData.get("scope") as string;
 
-      if (industry) params.set("industry", industry);
-      else params.delete("industry");
-
-      if (specialty) params.set("specialty", specialty);
-      else params.delete("specialty");
-
-      if (mentorOnly) params.set("mentor", "true");
-      else params.delete("mentor");
-
-      if (openToWork) params.set("work", "true");
-      else params.delete("work");
-
-      if (openToHire) params.set("hire", "true");
-      else params.delete("hire");
-
-      // Clear entity specific params when applying people filters
-      params.delete("filter");
-      params.delete("location");
-    } else {
-      // Entities Tab
-      if (entityType && entityType !== "all") params.set("filter", entityType);
-      else params.delete("filter");
-
-      if (entityLocation) params.set("location", entityLocation);
-      else params.delete("location");
-
-      // Clear people specific params when applying entity filters
-      params.delete("country");
-      params.delete("industry");
-      params.delete("specialty");
-      params.delete("mentor");
-      params.delete("work");
-      params.delete("hire");
-    }
+    if (country) params.set("country", country); else params.delete("country");
+    if (industry) params.set("industry", industry); else params.delete("industry");
+    if (specialty) params.set("specialty", specialty); else params.delete("specialty");
+    if (mentorOnly) params.set("mentor", "true"); else params.delete("mentor");
+    if (openToWork) params.set("work", "true"); else params.delete("work");
+    if (openToHire) params.set("hire", "true"); else params.delete("hire");
+    if (invest) params.set("invest", "true"); else params.delete("invest");
+    if (collab) params.set("collab", "true"); else params.delete("collab");
+    
+    if (scopeVal && scopeVal !== "all") params.set("scope", scopeVal);
+    else params.delete("scope");
 
     router.push(`${pathname}?${params.toString()}`);
   }
 
   function handleClearFilters() {
-    // Keep only the 'q' (search) parameter and the 'tab' parameter if they exist
     const q = searchParams.get("q");
-    const tab = searchParams.get("tab");
-
-    // Clear local state
-    setCountry("");
-    setIndustry("");
-    setSpecialty("");
-    setMentorOnly(false);
-    setOpenToWork(false);
-    setOpenToHire(false);
-    setEntityType("all");
-    setEntityLocation("");
-
-    // Update URL
-    let url = pathname;
+    const s = searchParams.get("scope");
+    
+    // Using native form reset is handled by the form inherently, but router push will rerender.
     const params = new URLSearchParams();
-    if (tab) params.set("tab", tab);
+    if (s) params.set("scope", s);
     if (q) params.set("q", q);
 
-    if (params.toString()) {
-      url += `?${params.toString()}`;
-    }
-
+    let url = pathname;
+    if (params.toString()) url += `?${params.toString()}`;
     router.push(url);
   }
 
   return (
-    <section className="wac-card p-5 sticky top-24 z-30">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold font-serif tracking-tight">
-          Focus Directory
-        </h2>
-        <p className="mt-1 text-xs opacity-70">Tailor your network view.</p>
-      </div>
+    <div className="w-full">
+      <form onSubmit={handleApplyFilters} className="space-y-0">
+        
+        {/* SECTION 1: INTENT */}
+        {(scope === "all" || scope === "people") && (
+          <div className="space-y-3 pb-6 border-b border-white/10">
+            <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-4">Intent</h3>
+            
+            <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-4 py-3 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
+              <input type="checkbox" name="mentor" value="true" defaultChecked={searchParams.get("mentor") === "true"} className="accent-[var(--accent)]" />
+              Mentoring
+            </label>
 
-      <form onSubmit={handleApplyFilters} className="space-y-4">
-        {activeTab === "people" ? (
-          <>
-            <div>
-              <label
-                htmlFor="country"
-                className="mb-1.5 block text-xs font-medium opacity-80 uppercase tracking-wider"
-              >
-                Country
-              </label>
-              <input
-                id="country"
-                type="text"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="e.g. United States"
-                className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-            </div>
+            <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-4 py-3 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
+              <input type="checkbox" name="hire" value="true" defaultChecked={searchParams.get("hire") === "true"} className="accent-[var(--accent)]" />
+              Hiring
+            </label>
 
-            <div>
-              <label
-                htmlFor="industry"
-                className="mb-1.5 block text-xs font-medium opacity-80 uppercase tracking-wider"
-              >
-                Industry
-              </label>
-              <input
-                id="industry"
-                type="text"
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                placeholder="e.g. Healthcare"
-                className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-            </div>
+            <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-4 py-3 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
+              <input type="checkbox" name="work" value="true" defaultChecked={searchParams.get("work") === "true"} className="accent-[var(--accent)]" />
+              Open to Work
+            </label>
+            
+            <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-4 py-3 text-xs font-medium opacity-50 cursor-not-allowed">
+              <input type="checkbox" disabled className="accent-[var(--accent)]" />
+              Investing (Future)
+            </label>
 
-            <div>
-              <label
-                htmlFor="specialty"
-                className="mb-1.5 block text-xs font-medium opacity-80 uppercase tracking-wider"
-              >
+            <label className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-4 py-3 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
+              <input type="checkbox" name="collab" value="true" defaultChecked={searchParams.get("collab") === "true"} className="accent-[var(--accent)]" />
+              Collaborating
+            </label>
+          </div>
+        )}
+
+        {/* SECTION 2: TYPE (SCOPE) */}
+        <div className="space-y-3 py-6 border-b border-white/10">
+          <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-4">Type</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <label className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold cursor-pointer transition ${scope === "all" ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]" : "bg-white/5 border-transparent text-white/70 hover:text-white"}`}>
+              <input type="radio" name="scope" value="all" defaultChecked={scope === "all" || !scope} className="sr-only" />
+              All
+            </label>
+            <label className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold cursor-pointer transition ${scope === "people" ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]" : "bg-white/5 border-transparent text-white/70 hover:text-white"}`}>
+              <input type="radio" name="scope" value="people" defaultChecked={scope === "people"} className="sr-only" />
+              People
+            </label>
+            <label className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold cursor-pointer transition ${scope === "businesses" ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]" : "bg-white/5 border-transparent text-white/70 hover:text-white"}`}>
+              <input type="radio" name="scope" value="businesses" defaultChecked={scope === "businesses"} className="sr-only" />
+              Businesses
+            </label>
+            <label className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-xs font-bold cursor-pointer transition ${scope === "groups" ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]" : "bg-white/5 border-transparent text-white/70 hover:text-white"}`}>
+              <input type="radio" name="scope" value="groups" defaultChecked={scope === "groups"} className="sr-only" />
+              Groups
+            </label>
+            <label className={`flex items-center justify-center gap-2 rounded-xl col-span-2 border px-3 py-3 text-xs font-bold cursor-pointer transition ${scope === "events" ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]" : "bg-white/5 border-transparent text-white/70 hover:text-white"}`}>
+              <input type="radio" name="scope" value="events" defaultChecked={scope === "events"} className="sr-only" />
+              Events
+            </label>
+          </div>
+        </div>
+
+        {/* SECTION 3: LOCATION */}
+        <div className="py-6 border-b border-white/10">
+          <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-4">Location</h3>
+          <label htmlFor="country" className="mb-1.5 block text-xs font-medium opacity-60 uppercase tracking-widest">
+            Country / Region
+          </label>
+          <input
+            id="country"
+            name="country"
+            type="text"
+            defaultValue={searchParams.get("country") || ""}
+            className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
+          />
+        </div>
+
+        {/* SECTION 4: INDUSTRY */}
+        <div className="py-6 border-b border-white/10">
+          <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-4">Industry</h3>
+          <input
+            id="industry"
+            name="industry"
+            type="text"
+            defaultValue={searchParams.get("industry") || ""}
+            placeholder="e.g. Healthcare, Tech"
+            className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
+          />
+        </div>
+
+        {/* SECTION 5: ADVANCED */}
+        {(scope === "all" || scope === "people") && (
+          <details className="py-6 group">
+            <summary className="text-sm font-bold text-white tracking-widest uppercase cursor-pointer list-none flex items-center justify-between outline-none">
+              Advanced <ChevronDown size={18} className="text-white/40 group-open:rotate-180 transition-transform" />
+            </summary>
+            <div className="pt-6 space-y-2">
+              <label htmlFor="specialty" className="mb-1.5 block text-xs font-medium opacity-60 uppercase tracking-widest">
                 Specialty
               </label>
               <input
                 id="specialty"
+                name="specialty"
                 type="text"
-                value={specialty}
-                onChange={(e) => setSpecialty(e.target.value)}
-                placeholder="e.g. Cardiology"
-                className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
+                defaultValue={searchParams.get("specialty") || ""}
+                placeholder="e.g. Cardiology, Frontend"
+                className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
               />
             </div>
-
-            <div className="space-y-2 pt-2 border-t border-[var(--foreground)]/10">
-              <label className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-5 py-2.5 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
-                <input
-                  type="checkbox"
-                  checked={mentorOnly}
-                  onChange={(e) => setMentorOnly(e.target.checked)}
-                  className="accent-[var(--accent)]"
-                />
-                Open to mentoring
-              </label>
-
-              <label className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-5 py-2.5 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
-                <input
-                  type="checkbox"
-                  checked={openToWork}
-                  onChange={(e) => setOpenToWork(e.target.checked)}
-                  className="accent-[var(--accent)]"
-                />
-                Open to Work
-              </label>
-
-              <label className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.01)] px-5 py-2.5 text-xs font-medium cursor-pointer hover:border-[var(--accent)]/50 transition">
-                <input
-                  type="checkbox"
-                  checked={openToHire}
-                  onChange={(e) => setOpenToHire(e.target.checked)}
-                  className="accent-[var(--accent)]"
-                />
-                Hiring
-              </label>
-            </div>
-          </>
-        ) : (
-          <>
-            <div>
-              <label
-                htmlFor="entityType"
-                className="mb-1.5 block text-xs font-medium opacity-80 uppercase tracking-wider"
-              >
-                Entity Type
-              </label>
-              <WacSelect
-                id="entityType"
-                options={entityOptions}
-                value={entityType}
-                onChange={setEntityType}
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="entityLocation"
-                className="mb-1.5 block text-xs font-medium opacity-80 uppercase tracking-wider"
-              >
-                Location
-              </label>
-              <input
-                id="entityLocation"
-                type="text"
-                value={entityLocation}
-                onChange={(e) => setEntityLocation(e.target.value)}
-                placeholder="e.g. New York"
-                className="w-full rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-2.5 text-sm outline-none transition focus:border-[var(--accent)]"
-              />
-            </div>
-          </>
+          </details>
         )}
 
         <div className="flex gap-3 pt-4">
@@ -272,27 +182,14 @@ export default function GlobalDirectoryFilters({
             Apply Filters
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={handleClearFilters}
-          className="w-full block text-center text-xs font-medium opacity-60 hover:opacity-100 hover:text-[var(--accent)] transition py-2"
-        >
-          Clear all filters
-        </button>
       </form>
 
-      <div className="mt-6 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-5 py-3 text-xs flex justify-between items-center">
-        <span className="opacity-70">
-          {activeTab === "people" ? "Network Size" : "Entities Indexed"}
-        </span>
-        <div className="font-bold text-[var(--accent)]">
-          {totalResults}{" "}
-          <span className="text-[var(--foreground)] opacity-50 font-normal">
-            found
-          </span>
+      <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[#111] px-5 py-4 text-xs flex flex-col items-center">
+        <span className="opacity-70 mb-1 font-medium tracking-wide uppercase">Results Found</span>
+        <div className="font-bold text-[var(--accent)] text-2xl">
+          {totalResults}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

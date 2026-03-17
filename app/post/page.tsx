@@ -98,7 +98,7 @@ export default function ComposePostPage() {
             <span className="font-bold text-lg hidden sm:inline opacity-0">New Post</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-[var(--accent)] text-sm font-bold opacity-80 cursor-pointer hidden sm:block hover:opacity-100 transition">Drafts</span>
+            <button type="button" className="text-[var(--accent)] text-sm font-bold opacity-80 cursor-pointer hidden sm:block hover:opacity-100 transition focus:outline-none focus:underline">Drafts</button>
             <button
               onClick={handleSubmit}
               disabled={!content.trim() || isSubmitting}

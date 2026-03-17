@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
+import type { BusinessProfile } from "@/lib/types/business-directory";
+import type { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
 
 // A combined type matching our new `v_people_directory_enriched` PostgreSQL view
 export type EnrichedDirectoryPerson = PersonDirectoryRow & {
@@ -175,6 +177,66 @@ function matchesSearch(person: EnrichedDirectoryPerson, q: string) {
     const expansions = STATE_MAP[term] ? [term, ...STATE_MAP[term]] : [term];
     return expansions.some((exp) => haystack.includes(exp));
   });
+}
+
+/**
+ * Fetch and filter businesses and organizations simultaneously.
+ */
+export async function getEntitiesDirectory(filters: SearchFilters): Promise<{
+  businesses: BusinessProfile[];
+  organizations: OrganizationDirectoryEntry[];
+  error?: Error | null;
+}> {
+  try {
+    const [bizRes, orgRes] = await Promise.all([
+      supabase.from("businesses_directory_v1").select("*").order("name"),
+      supabase.from("organizations_directory_v1").select("*").order("name"),
+    ]);
+
+    let businesses = (bizRes.data || []) as BusinessProfile[];
+    let organizations = (orgRes.data || []) as OrganizationDirectoryEntry[];
+
+    // Global Text Search (unified matching)
+    if (filters.q) {
+      const qLower = filters.q.toLowerCase()
+        .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
+        .replace(/\b(in|the|a|an|for|of|at|from)\b/g, " ");
+      const terms = qLower.split(/\s+/).filter((term) => term.length > 0);
+
+      const matchesTerm = (haystack: string, term: string) => {
+        const expansions = STATE_MAP[term] ? [term, ...STATE_MAP[term]] : [term];
+        return expansions.some((exp) => haystack.includes(exp));
+      };
+
+      businesses = businesses.filter((b) => {
+        const haystack = `${b.name || ""} ${b.description || ""} ${b.industry_name || ""} ${b.city || ""} ${b.state || ""} ${b.country || ""}`.toLowerCase();
+        return terms.every((term) => matchesTerm(haystack, term));
+      });
+
+      organizations = organizations.filter((o) => {
+        const haystack = `${o.name || ""} ${o.description || ""} ${o.organization_type || ""} ${o.city || ""} ${o.state || ""} ${o.country || ""}`.toLowerCase();
+        return terms.every((term) => matchesTerm(haystack, term));
+      });
+    }
+
+    // Exact Match Filters
+    if (filters.country) {
+      const c = filters.country.toLowerCase();
+      businesses = businesses.filter((b) => b.country?.toLowerCase() === c);
+      organizations = organizations.filter((o) => o.country?.toLowerCase() === c);
+    }
+
+    if (filters.industry) {
+      const ind = filters.industry.toLowerCase();
+      businesses = businesses.filter((b) => b.industry_name?.toLowerCase() === ind);
+      // organizations don't strictly have 'industry_name', but if they want to match on it we could or skip
+    }
+
+    return { businesses, organizations, error: null };
+  } catch (err: any) {
+    console.error("Error fetching entities directory:", err);
+    return { businesses: [], organizations: [], error: err };
+  }
 }
 
 /**

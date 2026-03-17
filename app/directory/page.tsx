@@ -1,67 +1,23 @@
 import { Suspense } from "react";
-import PeopleDirectoryLayout from "@/components/people/layout/PeopleDirectoryLayout";
-import PeopleResults from "@/components/people/results/PeopleResults";
-import PeopleSkeleton from "@/components/people/results/PeopleSkeleton";
-import PeopleSearchBar from "@/components/people/search/PeopleSearchBar";
-import DirectoryTabs from "@/components/directory/DirectoryTabs";
+import UnifiedDiscoveryLayout from "@/components/directory/UnifiedDiscoveryLayout";
+import UnifiedResults from "@/components/directory/UnifiedResults";
 import GlobalDirectoryFilters from "@/components/directory/GlobalDirectoryFilters";
-import EntitiesTab from "@/components/directory/EntitiesTab";
 import {
   getPeopleDirectory,
-  getEntitiesCount,
-  type UserProfileForRelevance,
+  getEntitiesDirectory,
 } from "@/lib/services/searchService";
 import { supabase } from "@/lib/supabase";
-import type {
-  EnrichedDirectoryPerson,
-  SearchFilters,
-} from "@/lib/services/searchService";
+import type { SearchFilters, EnrichedDirectoryPerson } from "@/lib/services/searchService";
+import type { EventDirectoryEntry } from "@/lib/types/event-directory";
 
-export type PeoplePageFilters = SearchFilters & {
-  tab?: string;
-  filter?: string; // Entities type
-  location?: string; // Entities location
-};
+export const dynamic = "force-dynamic";
 
-function buildActiveFilterPills(filters: PeoplePageFilters) {
-  const pills: Array<{ label: string; value: string }> = [];
-
-  if (filters.q) pills.push({ label: "Search", value: filters.q });
-
-  // People Filters
-  if (filters.country) pills.push({ label: "Country", value: filters.country });
-  if (filters.industry)
-    pills.push({ label: "Industry", value: filters.industry });
-  if (filters.specialty)
-    pills.push({ label: "Specialty", value: filters.specialty });
-  if (filters.mentorOnly)
-    pills.push({ label: "Mentor", value: "Open to mentoring" });
-  if (filters.openToWork)
-    pills.push({ label: "Status", value: "Open to Work" });
-  if (filters.openToHire) pills.push({ label: "Status", value: "Hiring" });
-  if (filters.openToInvest) pills.push({ label: "Status", value: "Investing" });
-  if (filters.openToCollaborate) pills.push({ label: "Status", value: "Collaborating" });
-
-  // Entity Filters
-  if (filters.filter && filters.filter !== "all") {
-    pills.push({
-      label: "Type",
-      value: filters.filter === "businesses" ? "Businesses" : "Organizations",
-    });
-  }
-  if (filters.location) {
-    pills.push({ label: "Location", value: filters.location });
-  }
-
-  return pills;
-}
-
-export default async function PeoplePage({
+export default async function DirectoryPage({
   searchParams,
 }: {
   searchParams: Promise<{
     q?: string;
-    tab?: string;
+    scope?: string;
     country?: string;
     industry?: string;
     specialty?: string;
@@ -70,16 +26,17 @@ export default async function PeoplePage({
     hire?: string;
     invest?: string;
     collab?: string;
-    filter?: string;
-    location?: string;
   }>;
 }) {
   const params = await searchParams;
-  const activeTab = (params.tab as "people" | "entities") || "people";
+  const scopeRaw = params.scope?.toLowerCase() || "all";
+  const mappedScope = scopeRaw === "organizations" ? "groups" : scopeRaw;
+  
+  const validScopes: string[] = ["all", "people", "groups", "businesses", "events"];
+  const scope = validScopes.includes(mappedScope) ? (mappedScope as "all" | "people" | "groups" | "businesses" | "events") : "all";
 
-  const filters: PeoplePageFilters = {
+  const filters: SearchFilters = {
     q: params.q?.trim() ?? "",
-    tab: activeTab,
     country: params.country?.trim() ?? "",
     industry: params.industry?.trim() ?? "",
     specialty: params.specialty?.trim() ?? "",
@@ -88,85 +45,85 @@ export default async function PeoplePage({
     openToHire: params.hire === "true",
     openToInvest: params.invest === "true",
     openToCollaborate: params.collab === "true",
-    filter: params.filter?.trim() ?? "",
-    location: params.location?.trim() ?? "",
   };
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: people, error } = await getPeopleDirectory(filters, user?.id);
-  const entitiesCount = filters.q
-    ? await getEntitiesCount(filters.q)
-    : undefined;
+  const fetchPeople = scope === "all" || scope === "people";
+  const fetchEntities = scope === "all" || scope === "groups" || scope === "businesses";
+  const fetchEvents = scope === "all" || scope === "events";
 
-  if (error) {
-    return (
-      <main className="wac-page">
-        <div className="wac-card p-8">
-          <h1 className="text-3xl font-bold">People Directory</h1>
-          <p className="mt-4 text-red-400">
-            Failed to load directory: {error.message}
-          </p>
-        </div>
-      </main>
-    );
-  }
+  const [peopleRes, entitiesRes] = await Promise.all([
+    fetchPeople ? getPeopleDirectory(filters, user?.id) : Promise.resolve({ data: [], error: null, count: 0 }),
+    fetchEntities ? getEntitiesDirectory(filters) : Promise.resolve({ businesses: [], organizations: [], error: null })
+  ]);
 
-  const activeFilterPills = buildActiveFilterPills(filters);
+  const people = peopleRes.data;
+  const businesses = scope === "all" || scope === "businesses" ? entitiesRes.businesses : [];
+  const groups = scope === "all" || scope === "groups" ? entitiesRes.organizations : [];
+  
+  const mockEvents: EventDirectoryEntry[] = [
+    {
+      id: "ev-1",
+      name: "Global Albanian Tech Summit 2026",
+      slug: "tech-summit-2026",
+      date: "2026-10-15",
+      time: "9:00 AM EST",
+      location: "Javits Center",
+      city: "New York",
+      state: "NY",
+      country: "USA",
+      description: "Join thousands of Albanian professionals for the largest tech and innovation summit of the year. Featuring keynote speakers from top tier firms.",
+      attendees_count: 1250,
+    },
+    {
+      id: "ev-2",
+      name: "Illyrian Founders Retreat",
+      slug: "founders-retreat",
+      date: "2026-11-05",
+      time: "10:00 AM CET",
+      location: "Marriot Hotel",
+      city: "Tirana",
+      country: "Albania",
+      description: "An exclusive weekend retreat for Albanian founders and venture capitalists discussing the future of the Balkan tech ecosystem.",
+      attendees_count: 45,
+    }
+  ];
+
+  // TODO: Implement actual getEventsDirectory backend service once DB schema expands
+  const events: EventDirectoryEntry[] = fetchEvents ? mockEvents : [];
+
+  const totalResults = people.length + businesses.length + groups.length + events.length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--background)]">
-      <DirectoryTabs
-        peopleCount={filters.q ? people.length : undefined}
-        entitiesCount={entitiesCount}
-      />
-      <main className="w-full max-w-[90rem] mx-auto px-4 pb-20">
-        <PeopleSearchBar initialQuery={filters.q} activeTab={activeTab} />
-
-        {activeFilterPills.length > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            {activeFilterPills.map((pill) => (
-              <div
-                key={`${pill.label}-${pill.value}`}
-                className="rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs"
-              >
-                <span className="opacity-70">{pill.label}:</span> {pill.value}
-              </div>
-            ))}
+    <UnifiedDiscoveryLayout
+      initialQuery={filters.q || ""}
+      scope={scope}
+      defaultFiltersOpen={false}
+      filtersConfig={<GlobalDirectoryFilters totalResults={totalResults} scope={scope} />}
+      totalResults={totalResults}
+      peopleCount={people.length}
+      businessCount={businesses.length}
+      groupsCount={groups.length}
+      eventsCount={events.length}
+      results={
+        <Suspense fallback={
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+             {[1, 2, 3, 4, 5, 6].map((i) => (
+               <div key={i} className="wac-card p-6 h-[250px] animate-pulse flex flex-col justify-between" />
+             ))}
           </div>
-        )}
-
-        {activeTab === "people" ? (
-          <PeopleDirectoryLayout
-            filters={
-              <GlobalDirectoryFilters
-                activeTab="people"
-                totalResults={people.length}
-              />
-            }
-            results={
-              <Suspense fallback={<PeopleSkeleton />}>
-                <PeopleResults people={people as EnrichedDirectoryPerson[]} />
-              </Suspense>
-            }
+        }>
+          <UnifiedResults
+            query={filters.q || undefined}
+            scope={scope}
+            people={people as EnrichedDirectoryPerson[]}
+            businesses={businesses}
+            groups={groups}
+            events={events}
           />
-        ) : (
-          <PeopleDirectoryLayout
-            filters={
-              <GlobalDirectoryFilters
-                activeTab="entities"
-                // Entity count is handled client-side in MVP, we just pass 0 for SSR initial render
-                totalResults={0}
-              />
-            }
-            results={
-              <Suspense fallback={<PeopleSkeleton />}>
-                <EntitiesTab />
-              </Suspense>
-            }
-          />
-        )}
-      </main>
-    </div>
+        </Suspense>
+      }
+    />
   );
 }

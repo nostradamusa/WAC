@@ -598,7 +598,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
                 }}
                 className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition flex items-center gap-3 text-[#D4AF37] font-semibold"
               >
-                <div className="w-6 flex justify-center"><MessageCircle size={16} strokeWidth={2} /></div>
+                <div className="w-6 flex justify-center"><MessageCircle size={16} strokeWidth={2} className="text-[#D4AF37]" /></div>
                 <span>Send in WAC Message</span>
               </button>
               

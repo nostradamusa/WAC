@@ -152,7 +152,7 @@ export default function GroupsHub() {
               <p className="text-xs opacity-70 mb-4 leading-relaxed">
                 Connect with professionals sharing your roots. Manage your profile to get discovered.
               </p>
-              <Link href="/profile" className="block w-full text-center py-2 rounded-full border border-[var(--accent)]/50 text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors">
+              <Link href="/profile" className="flex w-full items-center justify-center py-2.5 rounded-full border border-[var(--accent)]/50 text-[15px] font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors">
                 Update Profile
               </Link>
             </div>

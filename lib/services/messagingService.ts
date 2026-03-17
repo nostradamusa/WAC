@@ -21,12 +21,12 @@ export async function searchMessagingContacts(query: string): Promise<MessagingC
       .limit(5),
     supabase
       .from("businesses")
-      .select("id, name, industry, logo_url, is_verified, slug")
+      .select("id, name, category, logo_url, is_verified, slug")
       .ilike("name", `%${query}%`)
       .limit(5),
     supabase
       .from("organizations")
-      .select("id, name, type, logo_url, is_verified, slug")
+      .select("id, name, organization_type, logo_url, is_verified, slug")
       .ilike("name", `%${query}%`)
       .limit(5)
   ]);
@@ -49,7 +49,7 @@ export async function searchMessagingContacts(query: string): Promise<MessagingC
     results.push(...businessesRes.data.map(b => ({
       id: b.id,
       name: b.name,
-      headline: b.industry,
+      headline: b.category,
       avatar_url: b.logo_url,
       is_verified: b.is_verified || false,
       type: 'business' as const,
@@ -61,7 +61,7 @@ export async function searchMessagingContacts(query: string): Promise<MessagingC
     results.push(...orgsRes.data.map(o => ({
       id: o.id,
       name: o.name,
-      headline: o.type,
+      headline: o.organization_type,
       avatar_url: o.logo_url,
       is_verified: o.is_verified || false,
       type: 'organization' as const,
@@ -135,9 +135,51 @@ export async function getOrCreateConversation(
   }
 }
 
+export async function createGroupConversation(
+  currentUserId: string,
+  participants: { id: string; type: 'user' | 'business' | 'organization' }[],
+  groupName?: string
+): Promise<{ success: boolean; conversationId?: string; error?: any }> {
+  try {
+    // 1. Create a new group conversation
+    const { data: newConversation, error: createConvError } = await supabase
+      .from("conversations")
+      .insert([{ type: 'group', title: groupName || null }])
+      .select("id")
+      .single();
+
+    if (createConvError) throw createConvError;
+
+    const conversationId = newConversation.id;
+
+    // 2. Add all participants, including the current user
+    const allParticipants = [
+      { conversation_id: conversationId, actor_id: currentUserId, actor_type: 'user' },
+      ...participants.map(p => ({
+        conversation_id: conversationId,
+        actor_id: p.id,
+        actor_type: p.type
+      }))
+    ];
+
+    const { error: addParticipantsError } = await supabase
+      .from("conversation_participants")
+      .insert(allParticipants);
+
+    if (addParticipantsError) throw addParticipantsError;
+
+    return { success: true, conversationId };
+
+  } catch (error) {
+    console.error("Error creating group conversation:", error);
+    return { success: false, error };
+  }
+}
+
 export interface ConversationOverview {
   id: string;
   type: 'direct' | 'group';
+  title?: string;
   updated_at: string;
   last_message?: {
     content: string;
@@ -152,6 +194,12 @@ export interface ConversationOverview {
     type: 'user' | 'business' | 'organization';
     is_online?: boolean;
   };
+  participants?: {
+    id: string;
+    name: string;
+    avatar_url: string | null;
+    type: 'user' | 'business' | 'organization';
+  }[];
   unread_count: number;
 }
 
@@ -165,7 +213,7 @@ export async function getUserConversations(
       .select(`
         conversation_id,
         last_read_at,
-        conversations ( id, type, updated_at )
+        conversations ( id, type, title, updated_at )
       `)
       .eq("actor_id", userId);
 
@@ -248,9 +296,16 @@ export async function getUserConversations(
         }
       }
 
+      const groupParts = allParticipants?.filter(op => op.conversation_id === p.conversation_id && conv?.type === 'group');
+      const groupProfiles = groupParts ? groupParts.map(gp => {
+        const prof = profilesMap.get(gp.actor_id);
+        return prof ? { id: gp.actor_id, ...prof } : null;
+      }).filter(Boolean) : [];
+
       return {
         id: p.conversation_id,
         type: conv?.type as "direct" | "group",
+        title: conv?.title || undefined,
         updated_at: conv?.updated_at || "",
         last_message: lastMsg ? {
           content: lastMsg.content,
@@ -258,12 +313,13 @@ export async function getUserConversations(
           sender_id: lastMsg.sender_id,
           is_read: lastMsg.is_read
         } : undefined,
-        other_participant: otherPart && otherPartProfile ? {
+        other_participant: conv?.type === 'direct' && otherPart && otherPartProfile ? {
           id: otherPart.actor_id,
           name: otherPartProfile.name || "Unknown",
           avatar_url: otherPartProfile.avatar_url,
           type: otherPartProfile.type
         } : undefined,
+        participants: conv?.type === 'group' ? groupProfiles : undefined,
         unread_count
       };
     });
@@ -274,5 +330,70 @@ export async function getUserConversations(
   } catch (err) {
     console.error("Error fetching user conversations:", err);
     return [];
+  }
+}
+
+export interface MessageInterface {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  sender_type: 'user' | 'business' | 'organization';
+  content: string;
+  reactions: string[];
+  created_at: string;
+}
+
+export async function getMessages(conversationId: string): Promise<MessageInterface[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error("Error fetching messages:", error);
+    return [];
+  }
+  return data as MessageInterface[];
+}
+
+export async function sendMessage(
+  conversationId: string,
+  senderId: string,
+  senderType: 'user' | 'business' | 'organization',
+  content: string
+): Promise<MessageInterface | null> {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert([{
+      conversation_id: conversationId,
+      sender_id: senderId,
+      sender_type: senderType,
+      content,
+      reactions: []
+    }])
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error sending message:", error);
+    return null;
+  }
+  return data as MessageInterface;
+}
+
+export async function toggleMessageReactionDB(msgId: string, reactionType: string, currentReactions: string[]): Promise<void> {
+  const hasReacted = currentReactions.includes(reactionType);
+  const newReactions = hasReacted 
+    ? currentReactions.filter(r => r !== reactionType)
+    : [...currentReactions, reactionType];
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ reactions: newReactions })
+    .eq('id', msgId);
+
+  if (error) {
+    console.error("Error updating reactions:", error);
   }
 }

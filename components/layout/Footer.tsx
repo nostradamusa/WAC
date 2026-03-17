@@ -80,7 +80,7 @@ export default function Footer() {
                     href="/entities"
                     className="transition hover:text-[var(--accent)]"
                   >
-                    Organizations
+                    Communities
                   </Link>
                 </li>
                 <li>

@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { searchMentionSuggestions, MentionSuggestion } from "@/lib/services/feedService";
 
-interface MobileSearchOverlayProps {
+interface GlobalSearchOverlayProps {
   isOpen: boolean;
   onClose: () => void;
 }
@@ -67,7 +67,7 @@ const NETWORK_PULSE = [
   }
 ];
 
-export default function MobileSearchOverlay({ isOpen, onClose }: MobileSearchOverlayProps) {
+export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOverlayProps) {
   const [query, setQuery] = useState("");
   const [liveResults, setLiveResults] = useState<MentionSuggestion[]>([]);
   const router = useRouter();
@@ -112,22 +112,30 @@ export default function MobileSearchOverlay({ isOpen, onClose }: MobileSearchOve
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-[#111] animate-in slide-in-from-bottom-2 duration-300 md:hidden flex flex-col">
-      {/* Header / Search Bar */}
-      <div className="flex items-center gap-2 px-3 py-3 border-b border-white/5 bg-[#1a1a1a]">
-        <button onClick={onClose} className="p-2 -ml-2 text-white/70 hover:text-white transition rounded-full hover:bg-white/5">
-          <ArrowLeft size={20} />
-        </button>
+    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 flex items-start justify-center pt-0 md:pt-24 p-0 md:p-4">
+      {/* Click-away backdrop */}
+      <div className="absolute inset-0" onClick={onClose} />
+      
+      <div className="bg-[#111] md:bg-[#1a1a1a] w-full md:max-w-2xl md:rounded-2xl md:shadow-2xl md:border md:border-white/10 overflow-hidden flex flex-col h-[100dvh] md:h-auto md:max-h-[80vh] relative z-10 animate-in slide-in-from-bottom-2 md:slide-in-from-top-4">
+        {/* Header / Search Bar */}
+        <div className="flex items-center gap-2 px-3 md:px-5 py-3 md:py-4 border-b border-white/5 bg-[#1a1a1a] md:bg-transparent">
+          <button onClick={onClose} className="p-2 -ml-2 md:hidden text-white/70 hover:text-white transition rounded-full hover:bg-white/5">
+            <ArrowLeft size={20} />
+          </button>
+          <Search size={20} className="hidden md:block text-white/40 shrink-0" />
         <form onSubmit={handleSearchSubmit} className="flex-1 relative">
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search with Alban Intelligence..."
-            className="w-full bg-white/5 border border-white/10 rounded-full pl-4 pr-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)]/50 transition-colors text-white placeholder:text-white/40"
+            placeholder="Search the network globally..."
+            className="w-full bg-white/5 md:bg-transparent md:border-none border border-white/10 rounded-full pl-4 md:pl-2 pr-4 py-2 md:py-1 text-sm md:text-lg focus:outline-none transition-colors text-white placeholder:text-white/40"
           />
         </form>
+        <button onClick={onClose} className="hidden md:block text-xs font-medium px-2 py-1 rounded bg-white/10 text-white/50 hover:bg-white/20 hover:text-white transition ml-3">
+          ESC
+        </button>
       </div>
 
       {/* Scrollable Content */}
@@ -161,14 +169,14 @@ export default function MobileSearchOverlay({ isOpen, onClose }: MobileSearchOve
                ))
             ) : (
                <div className="p-8 text-center text-white/50 text-sm">
-                 No results found for "{query}"
+                 No results found for &quot;{query}&quot;
                </div>
             )}
             <button 
               onClick={handleSearchSubmit} 
               className="p-4 text-center text-[var(--accent)] font-semibold text-sm hover:bg-white/5 transition border-b border-white/5"
             >
-              See all results for "{query}"
+              See all results for &quot;{query}&quot;
             </button>
           </div>
         ) : (
@@ -289,7 +297,7 @@ export default function MobileSearchOverlay({ isOpen, onClose }: MobileSearchOve
           </div>
         )}
       </div>
-
     </div>
-  );
+  </div>
+);
 }

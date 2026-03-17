@@ -7,13 +7,13 @@ import { usePathname } from "next/navigation";
 import { Search, Plus, MessageCircle } from "lucide-react";
 import LanguageToggle from "./LanguageToggle";
 import { useActor } from "@/components/providers/ActorProvider";
-import MobileSearchOverlay from "./MobileSearchOverlay";
+import GlobalSearchOverlay from "./GlobalSearchOverlay";
 import EventsNavbarSearch from "@/components/events/EventsNavbarSearch";
 
 export default function Navbar() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isActorDropdownOpen, setIsActorDropdownOpen] = useState(false);
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const pathname = usePathname();
   const { currentActor, setCurrentActor, ownedEntities } = useActor();
 
@@ -33,7 +33,13 @@ export default function Navbar() {
       setUserEmail(session?.user?.email ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    const handleOpenSearch = () => setIsSearchOpen(true);
+    window.addEventListener("open-global-search", handleOpenSearch);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("open-global-search", handleOpenSearch);
+    };
   }, []);
 
   async function signInWithGoogle() {
@@ -133,8 +139,8 @@ export default function Navbar() {
         <div className="flex items-center gap-2 sm:gap-4">
           <LanguageToggle />
           {pathname !== '/events' && (
-            <Link
-              href="/directory"
+            <button
+              onClick={() => setIsSearchOpen(true)}
               className="rounded-full bg-[rgba(255,255,255,0.05)] p-2 transition-all duration-300 hover:bg-[rgba(255,255,255,0.1)] hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] mr-1"
               aria-label="Global Directory Search"
             >
@@ -152,7 +158,7 @@ export default function Navbar() {
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
-            </Link>
+            </button>
           )}
 
           <Link
@@ -168,9 +174,9 @@ export default function Navbar() {
                 <div className="relative hidden sm:block">
                   <button
                     onClick={() => setIsActorDropdownOpen(!isActorDropdownOpen)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] text-xs font-medium hover:border-[var(--accent)] transition"
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] text-sm font-medium hover:border-[var(--accent)] transition"
                   >
-                    <span className="opacity-60">Acting as:</span>
+                    <span className="opacity-60 text-xs">Acting as:</span>
                     <span className="text-[var(--accent)] truncate max-w-[120px] font-bold">
                       {currentActor.name}
                     </span>
@@ -223,13 +229,13 @@ export default function Navbar() {
 
               <Link
                 href="/profile"
-                className="px-3 py-1.5 rounded-full border border-transparent text-sm font-medium transition-all duration-300 hover:bg-[#D4AF37]/5 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] hidden sm:inline-block"
+                className="px-4 py-1.5 rounded-full border border-transparent text-sm font-medium transition-all duration-300 hover:bg-[#D4AF37]/5 hover:border-[#D4AF37]/20 hover:text-[#D4AF37] hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.5)] hidden sm:flex items-center justify-center"
               >
                 My Profile
               </Link>
               <button
                 onClick={signOut}
-                className="rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.05)] px-4 py-2 sm:px-5 sm:py-2 text-xs font-semibold hover:border-red-500/50 hover:text-red-400 transition"
+                className="rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.05)] px-4 py-1.5 sm:px-5 text-sm font-medium hover:border-red-500/50 hover:text-red-400 transition flex items-center justify-center"
               >
                 Sign Out
               </button>
@@ -249,7 +255,13 @@ export default function Navbar() {
         <div className="flex md:hidden items-center justify-between p-3 gap-3">
            <Link href="/profile" className="shrink-0 w-8 h-8 rounded-full overflow-hidden border border-[var(--accent)]/30">
              {currentActor ? (
-                <img src={currentActor.avatar_url || "https://i.pravatar.cc/150?img=11"} alt="Profile" className="w-full h-full object-cover" />
+                currentActor.avatar_url ? (
+                   <img src={currentActor.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                   <div className="w-full h-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center text-xs font-bold uppercase">
+                     {currentActor.name ? currentActor.name.charAt(0) : "?"}
+                   </div>
+                )
              ) : (
                 <div className="w-full h-full bg-white/10 flex items-center justify-center text-xs text-white/50">?</div>
              )}
@@ -262,7 +274,7 @@ export default function Navbar() {
                  placeholder="Search with AI..." 
                  onFocus={(e) => {
                    e.preventDefault();
-                   setIsMobileSearchOpen(true);
+                   setIsSearchOpen(true);
                    e.target.blur(); // Prevent mobile keyboard from opening on this background input
                  }}
                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-4 pr-4 py-1.5 text-sm transition-colors text-white placeholder:text-white/40 cursor-text" 
@@ -286,9 +298,9 @@ export default function Navbar() {
         </div>
       </header>
 
-      <MobileSearchOverlay 
-        isOpen={isMobileSearchOpen} 
-        onClose={() => setIsMobileSearchOpen(false)} 
+      <GlobalSearchOverlay 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)} 
       />
     </>
   );

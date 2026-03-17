@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+@import "tailwindcss";
 
 :root {
   --background: #151311;
@@ -87,7 +87,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(176, 141, 87, 0.16);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.4);
   background: rgba(255, 248, 239, 0.05);
 }
 
@@ -146,10 +146,17 @@ button:disabled {
 .wac-page {
   max-width: 1200px;
   margin: 0 auto;
-  padding-top: 8rem; /* Clears the 6rem header and adds spacing */
   padding-bottom: 2.5rem;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
+  padding-left: 0;
+  padding-right: 0;
+  overflow-x: hidden;
+}
+
+@media (min-width: 768px) {
+  .wac-page {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
 }
 
 .wac-card {
@@ -159,13 +166,13 @@ button:disabled {
     rgba(255, 255, 255, 0.01) 100%
   );
   color: var(--card-foreground);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(6px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: blur(10px);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,

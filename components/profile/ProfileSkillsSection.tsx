@@ -38,9 +38,8 @@ export default function ProfileSkillsSection({
   });
 
   return (
-    <div>
-      <label>Skills</label>
-      <br />
+    <div id="profile-field-skills-search">
+      <label className="block text-sm font-bold text-white/90 mb-2.5">Skills</label>
 
       <div className="space-y-6 mt-2">
         <div className="relative">
@@ -65,8 +64,8 @@ export default function ProfileSkillsSection({
           />
         </div>
 
-        <div className="bg-[rgba(255,248,239,0.02)] border border-[var(--border)] rounded-2xl p-6 min-h-[120px]">
-          <h4 className="wac-eyebrow mb-4">Your Expertises</h4>
+        <div className="min-h-[120px] pt-2">
+          <label className="block text-sm font-bold text-white/90 mb-2.5">Your Expertises</label>
 
           <div className="flex flex-wrap gap-3">
             {selectedSkillIds.length === 0 ? (
