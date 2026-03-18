@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(ls c:UsersAdminDesktopwac/*.sql)",
+      "Bash(grep -r \"organizations\\\\|businesses\" /c/Users/Admin/Desktop/wac/app --include=*.tsx -l)",
+      "Bash(ls -1 /c/Users/Admin/Desktop/wac/*.sql)",
+      "Bash(find /c/Users/Admin/Desktop/wac -maxdepth 1 -type f \\\\\\(-name .env* -o -name next.config.* -o -name tailwind.config.* \\\\\\))",
+      "Bash(ls -la *.sql)"
+    ]
+  }
+}
