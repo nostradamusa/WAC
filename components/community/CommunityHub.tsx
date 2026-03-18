@@ -2,35 +2,54 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import React from "react";
-import {
-  Briefcase,
-  Users,
-  User,
-  Hash,
-} from "lucide-react";
-
-import CreatePostBox from "@/components/feed/CreatePostBox";
+import { Hash, Building2, Landmark } from "lucide-react";
 import FeedList from "@/components/feed/FeedList";
 import WacSpotlightWidget from "./WacSpotlightWidget";
+import { useActor } from "@/components/providers/ActorProvider";
 
 export default function CommunityHub() {
+  const { currentActor } = useActor();
+  const isEntityContext = currentActor && currentActor.type !== "person";
+
   return (
-    <div className="w-full bg-[var(--background)] pt-0 pb-6 lg:py-8 relative z-20">
-      <div className="max-w-[80rem] mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-12">
-        
-        {/* LEFT & CENTER COLUMN: THE PULSE STAGE */}
-        <div className="col-span-1 lg:col-span-8">
-          <PulseHub />
+    // Mobile: full height minus just the navbar (header hidden on mobile)
+    // Desktop: minus navbar + sticky pulse header
+    <div className="w-full bg-[var(--background)] h-[calc(100vh-3.5rem)] md:h-[calc(100vh-8.25rem)] overflow-hidden">
+      <div className="max-w-[80rem] mx-auto px-4 h-full grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-12">
+
+        {/* LEFT COLUMN — independent scroll */}
+        <div className="col-span-1 lg:col-span-8 h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="pt-4 md:pt-6 pb-12">
+
+            {/* Acting-as banner — desktop only; mobile uses avatar menu */}
+            {isEntityContext && (
+              <div className="hidden md:flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04]">
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center shrink-0">
+                  {currentActor.avatar_url
+                    ? <img src={currentActor.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : <span className="text-[var(--accent)] text-[10px] font-bold">{currentActor.name.charAt(0)}</span>
+                  }
+                </div>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {currentActor.type === "organization"
+                    ? <Landmark size={11} className="text-[var(--accent)]/60 shrink-0" />
+                    : <Building2 size={11} className="text-[var(--accent)]/60 shrink-0" />
+                  }
+                  <span className="text-[11px] text-white/40">Acting as</span>
+                  <span className="text-[11px] font-semibold text-[var(--accent)] truncate">{currentActor.name}</span>
+                </div>
+              </div>
+            )}
+
+            <PulseHub />
+          </div>
         </div>
 
-        {/* RIGHT COLUMN: DISCOVER (Sticky) */}
-        <div className="hidden lg:block lg:col-span-4">
-          <div className="sticky top-24 h-[calc(100vh-6rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <div className="space-y-4 pb-12 pt-1 pr-1">
-              
-              {/* WAC Spotlight Discovery Engine */}
-              <WacSpotlightWidget />
+        {/* RIGHT COLUMN — desktop only */}
+        <div className="hidden lg:flex lg:col-span-4 h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex-col">
+          <div className="space-y-4 pb-12 pt-6 pr-1">
+
+            <WacSpotlightWidget />
 
             <div className="wac-card p-5">
               <h3 className="font-serif font-bold text-lg text-[var(--accent)] flex items-center gap-2 mb-4">
@@ -63,7 +82,6 @@ export default function CommunityHub() {
               </Link>
             </div>
 
-            {/* Right Sidebar Footer */}
             <div className="flex flex-col items-center justify-center pt-4 pb-8 px-4 text-[12px] text-white/50 space-y-2 text-center">
               <div className="flex flex-wrap justify-center gap-x-3 gap-y-1">
                 <Link href="/about" className="hover:text-[var(--accent)] hover:underline transition-colors">About</Link>
@@ -87,8 +105,6 @@ export default function CommunityHub() {
                 <span>World Albanian Congress © {new Date().getFullYear()}</span>
               </div>
             </div>
-
-            </div>
           </div>
         </div>
 
@@ -97,24 +113,13 @@ export default function CommunityHub() {
   );
 }
 
-// ----------------------------------------------------------------------
-// PULSE HUB (THE FEED)
-// ----------------------------------------------------------------------
-function PulseHub() {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+// ─── Pulse feed ───────────────────────────────────────────────────────────────
 
+function PulseHub() {
+  const [refreshTrigger] = useState(0);
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full rounded-xl overflow-hidden shadow-2xl">
-      
-
-
-
-      
-      <div className="mt-2">
-        <FeedList refreshTrigger={refreshTrigger} />
-      </div>
+      <FeedList refreshTrigger={refreshTrigger} />
     </div>
   );
 }
-
-

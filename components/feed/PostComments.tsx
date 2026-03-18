@@ -1,25 +1,33 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { NetworkComment } from "@/lib/types/network-feed";
-import { addPostComment, searchMentionSuggestions, MentionSuggestion, deleteComment, editComment } from "@/lib/services/feedService";
+import { addPostComment, searchMentionSuggestions, MentionSuggestion, deleteComment, editComment, toggleCommentReaction, ReactionType } from "@/lib/services/feedService";
+import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import Image from "next/image";
 import Link from "next/link";
-import { Send, Loader2, MoreHorizontal } from "lucide-react";
+import { Send, Loader2, MoreHorizontal, X } from "lucide-react";
 
 export default function PostComments({ postId }: { postId: string }) {
   const [comments, setComments] = useState<NetworkComment[]>([]);
   const [newContent, setNewContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [activeOptionsId, setActiveOptionsId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  
+  const [replyingToName, setReplyingToName] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [commentReactions, setCommentReactions] = useState<Record<string, ReactionType | null>>({});
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const [commentReactionCounts, setCommentReactionCounts] = useState<Record<string, Record<string, number>>>({});
+  const [reactionsModal, setReactionsModal] = useState<{ commentId: string; breakdown: any[]; loading: boolean; tab: string } | null>(null);
+
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
   const [mentionStartIdx, setMentionStartIdx] = useState(-1);
@@ -27,6 +35,7 @@ export default function PostComments({ postId }: { postId: string }) {
   const [activeMentions, setActiveMentions] = useState<MentionSuggestion[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
@@ -39,9 +48,16 @@ export default function PostComments({ postId }: { postId: string }) {
     adjustTextareaHeight();
   }, [newContent]);
 
+  // Auto-focus inline reply textarea when reply mode activates
+  useEffect(() => {
+    if (replyingToId && replyTextareaRef.current) {
+      replyTextareaRef.current.focus();
+    }
+  }, [replyingToId]);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user.id || null));
-    
+
     async function fetchComments() {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -57,6 +73,21 @@ export default function PostComments({ postId }: { postId: string }) {
 
       if (!error && data) {
         setComments(data as any[]);
+        const ids = data.map((c: any) => c.id);
+        if (ids.length > 0) {
+          const { data: rxns } = await supabase
+            .from("comment_reactions")
+            .select("comment_id, reaction_type")
+            .in("comment_id", ids);
+          if (rxns) {
+            const counts: Record<string, Record<string, number>> = {};
+            rxns.forEach((r: any) => {
+              if (!counts[r.comment_id]) counts[r.comment_id] = {};
+              counts[r.comment_id][r.reaction_type] = (counts[r.comment_id][r.reaction_type] || 0) + 1;
+            });
+            setCommentReactionCounts(counts);
+          }
+        }
       }
       setIsLoading(false);
     }
@@ -64,38 +95,45 @@ export default function PostComments({ postId }: { postId: string }) {
     fetchComments();
   }, [postId]);
 
+  // Top-level comment submit (bottom composer — no parent_id)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContent.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    
-    // Convert "@Name" back into "[(Name)](/link)" rich markdown before saving
+
     let finalContent = newContent.trim();
-    
-    // Sort mentions by length descending so longer names don't get partially replaced by shorter ones
     const sortedMentions = [...activeMentions].sort((a, b) => b.name.length - a.name.length);
-    
     sortedMentions.forEach(m => {
-       const linkPath = m.type === 'profile' ? `/people/${m.username_or_slug || m.id}` 
+       const linkPath = m.type === 'profile' ? `/people/${m.username_or_slug || m.id}`
                       : m.type === 'business' ? `/businesses/${m.username_or_slug || m.id}`
                       : `/organizations/${m.username_or_slug || m.id}`;
-                      
-       // Replace @Name with markdown link
-       // We use a global regex to replace all instances of that specific tag
        const regex = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
        finalContent = finalContent.replace(regex, `[@${m.name}](${linkPath})`);
     });
 
-    const { success, data } = await addPostComment(postId, finalContent, replyingToId);
-    
+    const { success, data } = await addPostComment(postId, finalContent, null);
     if (success && data && !Array.isArray(data)) {
       setComments((prev) => [...prev, data as any]);
       setNewContent("");
-      setActiveMentions([]); // clear memory
-      setReplyingToId(null);
+      setActiveMentions([]);
     }
-    
+    setIsSubmitting(false);
+  };
+
+  // Inline reply submit
+  const handleReplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyContent.trim() || isSubmitting || !replyingToId) return;
+
+    setIsSubmitting(true);
+    const { success, data } = await addPostComment(postId, replyContent.trim(), replyingToId);
+    if (success && data && !Array.isArray(data)) {
+      setComments(prev => [...prev, data as any]);
+      setReplyContent("");
+      setReplyingToId(null);
+      setReplyingToName(null);
+    }
     setIsSubmitting(false);
   };
 
@@ -140,25 +178,19 @@ export default function PostComments({ postId }: { postId: string }) {
   const handleTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setNewContent(val);
-    
+
     const pos = e.target.selectionStart;
     setCursorPos(pos);
-    
+
     const textBeforeCursor = val.slice(0, pos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
-    
+
     if (lastAtIndex !== -1) {
-      // Ensure the '@' is either at the beginning or preceded by a space/newline
       const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
-      
       if (/[\s\n]/.test(charBeforeAt)) {
         const queryCandidate = textBeforeCursor.slice(lastAtIndex + 1);
-        
-        // Allow up to 50 characters for a search (enough for first + last name + spaces)
-        // Stop searching if there's a newline
         if (queryCandidate.length <= 50 && !queryCandidate.includes('\n')) {
           setMentionStartIdx(lastAtIndex);
-          
           if (queryCandidate.length >= 2) {
             const results = await searchMentionSuggestions(queryCandidate);
             setMentionSuggestions(results);
@@ -172,27 +204,18 @@ export default function PostComments({ postId }: { postId: string }) {
         }
       }
     }
-    
     setShowMentions(false);
   };
 
   const handleMentionSelect = (suggestion: MentionSuggestion) => {
-    // We only insert the plain text @Name so the text field looks clean to the user
-    // Add a trailing space automatically so they can keep typing easily
     const mentionText = `@${suggestion.name} `;
-    
     const textBeforeMention = newContent.slice(0, mentionStartIdx);
     const textAfterCursor = newContent.slice(cursorPos);
-    
     setNewContent(textBeforeMention + mentionText + textAfterCursor);
     setShowMentions(false);
-    
-    // Remember this mention so we can convert it to markdown privately on submit
     if (!activeMentions.find(m => m.id === suggestion.id)) {
       setActiveMentions(prev => [...prev, suggestion]);
     }
-    
-    // Programmatically set the cursor position right after the inserted space
     setTimeout(() => {
       if (textareaRef.current) {
         const nextPos = textBeforeMention.length + mentionText.length;
@@ -202,23 +225,63 @@ export default function PostComments({ postId }: { postId: string }) {
     }, 0);
   };
 
+  const handleCommentReaction = async (commentId: string, type: ReactionType) => {
+    const prev = commentReactions[commentId] ?? null;
+    const next = prev === type ? null : type;
+    setCommentReactions(r => ({ ...r, [commentId]: next }));
+    setCommentReactionCounts(c => {
+      const cur = { ...(c[commentId] || {}) };
+      if (prev && cur[prev]) { cur[prev]--; if (!cur[prev]) delete cur[prev]; }
+      if (next) cur[next] = (cur[next] || 0) + 1;
+      return { ...c, [commentId]: cur };
+    });
+    setShowReactionPicker(null);
+    const { success } = await toggleCommentReaction(commentId, type);
+    if (!success) {
+      setCommentReactions(r => ({ ...r, [commentId]: prev }));
+      setCommentReactionCounts(c => {
+        const cur = { ...(c[commentId] || {}) };
+        if (next && cur[next]) { cur[next]--; if (!cur[next]) delete cur[next]; }
+        if (prev) cur[prev] = (cur[prev] || 0) + 1;
+        return { ...c, [commentId]: cur };
+      });
+    }
+  };
+
+  const getTopReactionTypes = (commentId: string) =>
+    Object.entries(commentReactionCounts[commentId] || {})
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([t]) => t);
+
+  const getTotalReactionCount = (commentId: string) =>
+    Object.values(commentReactionCounts[commentId] || {}).reduce((a, b) => a + b, 0);
+
+  const openReactionsModal = async (commentId: string) => {
+    setReactionsModal({ commentId, breakdown: [], loading: true, tab: "all" });
+    const { data } = await supabase
+      .from("comment_reactions")
+      .select("reaction_type, profile:profiles!profile_id(id, full_name, avatar_url, headline, is_verified)")
+      .eq("comment_id", commentId)
+      .order("created_at", { ascending: false });
+    setReactionsModal(prev => prev ? { ...prev, breakdown: data || [], loading: false } : null);
+  };
+
   const renderCommentContent = (content: string) => {
-    // Basic markdown link parser: [name](/link)
     const parts = content.split(/(\[[^\]]+\]\([^)]+\))/g);
     return parts.map((part, i) => {
       const match = part.match(/\[([^\]]+)\]\(([^)]+)\)/);
       if (match) {
-        let colorClass = "text-[var(--accent)]"; // default gold for people
+        let colorClass = "text-[var(--accent)]";
         if (match[2].startsWith("/businesses")) colorClass = "text-blue-400";
         if (match[2].startsWith("/organizations")) colorClass = "text-green-400";
-        
         return <Link key={i} href={match[2]} className={`${colorClass} font-semibold hover:underline`}>{match[1]}</Link>;
       }
       return <span key={i}>{part}</span>;
     });
   };
 
-  // Build a comment tree
   const topLevelComments = comments.filter((c) => !c.parent_id);
   const getReplies = (parentId: string) => comments.filter((c) => c.parent_id === parentId);
 
@@ -226,7 +289,7 @@ export default function PostComments({ postId }: { postId: string }) {
     let cAuthorName = "Unknown";
     let cAuthorAvatar = null;
     let cAuthorLink = "#";
-    
+
     if (comment.author_profile) {
       cAuthorName = comment.author_profile.full_name || "User";
       cAuthorAvatar = comment.author_profile.avatar_url;
@@ -243,6 +306,9 @@ export default function PostComments({ postId }: { postId: string }) {
 
     const replies = getReplies(comment.id);
     const isEditing = editingCommentId === comment.id;
+    // Which comment id this Reply button targets (replies-to-replies thread under parent)
+    const replyTargetId = isReply ? comment.parent_id! : comment.id;
+    const isActiveReplyTarget = replyingToId === replyTargetId;
 
     return (
       <div key={comment.id} className={`flex gap-3 text-sm flex-col ${isReply ? 'mt-3 pl-2 sm:pl-4 border-l-2 border-white/5' : ''}`}>
@@ -259,86 +325,227 @@ export default function PostComments({ postId }: { postId: string }) {
             </div>
           </Link>
           <div className="flex-1 min-w-0">
-             <div className="bg-black/20 rounded-2xl rounded-tl-[4px] p-3 border border-[var(--border)]/50 relative group">
-               <div className="flex justify-between items-start mb-1 gap-2">
-                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <Link href={cAuthorLink} className="font-semibold hover:text-[var(--accent)] transition truncate">
-                      {cAuthorName}
-                    </Link>
-                    <span className="text-xs opacity-50 shrink-0">{timeAgo(comment.created_at)}</span>
+            <div className="bg-black/20 rounded-2xl rounded-tl-[4px] p-3 border border-[var(--border)]/50 relative group">
+              <div className="flex justify-between items-start mb-1 gap-2">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <Link href={cAuthorLink} className="font-semibold hover:text-[var(--accent)] transition truncate">
+                    {cAuthorName}
+                  </Link>
+                  <span className="text-xs opacity-50 shrink-0">{timeAgo(comment.created_at)}</span>
+                </div>
+
+                {currentUserId === comment.submitted_by && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setActiveOptionsId(activeOptionsId === comment.id ? null : comment.id)}
+                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--accent)] transition p-1"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+                    {activeOptionsId === comment.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setActiveOptionsId(null)} />
+                        <div className="absolute right-0 top-full mt-1 w-28 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up">
+                          <button
+                            onClick={() => {
+                              setEditingCommentId(comment.id);
+                              setEditContent(comment.content);
+                              setActiveOptionsId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition"
+                          >
+                            Edit
+                          </button>
+                          <div className="h-px w-full bg-white/5" />
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  
-                  {currentUserId === comment.submitted_by && (
-                    <div className="relative">
-                      <button 
-                        onClick={() => setActiveOptionsId(activeOptionsId === comment.id ? null : comment.id)}
-                        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--accent)] transition p-1"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-                      
-                      {activeOptionsId === comment.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setActiveOptionsId(null)} />
-                          <div className="absolute right-0 top-full mt-1 w-28 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up">
-                            <button 
-                              onClick={() => { 
-                                setEditingCommentId(comment.id); 
-                                setEditContent(comment.content); 
-                                setActiveOptionsId(null); 
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition"
-                            >
-                              Edit
-                            </button>
-                            <div className="h-px w-full bg-white/5" />
-                            <button 
-                              onClick={() => handleDeleteComment(comment.id)}
-                              className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 transition"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </>
-                      )}
+                )}
+              </div>
+
+              {isEditing ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] resize-none"
+                    rows={2}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => setEditingCommentId(null)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white transition">Cancel</button>
+                    <button onClick={() => handleEditCommentSubmit(comment.id)} className="px-3 py-1 text-[10px] bg-[var(--accent)] text-black font-bold rounded hover:bg-[#F2D06B] transition">Save</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="opacity-90 whitespace-pre-wrap break-words">{renderCommentContent(comment.content)}</p>
+              )}
+            </div>
+
+            {/* Comment action row */}
+            <div className="flex items-center justify-between mt-1.5 px-1">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (isActiveReplyTarget) {
+                      setReplyingToId(null);
+                      setReplyingToName(null);
+                      setReplyContent("");
+                    } else {
+                      setReplyingToId(replyTargetId);
+                      setReplyingToName(cAuthorName);
+                    }
+                  }}
+                  className={`text-[11px] font-semibold transition ${isActiveReplyTarget ? 'text-[#D4AF37]' : 'text-white/40 hover:text-[#D4AF37]'}`}
+                >
+                  Reply
+                </button>
+                <span className="text-white/10 text-xs">·</span>
+                <div
+                  className="relative"
+                  onMouseEnter={() => setShowReactionPicker(comment.id)}
+                  onMouseLeave={() => setShowReactionPicker(null)}
+                >
+                  <button
+                    onClick={() => handleCommentReaction(comment.id, commentReactions[comment.id] || 'like')}
+                    className={`text-[11px] font-semibold transition flex items-center gap-1 ${commentReactions[comment.id] ? 'text-[#D4AF37]' : 'text-white/40 hover:text-pink-400'}`}
+                  >
+                    <ReactionIcon
+                      type={commentReactions[comment.id] || 'heart'}
+                      size={12}
+                      active={!!commentReactions[comment.id]}
+                      showTooltip={false}
+                      animateOnClick={false}
+                    />
+                    {commentReactions[comment.id]
+                      ? (SUPPORTED_REACTIONS.find(r => r.type === commentReactions[comment.id])?.label ?? commentReactions[comment.id])
+                      : 'Like'}
+                  </button>
+                  {showReactionPicker === comment.id && (
+                    <div className="absolute bottom-full left-0 pb-1.5 z-50">
+                      <div className="bg-[#1a1a1a] border border-white/10 rounded-full px-2.5 py-1.5 flex gap-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                        {SUPPORTED_REACTIONS.map(({ type }) => (
+                          <button
+                            key={type}
+                            onClick={(e) => { e.stopPropagation(); handleCommentReaction(comment.id, type); }}
+                            className="p-0.5"
+                          >
+                            <ReactionIcon type={type} size={22} active={commentReactions[comment.id] === type} showTooltip={false} className="hover:-translate-y-1.5 hover:scale-110" />
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
-               </div>
-               
-               {isEditing ? (
-                 <div className="mt-2 flex flex-col gap-2">
-                   <textarea 
-                     value={editContent}
-                     onChange={(e) => setEditContent(e.target.value)}
-                     className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] resize-none"
-                     rows={2}
-                   />
-                   <div className="flex gap-2 justify-end">
-                      <button onClick={() => setEditingCommentId(null)} className="px-2 py-1 text-[10px] text-white/50 hover:text-white transition">Cancel</button>
-                      <button onClick={() => handleEditCommentSubmit(comment.id)} className="px-3 py-1 text-[10px] bg-[var(--accent)] text-black font-bold rounded hover:bg-[#F2D06B] transition">Save</button>
-                   </div>
-                 </div>
-               ) : (
-                 <p className="opacity-90 whitespace-pre-wrap break-words">{renderCommentContent(comment.content)}</p>
-               )}
-             </div>
-             
-             {/* Comment Actions Area */}
-             <div className="flex items-center gap-4 mt-1.5 px-2">
-               <button 
-                 onClick={() => {
-                   setReplyingToId(isReply ? comment.parent_id! : comment.id);
-                   textareaRef.current?.focus();
-                 }} 
-                 className="text-xs font-semibold text-white/50 hover:text-[var(--accent)] transition"
-               >
-                 Reply
-               </button>
-             </div>
+                </div>
+              </div>
+
+              {getTotalReactionCount(comment.id) > 0 && (() => {
+                const topTypes = getTopReactionTypes(comment.id);
+                const dominantLabel = SUPPORTED_REACTIONS.find(r => r.type === topTypes[0])?.label ?? topTypes[0];
+                return (
+                  <button
+                    onClick={() => openReactionsModal(comment.id)}
+                    className="flex items-center gap-1 group"
+                  >
+                    <div className="flex -space-x-1">
+                      {topTypes.map(type => (
+                        <span key={type} className="leading-none" style={{ fontSize: '13px' }}>
+                          {SUPPORTED_REACTIONS.find(r => r.type === type)?.emoji}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="text-[11px] text-white/40 group-hover:text-[#D4AF37] transition font-semibold ml-0.5">
+                      {getTotalReactionCount(comment.id)}
+                    </span>
+                    <span className="text-[11px] text-white/30 group-hover:text-[#D4AF37]/70 transition">
+                      {dominantLabel}
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
           </div>
         </div>
 
-        {/* Render nested replies */}
+        {/* ── Inline reply composer ─────────────────────────────────────────
+            Only renders under top-level comments when this thread is active.
+            Nested reply clicks set replyingToId = parent_id so this
+            naturally appears under the correct top-level comment.
+        ────────────────────────────────────────────────────────────────── */}
+        {!isReply && replyingToId === comment.id && (
+          <div className="pl-11">
+            {/* Context strip */}
+            <div className="flex items-center justify-between mb-2 px-0.5">
+              <span className="flex items-center gap-1.5 text-[11px] text-white/40">
+                <span className="inline-block w-4 h-px bg-white/15 rounded-full" />
+                Replying to{" "}
+                <span className="font-semibold text-white/65">{replyingToName}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => { setReplyingToId(null); setReplyingToName(null); setReplyContent(""); }}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/[0.06] transition"
+                aria-label="Cancel reply"
+              >
+                <X size={11} />
+              </button>
+            </div>
+
+            {/* Composer row */}
+            <form onSubmit={handleReplySubmit} className="flex items-end gap-2">
+              {/* Current user avatar */}
+              <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] text-[10px] font-bold shrink-0 mb-[3px]">
+                {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
+              </div>
+
+              {/* Unified input + send shell */}
+              <div className="flex-1 flex items-end bg-black/25 border border-white/[0.07] rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]/30 focus-within:bg-black/30">
+                <textarea
+                  ref={replyTextareaRef}
+                  value={replyContent}
+                  onChange={(e) => {
+                    setReplyContent(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  }}
+                  placeholder="Write a reply…"
+                  rows={1}
+                  style={{ minHeight: "32px" }}
+                  className="flex-1 bg-transparent px-3 py-[7px] text-xs resize-none outline-none placeholder:text-white/20 leading-[1.45] overflow-hidden"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (replyContent.trim() && !isSubmitting) handleReplySubmit(e as any);
+                    } else if (e.key === "Escape") {
+                      setReplyingToId(null);
+                      setReplyingToName(null);
+                      setReplyContent("");
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!replyContent.trim() || isSubmitting}
+                  aria-label="Send reply"
+                  className="shrink-0 w-[26px] h-[26px] m-[3px] rounded-[10px] bg-[var(--accent)] text-black flex items-center justify-center disabled:opacity-25 hover:bg-[#F2D06B] transition-colors"
+                >
+                  {isSubmitting
+                    ? <Loader2 size={11} className="animate-spin" />
+                    : <Send size={11} className="translate-x-[1px]" />
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Nested replies */}
         {replies.length > 0 && (
           <div className="ml-8 mt-1 space-y-2 relative">
             {replies.map(reply => renderCommentThread(reply, true))}
@@ -349,9 +556,10 @@ export default function PostComments({ postId }: { postId: string }) {
   };
 
   return (
+    <>
     <div className="mt-4 pt-4 border-t border-[var(--border)] relative">
-      
-      {/* Existing Comments list */}
+
+      {/* Comments list */}
       {isLoading ? (
         <div className="flex justify-center p-4"><Loader2 className="animate-spin opacity-50" size={20} /></div>
       ) : comments.length > 0 ? (
@@ -362,8 +570,8 @@ export default function PostComments({ postId }: { postId: string }) {
         <div className="text-center text-sm opacity-50 py-2 mb-4">No comments yet. Be the first to start a discussion!</div>
       )}
 
-      {/* Input Field */}
-      <div className="relative">
+      {/* ── Top-level comment composer ───────────────────────────────────── */}
+      <div className="flex items-end gap-2.5">
         {showMentions && mentionSuggestions.length > 0 && (
           <div className="absolute bottom-full left-0 mb-2 w-full max-w-sm bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl overflow-hidden z-[50] animate-in fade-in slide-in-from-bottom-2 pointer-events-auto">
             <div className="max-h-96 overflow-y-auto custom-scrollbar pb-1">
@@ -372,7 +580,6 @@ export default function PostComments({ postId }: { postId: string }) {
                 const isBiz = suggestion.type === 'business';
                 const typeColor = isOrg ? 'text-green-400' : isBiz ? 'text-blue-400' : 'text-[#D4AF37]';
                 const bgBorderColor = isOrg ? 'border-green-500/30' : isBiz ? 'border-blue-500/30' : 'border-[#D4AF37]/30';
-
                 return (
                   <button
                     key={`${suggestion.id}-${idx}`}
@@ -407,30 +614,21 @@ export default function PostComments({ postId }: { postId: string }) {
             </div>
           </div>
         )}
-        
-        <form onSubmit={handleSubmit} className="relative w-full">
-          {replyingToId && (
-            <div className="flex items-center justify-between text-xs px-4 py-2 bg-white/5 rounded-t-xl border-t border-x border-white/10">
-              <span className="text-white/70">
-                Replying to <span className="font-semibold">{comments.find(c => c.id === replyingToId)?.author_profile?.full_name || 'user'}</span>
-              </span>
-              <button 
-                type="button" 
-                onClick={() => setReplyingToId(null)}
-                className="hover:text-red-400 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
+
+        {/* Current user avatar */}
+        <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] text-xs font-bold shrink-0 mb-1">
+          {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
+        </div>
+
+        <form onSubmit={handleSubmit} className="relative flex-1">
           <div className="relative">
             <textarea
               ref={textareaRef}
               value={newContent}
               onChange={handleTextChange}
-              placeholder="Write a comment... (Type @ to mention)"
+              placeholder="Write a comment… (Type @ to mention)"
               rows={1}
-              className={`w-full bg-black/20 border border-[var(--border)] ${replyingToId ? 'rounded-b-2xl border-t-0' : 'rounded-2xl'} pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden`}
+              className="w-full bg-black/20 border border-[var(--border)] rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden"
               onKeyDown={(e) => {
                 if (showMentions) {
                   if (e.key === 'ArrowDown') {
@@ -455,17 +653,118 @@ export default function PostComments({ postId }: { postId: string }) {
                 }
               }}
             />
-            <button 
+            <button
               type="submit"
               disabled={!newContent.trim() || isSubmitting}
               className="absolute right-2 bottom-2 shrink-0 w-8 h-8 bg-[var(--accent)] text-black rounded-xl flex items-center justify-center hover:bg-[#F2D06B] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} className="ml-0.5" />}
+              {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} className="translate-x-[1px]" />}
             </button>
           </div>
         </form>
       </div>
-      
     </div>
+
+    {/* Reactions Modal */}
+    {reactionsModal && typeof document !== "undefined" && createPortal(
+      <div
+        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+        onClick={() => setReactionsModal(null)}
+      >
+        <div
+          className="bg-[#0e0e0e] border border-white/[0.08] rounded-t-3xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-250 max-h-[80vh]"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+            <h2 className="text-sm font-bold text-white tracking-wide">Reactions</h2>
+            <button
+              onClick={() => setReactionsModal(null)}
+              className="w-7 h-7 rounded-full bg-white/[0.05] flex items-center justify-center text-white/40 hover:bg-white/10 hover:text-white transition"
+            >
+              <X size={13} />
+            </button>
+          </div>
+
+          {!reactionsModal!.loading && reactionsModal!.breakdown.length > 0 && (
+            <div className="flex items-center gap-1 px-4 pt-3 pb-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              <button
+                onClick={() => setReactionsModal(prev => prev ? { ...prev, tab: 'all' } : null)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition whitespace-nowrap ${
+                  reactionsModal!.tab === 'all'
+                    ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25'
+                    : 'text-white/40 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                All {reactionsModal!.breakdown.length}
+              </button>
+              {Object.entries(
+                reactionsModal!.breakdown.reduce((acc: Record<string, number>, r: any) => {
+                  acc[r.reaction_type] = (acc[r.reaction_type] || 0) + 1;
+                  return acc;
+                }, {})
+              )
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, count]) => (
+                  <button
+                    key={type}
+                    onClick={() => setReactionsModal(prev => prev ? { ...prev, tab: type } : null)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition whitespace-nowrap ${
+                      reactionsModal!.tab === type
+                        ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25'
+                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <span>{SUPPORTED_REACTIONS.find(r => r.type === type)?.emoji}</span>
+                    <span>{count}</span>
+                  </button>
+                ))}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+            {reactionsModal!.loading ? (
+              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-white/20" size={20} /></div>
+            ) : (() => {
+              const filtered = reactionsModal!.tab === 'all'
+                ? reactionsModal!.breakdown
+                : reactionsModal!.breakdown.filter((r: any) => r.reaction_type === reactionsModal!.tab);
+              return filtered.length > 0 ? filtered.map((r: any, i: number) => (
+                <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.025] transition">
+                  <div className="relative shrink-0">
+                    {r.profile?.avatar_url ? (
+                      <Image src={r.profile.avatar_url} alt={r.profile.full_name || ''} width={40} height={40} className="rounded-full border border-white/[0.08]" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/15 flex items-center justify-center text-sm font-bold text-[#D4AF37]">
+                        {r.profile?.full_name?.charAt(0) || '?'}
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 leading-none bg-[#0e0e0e] rounded-full p-0.5" style={{ fontSize: '13px' }}>
+                      {SUPPORTED_REACTIONS.find(rx => rx.type === r.reaction_type)?.emoji || '👍'}
+                    </div>
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-sm text-white truncate">{r.profile?.full_name || 'Unknown'}</span>
+                      {r.profile?.is_verified && (
+                        <svg className="w-3 h-3 text-[#D4AF37] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10.081.9C11.239.199 12.761.199 13.919.9l1.455.882c.49.297 1.05.438 1.611.408l1.7-.091c1.353-.072 2.553.844 2.89 2.158l.423 1.64c.143.553.438 1.05.85 1.45L24 8.527c.974.945.974 2.505 0 3.45l-1.152 1.118c-.412.4-.707.897-.85 1.45l-.423 1.64c-.337 1.314-1.537 2.23-2.89 2.158l-1.7-.091c-.56-.03-1.121.111-1.611.408l-1.455.882c-1.158.701-2.68.701-3.838 0l-1.455-.882c-.49-.297-1.05-.438-1.611-.408l-1.7.091c-1.353.072-2.553-.844-2.89-2.158l-.423-1.64c-.143-.553-.438-1.05-.85-1.45L0 11.977c-.974-.945-.974-2.505 0-3.45l1.152-1.118c.412-.4.707-.897.85-1.45l.423-1.64c.337-1.314 1.537-2.23 2.89-2.158l1.7.091c.56.03 1.121-.111 1.611-.408L10.081.9z"/>
+                        </svg>
+                      )}
+                    </div>
+                    {r.profile?.headline && (
+                      <span className="text-xs text-white/30 truncate mt-0.5">{r.profile.headline}</span>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-10 text-white/20 text-sm">No reactions yet</div>
+              );
+            })()}
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 }

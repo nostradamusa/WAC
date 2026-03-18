@@ -33,7 +33,7 @@ export default function ProfileCard({
     <section
       id={id}
       style={{ ...style, zIndex }}
-      className={`wac-card p-5 sm:p-6 md:p-8 border-t-4 border-t-[#D4AF37]/30 relative transition-transform duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl ${
+      className={`wac-card p-5 sm:p-6 md:p-8 border-t-2 border-t-[#D4AF37]/40 relative transition-transform duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl ${
         isHighlighted ? "scale-[1.01] shadow-[0_0_0_2px_var(--accent),0_0_40px_rgba(212,175,55,0.2)]" : ""
       }`}
     >

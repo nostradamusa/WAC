@@ -17,6 +17,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import FollowButton from "@/components/ui/FollowButton";
 
 export default function PublicProfile({ profile }: { profile: EnrichedDirectoryPerson }) {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -88,10 +89,7 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 md:pb-4 mt-2 md:mt-0">
-            <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-[var(--accent)] text-black font-bold hover:bg-[#ffe17d] transition shadow-[0_0_15px_rgba(212,175,55,0.3)]">
-              <UserPlus size={18} />
-              Connect
-            </button>
+            <FollowButton followingType="person" followingId={profile.id} size="sm" className="flex-1 md:flex-none px-6 py-2.5 text-sm" />
             <Link href="/messages" className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.02)] font-semibold hover:border-white/20 hover:text-[var(--accent)] hover:border-[var(--accent)] transition">
               <MessageCircle size={18} strokeWidth={1.5} />
               Message
@@ -160,6 +158,23 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
             </div>
           )}
         </div>
+
+        {/* Skills */}
+        {profile.skills && profile.skills.length > 0 && (
+          <div className="mt-10 wac-card p-6 md:p-8">
+            <h3 className="text-xl font-serif font-bold mb-4 text-[var(--accent)]">Skills</h3>
+            <div className="flex flex-wrap gap-2">
+              {profile.skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="inline-flex items-center rounded-full bg-white/5 border border-white/10 px-4 py-2 text-sm font-medium text-white/80 hover:border-[var(--accent)]/40 hover:text-white transition"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bio / About */}
         {profile.bio && (

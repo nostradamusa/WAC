@@ -56,17 +56,19 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
-      {/* Narrative Architectural Scroll */}
       <main className="flex-1 w-full flex flex-col pt-10">
         <Hero />
-        <EcosystemHub />
-        <HomeFeedPreview />
-        <NetworkIntelligence userId={userId} />
-        <LivingNetwork />
-        <MembersPreview />
-        <WhyItExists />
-        <Vision />
-        <JoinNetwork userId={userId} />
+        {/* Editorial sections — desktop only */}
+        <div className="hidden md:contents">
+          <EcosystemHub />
+          <HomeFeedPreview />
+          <NetworkIntelligence userId={userId} />
+          <LivingNetwork />
+          <MembersPreview />
+          <WhyItExists />
+          <Vision />
+          <JoinNetwork userId={userId} />
+        </div>
       </main>
     </div>
   );

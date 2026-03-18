@@ -234,15 +234,7 @@ export default function ProfileCompletionCard({
           key={item.label}
           type="button"
           onClick={() => onJumpToField(item.target)}
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #444",
-            background: "rgba(255,255,255,0.03)",
-            fontSize: 14,
-            textAlign: "left",
-            cursor: "pointer",
-          }}
+          className="px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-sm text-left hover:bg-white/[0.06] hover:border-white/20 transition cursor-pointer"
         >
           {label}
         </button>
@@ -252,13 +244,7 @@ export default function ProfileCompletionCard({
     return (
       <div
         key={item.label}
-        style={{
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid #444",
-          background: "rgba(255,255,255,0.03)",
-          fontSize: 14,
-        }}
+        className="px-3 py-2.5 rounded-xl border border-white/10 bg-white/[0.03] text-sm"
       >
         {label}
       </div>
@@ -266,14 +252,7 @@ export default function ProfileCompletionCard({
   }
 
   return (
-    <div
-      style={{
-        border: "1px solid #444",
-        borderRadius: 14,
-        padding: 18,
-        background: "rgba(255,255,255,0.03)",
-      }}
-    >
+    <div className="wac-card p-5">
       <div
         style={{
           display: "flex",

@@ -1,644 +1,443 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import React from "react";
-import WacSelect from "@/components/ui/WacSelect";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState } from "react";
 import {
-  ChevronRight,
-  CalendarDays,
-  Users,
-  BookOpen,
-  Plane,
-  Briefcase,
-  GraduationCap,
   Baby,
-  Hash,
-  User,
+  TrendingUp,
+  Briefcase,
+  Plane,
+  Users,
+  Plus,
 } from "lucide-react";
 
-type HubTab = "teens" | "parents" | "careers" | "travelers";
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type PathwayId = "family" | "career" | "industry" | "travel";
+
+interface Pathway {
+  id: PathwayId;
+  title: string;
+  tagline: string;
+  icon: React.ElementType;
+  color: string;
+  mutedColor: string;
+  iconBg: string;
+  cardBg: string;
+  border: string;
+  activeBorder: string;
+  groupCount: number;
+}
+
+interface Group {
+  id: string;
+  name: string;
+  pathway: PathwayId;
+  category: string;
+  description: string;
+  members: number;
+  activity: string;
+  isNew?: boolean;
+}
+
+// ── Static seed data ───────────────────────────────────────────────────────
+// These will be replaced with DB queries once the groups table is live.
+
+const PATHWAYS: Pathway[] = [
+  {
+    id: "family",
+    title: "Family & Roots",
+    tagline: "Raise children with their Albanian identity",
+    icon: Baby,
+    color: "text-purple-400",
+    mutedColor: "text-purple-400/70",
+    iconBg: "bg-purple-500/15",
+    cardBg: "bg-purple-500/[0.05]",
+    border: "border-purple-500/15",
+    activeBorder: "border-purple-400/50",
+    groupCount: 3,
+  },
+  {
+    id: "career",
+    title: "Career & Momentum",
+    tagline: "Grow professionally within the network",
+    icon: TrendingUp,
+    color: "text-sky-400",
+    mutedColor: "text-sky-400/70",
+    iconBg: "bg-sky-500/15",
+    cardBg: "bg-sky-500/[0.05]",
+    border: "border-sky-500/15",
+    activeBorder: "border-sky-400/50",
+    groupCount: 3,
+  },
+  {
+    id: "industry",
+    title: "Industry & Influence",
+    tagline: "Connect with peers in your professional field",
+    icon: Briefcase,
+    color: "text-[#D4AF37]",
+    mutedColor: "text-[#D4AF37]/70",
+    iconBg: "bg-[#D4AF37]/15",
+    cardBg: "bg-[#D4AF37]/[0.05]",
+    border: "border-[#D4AF37]/15",
+    activeBorder: "border-[#D4AF37]/50",
+    groupCount: 3,
+  },
+  {
+    id: "travel",
+    title: "Travel & Lifestyle",
+    tagline: "Stay connected across borders",
+    icon: Plane,
+    color: "text-emerald-400",
+    mutedColor: "text-emerald-400/70",
+    iconBg: "bg-emerald-500/15",
+    cardBg: "bg-emerald-500/[0.05]",
+    border: "border-emerald-500/15",
+    activeBorder: "border-emerald-400/50",
+    groupCount: 2,
+  },
+];
+
+const CATEGORIES = [
+  "All",
+  "Parenting & Family",
+  "Career & Professional",
+  "Business & Founder",
+  "Industry Circles",
+  "Education & Mentorship",
+  "Travel & Lifestyle",
+  "Culture & Identity",
+  "City / Region",
+  "Special Interest",
+];
+
+const GROUPS: Group[] = [
+  {
+    id: "1",
+    name: "Albanian Parents Network",
+    pathway: "family",
+    category: "Parenting & Family",
+    description: "Connecting Albanian parents across North America to share resources, school programs, and community events.",
+    members: 214,
+    activity: "12 posts this week",
+  },
+  {
+    id: "2",
+    name: "Shkolla Shqipe Coordinators",
+    pathway: "family",
+    category: "Education & Mentorship",
+    description: "For teachers and organizers of Albanian language schools. Share curriculum, coordinate schedules, and grow enrollment.",
+    members: 87,
+    activity: "5 posts this week",
+  },
+  {
+    id: "3",
+    name: "Albanian Moms NYC",
+    pathway: "family",
+    category: "Parenting & Family",
+    description: "A local group for Albanian mothers in the New York metro area. Playdates, school advice, and mutual support.",
+    members: 63,
+    activity: "9 posts this week",
+    isNew: true,
+  },
+  {
+    id: "4",
+    name: "Early Career Albanians",
+    pathway: "career",
+    category: "Career & Professional",
+    description: "For professionals in their 20s and 30s. Jobs, mentors, skill-building, and peer support across all industries.",
+    members: 341,
+    activity: "28 posts this week",
+  },
+  {
+    id: "5",
+    name: "WAC Mentorship Network",
+    pathway: "career",
+    category: "Education & Mentorship",
+    description: "Matching experienced professionals with students and early-career members. Applications open each semester.",
+    members: 259,
+    activity: "Active",
+  },
+  {
+    id: "6",
+    name: "Albanian Women in Leadership",
+    pathway: "career",
+    category: "Career & Professional",
+    description: "A professional circle for Albanian women in executive, founder, and leadership roles across all sectors.",
+    members: 118,
+    activity: "11 posts this week",
+    isNew: true,
+  },
+  {
+    id: "7",
+    name: "Albanian Tech & AI",
+    pathway: "industry",
+    category: "Industry Circles",
+    description: "Engineers, founders, and builders in tech. Weekly threads, startup spotlights, hiring opportunities, and AI discussions.",
+    members: 193,
+    activity: "41 posts this week",
+  },
+  {
+    id: "8",
+    name: "Albanian Founders Circle",
+    pathway: "industry",
+    category: "Business & Founder",
+    description: "For entrepreneurs building companies. Fundraising, co-founder search, investor introductions, and founder AMAs.",
+    members: 97,
+    activity: "14 posts this week",
+    isNew: true,
+  },
+  {
+    id: "9",
+    name: "Albanian Real Estate Circle",
+    pathway: "industry",
+    category: "Business & Founder",
+    description: "Agents, investors, and developers across residential and commercial real estate. Deals, resources, and market intel.",
+    members: 128,
+    activity: "8 posts this week",
+  },
+  {
+    id: "10",
+    name: "Summer Eagles",
+    pathway: "travel",
+    category: "Travel & Lifestyle",
+    description: "For diaspora who spend extended time back in the Balkans. Logistics, property management, local meetups, and long-stay guides.",
+    members: 176,
+    activity: "19 posts this week",
+  },
+  {
+    id: "11",
+    name: "OriginAL — Balkans Travelers",
+    pathway: "travel",
+    category: "Travel & Lifestyle",
+    description: "Young diaspora adults exploring Albania, Kosovo, and North Macedonia for the first time. Trip coordination and cultural immersion.",
+    members: 142,
+    activity: "22 posts this week",
+  },
+];
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function formatMembers(n: number) {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n.toString();
+}
+
+function getInitials(name: string) {
+  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+// ── Group card ─────────────────────────────────────────────────────────────
+
+function GroupCard({ group, pathway }: { group: Group; pathway: Pathway }) {
+  return (
+    <div className="wac-card p-4 flex items-start gap-3.5 group hover:border-white/15 transition-colors">
+      {/* Avatar */}
+      <div
+        className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs ${pathway.iconBg} ${pathway.color}`}
+      >
+        {getInitials(group.name)}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-0.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="font-semibold text-sm text-white truncate leading-snug">
+              {group.name}
+            </h3>
+            {group.isNew && (
+              <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/20">
+                New
+              </span>
+            )}
+          </div>
+          <button
+            className={`shrink-0 text-[11px] font-bold px-3 py-1 rounded-full border transition-colors ${pathway.border} ${pathway.color} hover:${pathway.cardBg}`}
+          >
+            Join
+          </button>
+        </div>
+
+        <p className="text-[11px] text-white/40 leading-relaxed line-clamp-2 mb-1.5">
+          {group.description}
+        </p>
+
+        <div className="flex items-center gap-2.5 text-[10px] text-white/30">
+          <span className="flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            {formatMembers(group.members)} members
+          </span>
+          <span className="text-white/15">·</span>
+          <span className={group.isNew ? "text-[var(--accent)]/60" : ""}>
+            {group.activity}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 
 export default function GroupsHub() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [activeCategory, setActiveCategory] = useState("All");
 
-  const [activeTab, setActiveTab] = useState<HubTab>("teens");
-
-  // Sync state with URL parameter on mount/change
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (
-      tabParam &&
-      ["teens", "parents", "careers", "travelers"].includes(tabParam)
-    ) {
-      setActiveTab(tabParam as HubTab);
-    }
-  }, [searchParams]);
-
-  const handleTabChange = (tab: HubTab) => {
-    setActiveTab(tab);
-    // Update the URL without a full page reload so it stays deep-linkable
-    router.push(`/groups?tab=${tab}`, { scroll: false });
+  const handlePathwayClick = (pathwayId: string) => {
+    setActiveFilter(prev => prev === pathwayId ? "all" : pathwayId);
+    setActiveCategory("All");
   };
 
-  return (
-    <div className="w-full bg-[var(--background)] py-8 relative z-20">
-      <div className="max-w-[80rem] mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* LEFT COLUMN: NAVIGATION (Sticky) */}
-        <div className="hidden lg:block lg:col-span-3">
-          <div className="sticky top-24 wac-card p-4 space-y-1">
-            <h3 className="text-xs font-bold uppercase tracking-wider opacity-50 mb-3 px-3">
-              Network Groups
-            </h3>
-            
-            <button
-              onClick={() => handleTabChange("teens")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "teens"
-                  ? "bg-slate-500/10 text-slate-300"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              Emerging Talent
-            </button>
-            
-            <button
-              onClick={() => handleTabChange("parents")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "parents"
-                  ? "bg-purple-500/10 text-purple-300"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <Baby className="w-4 h-4" />
-              Family Roots
-            </button>
-            
-            <button
-              onClick={() => handleTabChange("careers")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "careers"
-                  ? "bg-blue-500/10 text-blue-300"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              Up and Comers
-            </button>
+  const handleCategoryClick = (category: string) => {
+    setActiveCategory(category);
+    setActiveFilter("all");
+  };
 
-            <button
-              onClick={() => handleTabChange("travelers")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === "travelers"
-                  ? "bg-emerald-500/10 text-emerald-300"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <Plane className="w-4 h-4" />
-              Travelers
-            </button>
-          </div>
-        </div>
+  const filteredGroups = GROUPS.filter(g => {
+    if (activeCategory !== "All") return g.category === activeCategory;
+    if (activeFilter !== "all") return g.pathway === activeFilter;
+    return true;
+  });
 
-        {/* MOBILE NAVIGATION (Grid/Wrap Layout) */}
-        <div className="lg:hidden col-span-1 pb-2 border-b border-white/5 space-y-2">
-          {/* 2x2 Grid for sub-hubs */}
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => handleTabChange("teens")} className={`flex justify-center items-center gap-2 px-2 py-2.5 rounded-xl text-[11px] font-bold transition-all ${activeTab === "teens" ? "bg-slate-500/15 text-slate-300 border border-slate-500/50" : "bg-[#111] border border-white/10 text-white/70 hover:bg-white/5"}`}><GraduationCap className="w-3.5 h-3.5" /> Emerging</button>
-            <button onClick={() => handleTabChange("parents")} className={`flex justify-center items-center gap-2 px-2 py-2.5 rounded-xl text-[11px] font-bold transition-all ${activeTab === "parents" ? "bg-purple-500/15 text-purple-300 border border-purple-500/50" : "bg-[#111] border border-white/10 text-white/70 hover:bg-white/5"}`}><Baby className="w-3.5 h-3.5" /> Family</button>
-            <button onClick={() => handleTabChange("careers")} className={`flex justify-center items-center gap-2 px-2 py-2.5 rounded-xl text-[11px] font-bold transition-all ${activeTab === "careers" ? "bg-blue-500/15 text-blue-300 border border-blue-500/50" : "bg-[#111] border border-white/10 text-white/70 hover:bg-white/5"}`}><Briefcase className="w-3.5 h-3.5" /> Careers</button>
-            <button onClick={() => handleTabChange("travelers")} className={`flex justify-center items-center gap-2 px-2 py-2.5 rounded-xl text-[11px] font-bold transition-all ${activeTab === "travelers" ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/50" : "bg-[#111] border border-white/10 text-white/70 hover:bg-white/5"}`}><Plane className="w-3.5 h-3.5" /> Travelers</button>
-          </div>
-        </div>
-
-        {/* CENTER COLUMN: MAIN CONTENT STAGE */}
-        <div className="col-span-1 lg:col-span-6">
-          {activeTab === "teens" && <TeensHub />}
-          {activeTab === "parents" && <ParentsHub />}
-          {activeTab === "careers" && <CareersHub />}
-          {activeTab === "travelers" && <TravelersHub />}
-        </div>
-
-        {/* RIGHT COLUMN: DISCOVER (Sticky) */}
-        <div className="hidden lg:block lg:col-span-3">
-          <div className="sticky top-24 space-y-4">
-            <div className="wac-card p-5">
-              <h3 className="font-serif font-bold text-lg text-[var(--accent)] flex items-center gap-2 mb-4">
-                <Hash className="w-4 h-4" />
-                Trending
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="text-xs opacity-60">Global Summit 2026</div>
-                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">#WAC2026 London Registration Open</div>
-                </div>
-                <div>
-                  <div className="text-xs opacity-60">Mentorship Network</div>
-                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">Spring Cohort Applications Live</div>
-                </div>
-                <div>
-                  <div className="text-xs opacity-60">Tech Diaspora</div>
-                  <div className="font-semibold text-sm hover:text-[var(--accent)] cursor-pointer transition-colors">Albanian AI Startup Funding Round</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="wac-card p-5 bg-gradient-to-br from-[#111] to-[rgba(212,175,55,0.05)] border-[var(--accent)]/20">
-              <h3 className="font-serif font-bold text-[var(--accent)] mb-2">Build Your Network</h3>
-              <p className="text-xs opacity-70 mb-4 leading-relaxed">
-                Connect with professionals sharing your roots. Manage your profile to get discovered.
-              </p>
-              <Link href="/profile" className="flex w-full items-center justify-center py-2.5 rounded-full border border-[var(--accent)]/50 text-[15px] font-medium text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors">
-                Update Profile
-              </Link>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------
-// TEENS HUB
-// ----------------------------------------------------------------------
-function TeensHub() {
-  const [teenInterest, setTeenInterest] = useState("College Prep");
-
-  const interestOptions = [
-    { value: "College Prep", label: "College Prep" },
-    { value: "Trade / Vocational", label: "Trade / Vocational" },
-    { value: "Entrepreneurship", label: "Entrepreneurship" },
-  ];
+  const activePathwayData = PATHWAYS.find(p => p.id === activeFilter);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-12 border-l-4 border-[var(--accent)] pl-6">
-        <h2 className="text-3xl font-extrabold mb-3">
-          College Prep & Future Planning
-        </h2>
-        <p className="text-lg opacity-70 max-w-2xl">
-          Whether you’re aiming for a 4-year university, a trade school, or
-          exploring your options — we have mentors, timelines, and resources to
-          help you get there with your Albanian identity front and center.
+    <div className="w-full max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-10 pb-24">
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="space-y-1.5">
+        <h1 className="text-2xl md:text-3xl font-serif font-bold text-white tracking-tight">
+          Find your{" "}
+          <span className="text-[var(--accent)] italic font-light">people</span>
+        </h1>
+        <p className="text-sm text-white/45 max-w-xl leading-relaxed">
+          Groups are communities organized around shared interests, life stage, career, or culture.
+          Browse by pathway or category to find where you belong.
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2 space-y-8">
-          <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-[var(--accent)]" />
-              Your College Roadmap
-            </h3>
-
-            <div className="space-y-6 relative before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-[var(--border)] before:to-transparent">
-              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full border-4 border-[var(--background)] bg-[var(--accent)] text-white text-xs font-bold shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow">
-                  9
-                </div>
-                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-[var(--foreground)]/10 bg-[var(--background)]">
-                  <h4 className="font-bold mb-1">
-                    Freshman Year — Build Your Foundation
-                  </h4>
-                  <p className="text-sm opacity-70 leading-relaxed">
-                    Focus on grades and join at least 2 extracurriculars. Start
-                    exploring what subjects interest you. Attend a WAC college
-                    info session.
-                  </p>
-                </div>
-              </div>
-              <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full border-4 border-[var(--background)] bg-[var(--foreground)]/20 text-[var(--foreground)] text-xs font-bold shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow">
-                  10
-                </div>
-                <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2rem)] p-4 rounded-xl border border-[var(--foreground)]/10 bg-[var(--background)]">
-                  <h4 className="font-bold mb-1">
-                    Sophomore Year — Explore & Test
-                  </h4>
-                  <p className="text-sm opacity-70 leading-relaxed">
-                    Take a PSAT for practice. Research colleges online. Consider
-                    a WAC-sponsored job shadow with an Albanian professional in
-                    your field.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 text-center">
-              <button className="text-[var(--accent)] font-bold text-sm uppercase tracking-wider hover:underline">
-                View Full Roadmap →
-              </button>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Link
-              href="/directory?type=person&mentor=true"
-              className="wac-card p-6 group hover:border-[var(--accent)] transition-colors"
+      {/* ── Featured Pathways ───────────────────────────────────────────── */}
+      <section className="space-y-3.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-white/35">
+            Featured Pathways
+          </h2>
+          {activeFilter !== "all" && (
+            <button
+              onClick={() => setActiveFilter("all")}
+              className="text-[11px] text-white/35 hover:text-white/60 transition"
             >
-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mb-4">
-                <Users className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold mb-2">Find a Mentor</h4>
-              <p className="text-sm opacity-70">
-                Connect with Albanian professionals in the industry you want to
-                enter.
-              </p>
-            </Link>
-            <div className="wac-card p-6 group cursor-not-allowed opacity-80">
-              <div className="w-10 h-10 rounded-full bg-[var(--foreground)]/10 text-[var(--foreground)] flex items-center justify-center mb-4">
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold mb-2">WAC Scholarships</h4>
-              <p className="text-sm opacity-70">
-                Annual scholarship for Albanian-American students.{" "}
-                <span className="text-[var(--accent)]">Opens May 2026</span>.
-              </p>
-            </div>
-          </div>
+              Clear filter
+            </button>
+          )}
         </div>
 
-        <div className="space-y-6">
-          <div className="wac-card border-[var(--accent)]/30 border p-6 relative z-20">
-            <h3 className="font-serif italic text-xl mb-4 tracking-wide">
-              Register a Teen
-            </h3>
-            <p className="text-sm opacity-70 mb-6">
-              Register to receive updates, invites to teen events, and connect
-              with advisors and tutors.
-            </p>
-            <form className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2 opacity-60">
-                  Teen's Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full bg-[var(--background)] border border-[var(--foreground)]/20 rounded p-3 text-sm focus:border-[var(--accent)] focus:outline-none transition-colors"
-                  placeholder="First Last"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2 opacity-60">
-                  Interests
-                </label>
-                <WacSelect
-                  options={interestOptions}
-                  value={teenInterest}
-                  onChange={setTeenInterest}
-                />
-              </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+          {PATHWAYS.map(pathway => {
+            const Icon = pathway.icon;
+            const isActive = activeFilter === pathway.id;
+            return (
               <button
-                type="button"
-                className="w-full bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 font-bold uppercase tracking-wider text-sm p-3 rounded transition-colors"
+                key={pathway.id}
+                onClick={() => handlePathwayClick(pathway.id)}
+                className={`flex flex-col items-start gap-3 p-4 rounded-2xl border text-left transition-all ${
+                  isActive
+                    ? `${pathway.cardBg} ${pathway.activeBorder}`
+                    : `bg-white/[0.025] ${pathway.border} hover:bg-white/[0.04]`
+                }`}
               >
-                Register Now
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${pathway.iconBg}`}>
+                  <Icon className={`w-4 h-4 ${pathway.color}`} strokeWidth={1.8} />
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold leading-snug mb-0.5 ${isActive ? pathway.color : "text-white/80"}`}>
+                    {pathway.title}
+                  </p>
+                  <p className="text-[10px] text-white/35 leading-relaxed hidden sm:block">
+                    {pathway.tagline}
+                  </p>
+                </div>
+                <p className={`text-[10px] font-semibold ${pathway.mutedColor}`}>
+                  {pathway.groupCount} groups
+                </p>
               </button>
-            </form>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold uppercase tracking-wider text-sm flex items-center gap-2 opacity-80">
-                <CalendarDays className="w-4 h-4" /> Upcoming Teen Events
-              </h3>
-              <Link
-                href="/events"
-                className="text-xs text-[var(--accent)] hover:underline"
-              >
-                View Calendar
-              </Link>
-            </div>
-            <div className="space-y-3">
-              <div className="p-4 border border-[var(--foreground)]/10 rounded-lg hover:bg-[var(--foreground)]/5 transition-colors cursor-pointer">
-                <div className="flex justify-between items-start mb-1">
-                  <h4 className="font-bold text-sm">SAT Prep Boot Camp</h4>
-                  <span className="text-[var(--accent)] text-xs font-bold">
-                    Mar 22
-                  </span>
-                </div>
-                <p className="text-xs opacity-60">Hosted by AACC Riverdale</p>
-              </div>
-              <div className="p-4 border border-[var(--foreground)]/10 rounded-lg hover:bg-[var(--foreground)]/5 transition-colors cursor-pointer">
-                <div className="flex justify-between items-start mb-1">
-                  <h4 className="font-bold text-sm">College Essay Workshop</h4>
-                  <span className="text-[var(--accent)] text-xs font-bold">
-                    Apr 05
-                  </span>
-                </div>
-                <p className="text-xs opacity-60">Virtual — Zoom</p>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      </div>
-    </div>
-  );
-}
+      </section>
 
-// ----------------------------------------------------------------------
-// PARENTS HUB
-// ----------------------------------------------------------------------
-function ParentsHub() {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-12 border-l-4 border-purple-600 pl-6">
-        <h2 className="text-3xl font-extrabold mb-3">Parent Connect</h2>
-        <p className="text-lg opacity-70 max-w-2xl">
-          Raising the next generation. Connect with other Albanian parents, find
-          local Shkolla Shqipe programs, daycares, and organize weekend
-          playdates.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <h3 className="text-xl font-bold mb-2">Shkolla Shqipe</h3>
-          <p className="text-sm opacity-70 mb-4">
-            Find weekend Albanian language schools and cultural programs for
-            children ages 4-12 in your area.
-          </p>
-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
-            Find a School →
-          </span>
-        </div>
-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
-            <Baby className="w-6 h-6" />
-          </div>
-          <h3 className="text-xl font-bold mb-2">Daycare Network</h3>
-          <p className="text-sm opacity-70 mb-4">
-            A directory of Albanian-owned daycares and childcare providers for
-            working parents.
-          </p>
-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
-            Search Map →
-          </span>
-        </div>
-        <div className="wac-card p-6 group hover:border-purple-500 transition-colors cursor-pointer">
-          <div className="w-12 h-12 rounded bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4">
-            <Users className="w-6 h-6" />
-          </div>
-          <h3 className="text-xl font-bold mb-2">Regional Playdates</h3>
-          <p className="text-sm opacity-70 mb-4">
-            Join local WhatsApp groups to coordinate weekend park meetups and
-            family dinners.
-          </p>
-          <span className="text-xs font-bold text-purple-500 uppercase tracking-widest group-hover:underline">
-            Join a Group →
-          </span>
-        </div>
-      </div>
-
-      <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8 flex flex-col md:flex-row items-center gap-8">
-        <div className="flex-1">
-          <h3 className="text-2xl font-bold mb-3">Family Events Calendar</h3>
-          <p className="opacity-70 text-sm mb-6 max-w-lg">
-            See all kid-friendly events, cultural festivals, and language school
-            registrations across multiple organizations in one place.
-          </p>
-          <button className="bg-purple-600 text-white hover:bg-purple-700 font-bold uppercase tracking-wider text-sm px-6 py-3 rounded transition-colors">
-            Subscribe to Parent Calendar
-          </button>
-        </div>
-        <div className="w-full md:w-80 bg-[var(--background)] border border-[var(--foreground)]/10 rounded-xl p-5 shadow-lg">
-          <div className="flex items-center gap-3 mb-4 border-b border-[var(--foreground)]/10 pb-4">
-            <div className="bg-purple-500 text-white text-center rounded overflow-hidden w-12 pb-1 shrink-0">
-              <div className="text-[10px] uppercase font-bold bg-white/20 py-0.5">
-                Apr
-              </div>
-              <div className="text-lg font-bold">12</div>
-            </div>
-            <div>
-              <h4 className="font-bold text-sm">Spring Family Picnic</h4>
-              <p className="text-xs opacity-60">Van Cortlandt Park, NY</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-500 text-white text-center rounded overflow-hidden w-12 pb-1 shrink-0">
-              <div className="text-[10px] uppercase font-bold bg-white/20 py-0.5">
-                May
-              </div>
-              <div className="text-lg font-bold">03</div>
-            </div>
-            <div>
-              <h4 className="font-bold text-sm">Shkolla Shqipe Grad</h4>
-              <p className="text-xs opacity-60">AACC Riverdale</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------
-// CAREERS HUB
-// ----------------------------------------------------------------------
-function CareersHub() {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-12 border-l-4 border-blue-600 pl-6">
-        <h2 className="text-3xl font-extrabold mb-3">Career Growers</h2>
-        <p className="text-lg opacity-70 max-w-2xl">
-          For professionals in their 30s and 40s scaling their impact. Expand
-          your network, find investment opportunities, or give back by mentoring
-          the next generation.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-12 gap-8">
-        <div className="md:col-span-8 space-y-6">
-          <div className="wac-card p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center group hover:border-blue-500 transition-colors cursor-pointer">
-            <div className="w-16 h-16 shrink-0 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-              <Briefcase className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-2">
-                Albanian American Business Association
-              </h3>
-              <p className="text-sm opacity-70 mb-3">
-                Join the premier network of Albanian corporate professionals and
-                entrepreneurs. Access exclusive networking events and B2B
-                directories.
-              </p>
-              <span className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all">
-                Explore AABA <ChevronRight className="w-4 h-4" />
-              </span>
-            </div>
-          </div>
-
-          <div className="wac-card p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center group hover:border-blue-500 transition-colors cursor-pointer">
-            <div className="w-16 h-16 shrink-0 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-              <Users className="w-8 h-8" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold mb-2">Mentorship Program</h3>
-              <p className="text-sm opacity-70 mb-3">
-                You've made it. Now lay the ladder down. Opt-in to the WAC
-                directory as "Open to Mentoring" to guide college students and
-                recent grads.
-              </p>
-              <Link
-                href="/profile"
-                className="text-xs font-bold text-blue-500 uppercase tracking-widest flex items-center gap-1 group-hover:gap-2 transition-all"
-              >
-                Update Your Profile <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="md:col-span-4">
-          <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-6 h-full">
-            <h3 className="font-bold uppercase tracking-wider text-sm mb-4 opacity-80 flex items-center gap-2 border-b border-[var(--foreground)]/10 pb-3">
-              <Briefcase className="w-4 h-4" /> Latest Opportunities
-            </h3>
-
-            <div className="space-y-4">
-              <Link href="#" className="block group">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 mb-1">
-                  Board Seat Open
-                </div>
-                <h4 className="font-bold text-sm group-hover:text-blue-500 transition-colors">
-                  WAC Strategy Council
-                </h4>
-                <p className="text-xs opacity-60 mt-1 line-clamp-2">
-                  Seeking experienced executives to help guide the 2027 roadmap
-                  for diaspora engagement.
-                </p>
-              </Link>
-              <Link href="#" className="block group">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
-                  Investment Group
-                </div>
-                <h4 className="font-bold text-sm group-hover:text-blue-500 transition-colors">
-                  Real Estate Syndicate: NYC
-                </h4>
-                <p className="text-xs opacity-60 mt-1 line-clamp-2">
-                  Monthly meetup for commercial real estate investors looking to
-                  pool resources.
-                </p>
-              </Link>
-            </div>
-
-            <button className="w-full mt-6 border border-blue-500 text-blue-500 hover:bg-blue-500/10 font-bold uppercase tracking-wider text-xs p-3 rounded transition-colors">
-              View Job Board
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------
-// TRAVELERS HUB
-// ----------------------------------------------------------------------
-function TravelersHub() {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-12 border-l-4 border-emerald-600 pl-6">
-        <h2 className="text-3xl font-extrabold mb-3">
-          Travelers & Summer Eagles
+      {/* ── Browse by Category ──────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-white/35">
+          Browse by Category
         </h2>
-        <p className="text-lg opacity-70 max-w-2xl">
-          Connect with the homeland. Whether you're a young adult experiencing
-          the Balkans for the first time with OriginAL, or a retired "Summer
-          Eagle" spending months back home.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-8 mb-10">
-        <div className="relative overflow-hidden rounded-xl border border-[var(--foreground)]/10 group cursor-pointer h-64">
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-900 to-emerald-950"></div>
-          <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[url('https://images.unsplash.com/photo-1542478421-4ea2e16c802f?q=80&w=1200')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 p-6 z-10 w-full">
-            <div className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">
-              Age 18-24
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              OriginAL Birthright Trip
-            </h3>
-            <p className="text-sm text-white/80 line-clamp-2 pr-4">
-              A free volunteer and cultural immersion trip to Albania and Kosovo
-              for young diaspora adults.
-            </p>
-          </div>
-        </div>
-
-        <Link
-          href="/guide/travel"
-          className="relative overflow-hidden block rounded-xl border border-[var(--foreground)]/10 group cursor-pointer h-64"
+        <div
+          className="flex gap-2 overflow-x-auto pb-0.5"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-stone-900"></div>
-          <div className="absolute inset-0 opacity-40 mix-blend-overlay bg-[url('https://images.unsplash.com/photo-1590022216657-3f8ca622eff7?q=80&w=1200')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 p-6 z-10 w-full">
-            <div className="text-xs font-bold uppercase tracking-widest text-stone-300 mb-2">
-              Cultural Hub
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              Struga Basecamp Guide
-            </h3>
-            <p className="text-sm text-white/80 line-clamp-2 pr-4">
-              The strategic travel guide for Albanian diaspora visiting the
-              Balkans. Reach 4 countries from one lake stay.
-            </p>
-          </div>
-        </Link>
-      </div>
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => handleCategoryClick(cat)}
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-[11px] font-semibold border transition-colors whitespace-nowrap ${
+                activeCategory === cat
+                  ? "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30"
+                  : "bg-white/[0.03] text-white/40 border-white/[0.07] hover:text-white/65 hover:border-white/15"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </section>
 
-      <div className="bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 rounded-xl p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h3 className="text-xl font-bold mb-1 flex items-center gap-2">
-              <Plane className="w-5 h-5 text-emerald-500" />
-              Summer Eagles Network
-            </h3>
-            <p className="text-sm opacity-70">
-              For diaspora members spending 1-5 months in the Balkans each year.
-            </p>
-          </div>
-          <button className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold uppercase tracking-wider text-xs px-5 py-2.5 rounded transition-colors shrink-0">
-            Join the Network
+      {/* ── Groups List ─────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-white/35">
+            {activeFilter !== "all"
+              ? activePathwayData?.title
+              : activeCategory !== "All"
+              ? activeCategory
+              : "All Groups"}
+            {" "}
+            <span className="text-white/20 font-normal normal-case tracking-normal">
+              — {filteredGroups.length} {filteredGroups.length === 1 ? "group" : "groups"}
+            </span>
+          </h2>
+          <button className="flex items-center gap-1.5 text-[11px] text-[var(--accent)] hover:text-[#F2D06B] font-semibold transition">
+            <Plus className="w-3.5 h-3.5" />
+            Suggest a group
           </button>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <h4 className="font-bold text-sm">Property Management</h4>
-            <p className="text-xs opacity-70 leading-relaxed">
-              Connect with vetted local services to manage your apartment or
-              house while you're back in the States.
-            </p>
+        {filteredGroups.length > 0 ? (
+          <div className="grid md:grid-cols-2 gap-2.5">
+            {filteredGroups.map(group => {
+              const pathway = PATHWAYS.find(p => p.id === group.pathway)!;
+              return <GroupCard key={group.id} group={group} pathway={pathway} />;
+            })}
           </div>
-          <div className="space-y-2">
-            <h4 className="font-bold text-sm">Long-Stay Logistics</h4>
-            <p className="text-xs opacity-70 leading-relaxed">
-              Guides on banking, healthcare access, and residency permits for
-              extended summer stays.
-            </p>
+        ) : (
+          <div className="py-16 text-center space-y-2">
+            <p className="text-white/40 text-sm">No groups in this category yet.</p>
+            <p className="text-white/25 text-xs">Be the first to suggest one.</p>
           </div>
-          <div className="space-y-2">
-            <h4 className="font-bold text-sm">Local Meetups</h4>
-            <p className="text-xs opacity-70 leading-relaxed">
-              Weekly coffee gatherings in Tirana, Prishtina, and Struga
-              organized specifically for diaspora visitors.
-            </p>
-          </div>
+        )}
+      </section>
+
+      {/* ── Start a Group CTA ───────────────────────────────────────────── */}
+      <section className="mt-4 p-5 md:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.07] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-sm text-white mb-0.5">Don't see your community?</h3>
+          <p className="text-[11px] text-white/40 leading-relaxed">
+            Groups can form around any shared interest, city, profession, or life stage.
+          </p>
         </div>
-      </div>
+        <button className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--accent)] text-black text-xs font-bold hover:bg-[#F2D06B] transition-colors">
+          <Plus className="w-3.5 h-3.5" />
+          Propose a Group
+        </button>
+      </section>
     </div>
   );
 }

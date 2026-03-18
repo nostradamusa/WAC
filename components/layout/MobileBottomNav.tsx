@@ -3,70 +3,120 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Compass, Activity, CalendarDays, Bell } from "lucide-react";
+import { Search, Activity, CalendarDays, Bell } from "lucide-react";
 import { useScrollDirection } from "@/lib/hooks/useScrollDirection";
+import { useNotificationCount } from "@/lib/hooks/useUnreadCounts";
+import { supabase } from "@/lib/supabase";
 
 export default function MobileBottomNav() {
-  const pathname = usePathname();
+  const pathname  = usePathname();
   const scrollDirection = useScrollDirection();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted]     = useState(false);
+  const [userId, setUserId]       = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    setMounted(true);
+    supabase.auth.getSession().then(({ data }) => {
+      setUserId(data.session?.user?.id ?? null);
+      setUserEmail(data.session?.user?.email ?? null);
+    });
   }, []);
 
+  const notifCount = useNotificationCount(userId, userEmail);
+
   const navItems = [
-    { name: "Home", href: "/", icon: null, imageSrc: "/images/wac-logo.jpg" },
-    { name: "Directory", href: "/directory", icon: Compass },
-    { name: "The Pulse", href: "/community", icon: Activity },
-    { name: "Events", href: "/events", icon: CalendarDays },
-    { name: "Alerts", href: "/notifications", icon: Bell },
+    { name: "Home",      href: "/",             icon: null,     imageSrc: "/images/wac-logo.jpg" },
+    { name: "Directory", href: "/directory",     icon: Search,   imageSrc: null },
+    { name: "The Pulse", href: "/community",     icon: Activity, imageSrc: null },
+    { name: "Events",    href: "/events",        icon: CalendarDays, imageSrc: null },
+    { name: "Alerts",    href: "/notifications", icon: Bell,     imageSrc: null },
   ];
 
-  if (pathname === '/post') {
-    return null;
-  }
+  if (pathname === "/post") return null;
 
   return (
-    <div 
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#111]/95 backdrop-blur-md border-t border-white/10 px-2 py-2 safe-area-pb transition-transform duration-300 ease-in-out ${
+    <nav
+      aria-label="Main navigation"
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f]/96 backdrop-blur-xl border-t border-white/[0.07] safe-area-pb transition-transform duration-300 ease-in-out ${
         scrollDirection === "down" ? "translate-y-[120%]" : "translate-y-0"
       }`}
     >
-      <div className="flex items-center justify-between max-w-md mx-auto">
+      <div className="flex items-center justify-around max-w-md mx-auto px-1 py-1.5">
         {navItems.map((item) => {
           const isActive = mounted ? pathname === item.href : false;
-          const Icon = item.icon;
-          
+          const isPulse  = item.href === "/community";
+          const isAlerts = item.name === "Alerts";
+          const Icon     = item.icon;
+
           return (
-            <Link 
-              key={item.href} 
+            <Link
+              key={item.href}
               href={item.href}
-              className={`group flex flex-col items-center justify-center w-16 gap-1 transition-all ${
-                isActive ? "text-[var(--accent)]" : "text-white/60 hover:text-[var(--accent)]"
+              aria-label={item.name}
+              aria-current={isActive ? "page" : undefined}
+              className={`group relative flex items-center justify-center transition-all duration-200 ${
+                isPulse ? "w-14 h-14" : "w-12 h-12"
+              } ${
+                isActive && !isPulse ? "text-[var(--accent)]" : !isPulse ? "text-white/45 hover:text-white/75" : ""
               }`}
             >
-              <div className={`relative flex items-center justify-center transition-all duration-300 ${isActive ? 'drop-shadow-[0_0_12px_rgba(212,175,55,0.8)]' : 'group-hover:drop-shadow-[0_0_12px_rgba(212,175,55,0.8)]'}`}>
-                {Icon ? (
-                  <Icon size={24} strokeWidth={isActive ? 2 : 1.5} />
-                ) : item.imageSrc ? (
-                  <div className={`w-6 h-6 rounded-full overflow-hidden border ${isActive ? "border-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.6)]" : "border-white/20"} flex items-center justify-center bg-[var(--accent)]`}>
-                    <img src={item.imageSrc} alt={item.name} className="w-full h-full object-cover scale-[1.4] mix-blend-multiply" />
-                  </div>
-                ) : null}
-                {item.name === "Alerts" && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                    3
-                  </span>
-                )}
-              </div>
-              <span className={`text-[10px] ${isActive ? "font-bold" : "font-medium"}`}>
-                {item.name}
-              </span>
+              {isPulse ? (
+                // ── Pulse: circular container, center of gravity ─────────────
+                <div className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
+                  isActive
+                    ? "bg-[var(--accent)]/[0.13] ring-1 ring-[var(--accent)]/35 drop-shadow-[0_0_20px_rgba(212,175,55,0.55)]"
+                    : "bg-white/[0.05] ring-1 ring-white/[0.07] group-hover:bg-[var(--accent)]/[0.07] group-hover:ring-[var(--accent)]/20"
+                }`}>
+                  <Activity
+                    size={24}
+                    strokeWidth={isActive ? 2.2 : 1.6}
+                    className={`transition-colors ${
+                      isActive ? "text-[var(--accent)]" : "text-white/40 group-hover:text-[var(--accent)]"
+                    }`}
+                  />
+                </div>
+              ) : (
+                // ── Standard items ───────────────────────────────────────────
+                <div className={`relative flex items-center justify-center w-12 h-12 transition-all duration-200 ${
+                  isActive
+                    ? "drop-shadow-[0_0_10px_rgba(212,175,55,0.75)]"
+                    : "group-hover:drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+                }`}>
+                  {Icon ? (
+                    <Icon size={26} strokeWidth={isActive ? 2.1 : 1.6} />
+                  ) : item.imageSrc ? (
+                    <div className={`w-7 h-7 rounded-full overflow-hidden border-2 flex items-center justify-center bg-[var(--accent)] transition-all ${
+                      isActive
+                        ? "border-[var(--accent)] shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+                        : "border-white/20 group-hover:border-[var(--accent)]/40"
+                    }`}>
+                      <img
+                        src={item.imageSrc}
+                        alt=""
+                        className="w-full h-full object-cover scale-[1.4] mix-blend-multiply"
+                      />
+                    </div>
+                  ) : null}
+
+                  {/* Active dot */}
+                  {isActive && (
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(212,175,55,1)]" />
+                  )}
+
+                  {/* Notification badge */}
+                  {isAlerts && notifCount > 0 && (
+                    <span className="absolute top-1 right-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-red-500 px-[3px] text-[9px] font-bold text-white leading-none">
+                      {notifCount > 9 ? "9+" : notifCount}
+                    </span>
+                  )}
+                </div>
+              )}
             </Link>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

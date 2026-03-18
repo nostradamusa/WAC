@@ -25,6 +25,7 @@ export default function GlobalDirectoryFilters({
     const country = formData.get("country") as string;
     const industry = formData.get("industry") as string;
     const specialty = formData.get("specialty") as string;
+    const skills = formData.get("skills") as string;
     const mentorOnly = formData.get("mentor") === "true";
     const openToWork = formData.get("work") === "true";
     const openToHire = formData.get("hire") === "true";
@@ -35,6 +36,7 @@ export default function GlobalDirectoryFilters({
     if (country) params.set("country", country); else params.delete("country");
     if (industry) params.set("industry", industry); else params.delete("industry");
     if (specialty) params.set("specialty", specialty); else params.delete("specialty");
+    if (skills?.trim()) params.set("skills", skills.trim()); else params.delete("skills");
     if (mentorOnly) params.set("mentor", "true"); else params.delete("mentor");
     if (openToWork) params.set("work", "true"); else params.delete("work");
     if (openToHire) params.set("hire", "true"); else params.delete("hire");
@@ -158,18 +160,34 @@ export default function GlobalDirectoryFilters({
             <summary className="text-sm font-bold text-white tracking-widest uppercase cursor-pointer list-none flex items-center justify-between outline-none">
               Advanced <ChevronDown size={18} className="text-white/40 group-open:rotate-180 transition-transform" />
             </summary>
-            <div className="pt-6 space-y-2">
-              <label htmlFor="specialty" className="mb-1.5 block text-xs font-medium opacity-60 uppercase tracking-widest">
-                Specialty
-              </label>
-              <input
-                id="specialty"
-                name="specialty"
-                type="text"
-                defaultValue={searchParams.get("specialty") || ""}
-                placeholder="e.g. Cardiology, Frontend"
-                className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
-              />
+            <div className="pt-6 space-y-5">
+              <div>
+                <label htmlFor="skills" className="mb-1.5 block text-xs font-medium opacity-60 uppercase tracking-widest">
+                  Skills
+                </label>
+                <input
+                  id="skills"
+                  name="skills"
+                  type="text"
+                  defaultValue={searchParams.get("skills") || ""}
+                  placeholder="e.g. React.js, Python"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
+                />
+                <p className="mt-1.5 text-[10px] opacity-40">Comma-separated</p>
+              </div>
+              <div>
+                <label htmlFor="specialty" className="mb-1.5 block text-xs font-medium opacity-60 uppercase tracking-widest">
+                  Specialty
+                </label>
+                <input
+                  id="specialty"
+                  name="specialty"
+                  type="text"
+                  defaultValue={searchParams.get("specialty") || ""}
+                  placeholder="e.g. Cardiology, Frontend"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white"
+                />
+              </div>
             </div>
           </details>
         )}

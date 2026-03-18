@@ -2,291 +2,253 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bookmark, Share, Briefcase, UserPlus, GraduationCap, HandCoins, Users } from "lucide-react";
+import {
+  Bookmark,
+  Share2,
+  Briefcase,
+  UserPlus,
+  GraduationCap,
+  HandCoins,
+  Users,
+  MapPin,
+} from "lucide-react";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import FollowButton from "@/components/ui/FollowButton";
 
 type DirectoryPerson = PersonDirectoryRow & {
   current_title?: string | null;
   company?: string | null;
 };
 
-type PersonCardProps = {
-  person: DirectoryPerson;
-};
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-function getInitials(person: DirectoryPerson) {
-  const source = person.full_name || person.username || "WAC";
-  return source
+function getInitials(p: DirectoryPerson) {
+  return (p.full_name || p.username || "W")
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((w) => w[0]?.toUpperCase())
     .join("");
 }
 
-function abbreviateCountry(country: string | null) {
+function abbrev(country: string | null) {
   if (!country) return "";
-
-  const normalized = country.trim().toLowerCase();
-
-  if (
-    normalized === "united states" ||
-    normalized === "united states of america" ||
-    normalized === "usa"
-  ) {
-    return "USA";
-  }
-
-  if (normalized === "united kingdom" || normalized === "uk") {
-    return "UK";
-  }
-
+  const n = country.trim().toLowerCase();
+  if (n === "united states" || n === "united states of america" || n === "usa") return "USA";
+  if (n === "united kingdom" || n === "uk") return "UK";
   return country;
 }
 
-function buildLocation(person: DirectoryPerson) {
-  const state = person.state?.trim();
-  const country = abbreviateCountry(person.country);
-  return [state, country].filter(Boolean).join(", ");
+function buildLocation(p: DirectoryPerson) {
+  return [p.state?.trim(), abbrev(p.country)].filter(Boolean).join(", ");
 }
 
-function buildPrimaryLine(person: DirectoryPerson) {
-  if (person.headline?.trim()) {
-    return person.headline.trim();
-  }
-
-  if (person.current_title?.trim()) {
-    return person.current_title.trim();
-  }
-
+function buildPrimary(p: DirectoryPerson) {
   return (
-    person.profession_name?.trim() ||
-    person.profession?.trim() ||
-    person.specialty_name?.trim() ||
+    p.headline?.trim() ||
+    p.current_title?.trim() ||
+    p.profession_name?.trim() ||
+    p.profession?.trim() ||
+    p.specialty_name?.trim() ||
     ""
   );
 }
 
-function buildSecondaryLine(person: DirectoryPerson) {
-  const title = person.current_title?.trim();
-  const company = person.company?.trim();
-
-  if (title && company) {
-    return `${title} at ${company}`;
-  }
-
-  return title || company || "";
-}
-
-function buildRoots(person: DirectoryPerson) {
-  const parts = [
-    person.ancestry_village,
-    person.ancestry_city,
-    abbreviateCountry(person.ancestry_country),
-  ]
-    .map((p) => p?.trim())
+function buildRoots(p: DirectoryPerson) {
+  const parts = [p.ancestry_village, p.ancestry_city, abbrev(p.ancestry_country)]
+    .map((x) => x?.trim())
     .filter(Boolean);
-
-  if (parts.length === 0) return "";
-
-  // Deduplicate just in case city/village are same
-  const uniqueParts = Array.from(new Set(parts));
-  return uniqueParts.join(", ");
+  return [...new Set(parts)].join(", ");
 }
 
-export default function PersonCard({ person }: PersonCardProps) {
-  const [isSaved, setIsSaved] = useState(false);
+// ── Badge config ───────────────────────────────────────────────────────────
+
+const BADGE_CONFIG = [
+  { key: "open_to_work",         urlParam: "work=true",   label: "Open to Work", Icon: Briefcase,     color: "bg-green-500/10 text-green-400 border-green-500/20"  },
+  { key: "open_to_hire",         urlParam: "hire=true",   label: "Hiring",       Icon: UserPlus,      color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
+  { key: "open_to_mentor",       urlParam: "mentor=true", label: "Mentoring",    Icon: GraduationCap, color: "bg-blue-500/10 text-blue-400 border-blue-500/20"       },
+  { key: "open_to_invest",       urlParam: "invest=true", label: "Investing",    Icon: HandCoins,     color: "bg-amber-500/10 text-amber-400 border-amber-500/20"    },
+  { key: "open_to_collaborate",  urlParam: "collab=true", label: "Collab",       Icon: Users,         color: "bg-rose-500/10 text-rose-400 border-rose-500/20"       },
+] as const;
+
+// ── Component ──────────────────────────────────────────────────────────────
+
+export default function PersonCard({ person }: { person: DirectoryPerson }) {
+  const [isSaved, setIsSaved]     = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  const displayName = person.full_name || person.username || "Unnamed Member";
-  const profileHref = person.username ? `/people/${person.username}` : "#";
-  const initials = getInitials(person);
-  const primaryLine = buildPrimaryLine(person);
-  const secondaryLine = buildSecondaryLine(person);
-  const location = buildLocation(person);
-  const roots = buildRoots(person);
+  const displayName  = person.full_name || person.username || "Member";
+  const profileHref  = person.username ? `/people/${person.username}` : "#";
+  const initials     = getInitials(person);
+  const primaryLine  = buildPrimary(person);
+  const location     = buildLocation(person);
+  const roots        = buildRoots(person);
 
-  function handleShare(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    const url = `${window.location.origin}${profileHref}`;
-    navigator.clipboard.writeText(url);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
-  }
+  // @ts-expect-error banner_url occasionally present in real data
+  const bannerUrl: string | null = person.banner_url ?? null;
 
-  const badges = [];
-  if (person.open_to_work) {
-    badges.push({ id: "work", urlParam: "work=true", label: "Open to Work", icon: Briefcase, colorClass: "bg-green-500/10 text-green-400 border-green-500/20" });
-  }
-  if (person.open_to_hire) {
-    badges.push({ id: "hire", urlParam: "hire=true", label: "Hiring", icon: UserPlus, colorClass: "bg-purple-500/10 text-purple-400 border-purple-500/20" });
-  }
-  if (person.open_to_mentor) {
-    badges.push({ id: "mentor", urlParam: "mentor=true", label: "Mentoring", icon: GraduationCap, colorClass: "bg-blue-500/10 text-blue-400 border-blue-500/20" });
-  }
-  if (person.open_to_invest) {
-    badges.push({ id: "invest", urlParam: "invest=true", label: "Investing", icon: HandCoins, colorClass: "bg-amber-500/10 text-amber-400 border-amber-500/20" });
-  }
-  if (person.open_to_collaborate) {
-    badges.push({ id: "collab", urlParam: "collab=true", label: "Collaborating", icon: Users, colorClass: "bg-rose-500/10 text-rose-400 border-rose-500/20" });
-  }
+  const badges = BADGE_CONFIG.filter((b) => !!(person as any)[b.key]);
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    setIsSaved(!isSaved);
+    setIsSaved((v) => !v);
+  }
+
+  function handleShare(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.writeText(`${window.location.origin}${profileHref}`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 2000);
   }
 
   return (
-    <article className="wac-card group h-full overflow-hidden p-0 transition hover:-translate-y-0.5 relative flex flex-col">
-      <div className="relative h-28 shrink-0 overflow-hidden">
-        {/* Action Bar (Share/Save) */}
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-20 transition-opacity opacity-0 group-hover:opacity-100 sm:opacity-100">
+    <article className="wac-card group overflow-hidden p-0 flex flex-col relative hover:-translate-y-0.5 transition-transform">
+
+      {/* ── Banner ──────────────────────────────────────────────────────── */}
+      <div className="relative h-16 shrink-0 overflow-hidden">
+        {bannerUrl ? (
+          <>
+            <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-black/40" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-700/55 to-slate-800/45" />
+        )}
+
+        {/* Save / share — hover reveal */}
+        <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleSave}
-            title={isSaved ? "Remove bookmark" : "Save for later"}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-white transition hover:bg-black/60"
+            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
           >
-            <Bookmark
-              size={15}
-              className={
-                isSaved ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white"
-              }
-            />
+            <Bookmark size={10} className={isSaved ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white"} />
           </button>
           <button
             onClick={handleShare}
-            title="Share profile"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 border border-white/10 backdrop-blur-md text-white transition hover:bg-black/60"
+            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
           >
-            <Share size={15} />
+            <Share2 size={10} className="text-white" />
           </button>
         </div>
-        {/* @ts-expect-error banner_url isn't in schema but seems to exist in real data sometimes based on previous code */}
-        {person.banner_url ? (
-          <>
-            <img
-              /* @ts-expect-error banner_url */
-              src={person.banner_url}
-              alt={`${displayName} banner`}
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black/35" />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/25" />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(190,205,212,0.95)_0%,rgba(190,205,212,0.88)_100%)]" />
-        )}
 
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Avatar — overlaps banner edge */}
+        <div className="absolute bottom-0 left-4 translate-y-1/2 z-10">
           {person.avatar_url ? (
             <img
               src={person.avatar_url}
               alt={displayName}
-              className="h-20 w-20 rounded-full border-4 border-[var(--card)] object-cover shadow-lg"
+              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md"
             />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--card)] bg-[rgba(255,255,255,0.10)] text-lg font-semibold uppercase tracking-wide shadow-lg">
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-white/[0.08] flex items-center justify-center text-sm font-semibold uppercase text-white/65 shadow-md">
               {initials}
             </div>
           )}
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col px-6 pb-5 pt-5 text-center">
-        <div className="flex items-start justify-center gap-1.5">
-          <h2 className="line-clamp-2 break-words text-xl font-semibold leading-tight">
-            {displayName}
-          </h2>
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col px-4 pt-9 pb-4">
 
-          {person.is_verified && <VerifiedBadge className="mt-0.5" />}
+        {/* Name + verified */}
+        <div className="flex items-center gap-1 min-w-0 mb-0.5">
+          <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
+          {person.is_verified && <VerifiedBadge className="shrink-0 mt-px" />}
         </div>
 
+        {/* Headline */}
         {primaryLine && (
-          <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug opacity-95">
-            {primaryLine}
-          </p>
+          <p className="text-[11px] text-white/55 line-clamp-1 leading-snug">{primaryLine}</p>
         )}
 
-        {secondaryLine && (
-          <p className="mt-1 line-clamp-1 min-h-[1.25rem] text-sm leading-snug opacity-82">
-            {secondaryLine}
-          </p>
-        )}
-
-        {location && (
-          <p className="mt-1 line-clamp-1 min-h-[1.25rem] text-sm opacity-65">
-            {location}
-          </p>
-        )}
-
-        {roots && (
-          <p className="mt-1 line-clamp-1 min-h-[1.25rem] text-sm opacity-70">
-            Roots: {roots}
-          </p>
-        )}
-
-        <div className="mt-auto pt-4 flex flex-col gap-3 w-full">
-          {/* Always render the container with a min-height so the button layout doesn't shift */}
-          <div className="min-h-[26px] flex flex-wrap justify-center gap-1.5 z-30">
-            {badges.length > 0 && (
-              <>
-                {(() => {
-                  const first = badges[0];
-                  const Icon = first.icon;
-                  return (
-                    <Link href={`/directory?${first.urlParam}`} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest border ${first.colorClass} hover:brightness-110 transition`}>
-                      <Icon size={12} /> {first.label}
-                    </Link>
-                  );
-                })()}
-
-                {badges.length > 1 && (
-                  <div className="group/badge relative flex items-center">
-                    <button className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[rgba(255,255,255,0.05)] px-2 py-1 text-[10px] font-bold text-white/80 border border-white/10 transition group-hover/badge:bg-[rgba(255,255,255,0.1)] focus:outline-none focus:bg-[rgba(255,255,255,0.15)] focus:border-white/30">
-                      +{badges.length - 1}
-                    </button>
-
-                    <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 hidden flex-col gap-1 rounded-xl bg-[#111] border border-white/10 p-2 shadow-[0_10px_40px_rgba(0,0,0,0.8)] group-hover/badge:flex group-focus-within/badge:flex z-[100] min-w-max pointer-events-auto">
-                      <div className="text-[9px] font-bold uppercase tracking-widest opacity-50 px-2 pb-1.5 mb-0.5 mt-1.5 border-b border-white/10 text-left cursor-default">Also Open To:</div>
-                      {badges.slice(1).map((b) => {
-                        const BIcon = b.icon;
-                        return (
-                          <Link href={`/directory?${b.urlParam}`} key={b.id} className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest ${b.colorClass} border border-transparent bg-transparent transition-all hover:bg-white/5 hover:border-white/10 cursor-pointer pointer-events-auto`}>
-                            <BIcon size={12} /> {b.label}
-                          </Link>
-                        );
-                      })}
-                      {/* Triangle Pointer */}
-                      <div className="absolute top-full left-1/2 -ms-1.5 -mt-[1px] border-4 border-transparent border-t-white/10 pointer-events-none"></div>
-                      <div className="absolute top-full left-1/2 -ms-1.5 -mt-[2px] border-4 border-transparent border-t-[#111] pointer-events-none"></div>
-                    </div>
-                  </div>
-                )}
-              </>
+        {/* Location + Roots */}
+        {(location || roots) && (
+          <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
+            {location && (
+              <span className="flex items-center gap-0.5 text-[11px] text-white/35">
+                <MapPin size={9} className="shrink-0" />
+                {location}
+              </span>
+            )}
+            {roots && (
+              <span className="text-[11px] text-white/25">
+                {location && "· "}Roots: {roots}
+              </span>
             )}
           </div>
+        )}
 
-          {person.username ? (
+        {/* Skills */}
+        {person.skills && person.skills.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2.5">
+            {person.skills.slice(0, 2).map((s) => (
+              <span
+                key={s}
+                className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.07] text-[10px] text-white/50"
+              >
+                {s}
+              </span>
+            ))}
+            {person.skills.length > 2 && (
+              <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.07] text-[10px] text-white/30">
+                +{person.skills.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Intent badges */}
+        {badges.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(() => {
+              const { urlParam, label, Icon, color } = badges[0];
+              return (
+                <Link
+                  href={`/directory?${urlParam}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${color}`}
+                >
+                  <Icon size={10} /> {label}
+                </Link>
+              );
+            })()}
+            {badges.length > 1 && (
+              <span className="inline-flex items-center rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] font-bold text-white/50">
+                +{badges.length - 1}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Spacer */}
+        <div className="flex-1 min-h-3" />
+
+        {/* CTAs */}
+        {person.username ? (
+          <div className="flex gap-1.5 mt-3">
+            <FollowButton followingType="person" followingId={person.id} size="sm" className="flex-1" />
             <Link
               href={profileHref}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--accent)] px-5 py-3 text-sm font-semibold text-[var(--accent)] transition hover:bg-[rgba(255,255,255,0.03)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50"
+              className="flex-1 flex items-center justify-center py-1.5 rounded-xl border border-[#D4AF37]/50 text-[#D4AF37] text-xs font-semibold hover:bg-[#D4AF37]/[0.06] transition-colors"
             >
-              View Profile
+              View
             </Link>
-          ) : (
-            <span className="flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--border)] px-5 py-3 text-sm font-semibold opacity-50 bg-[rgba(255,255,255,0.02)]">
-              No username yet
-            </span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="mt-3 h-8 rounded-xl border border-white/[0.07] flex items-center justify-center text-[11px] text-white/25">
+            Profile pending
+          </div>
+        )}
       </div>
 
-      {/* Toast Notification for Share */}
+      {/* Toast */}
       <div
-        className={`absolute bottom-6 left-1/2 -translate-x-1/2 bg-[var(--accent)] text-black px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all duration-300 ${showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"}`}
+        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
+          showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
+        }`}
       >
         Link copied!
       </div>

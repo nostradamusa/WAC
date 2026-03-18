@@ -79,39 +79,57 @@ export default function DirectorySearchContext({
   };
 
   return (
-    <div className="w-full relative z-10 py-6 sm:py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        
+    <div className="w-full relative z-10 py-6 sm:py-8 overflow-x-hidden">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col gap-6 min-w-0">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0">
+
         {/* Context Indicator */}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-3 text-white/60 mb-2">
             <Search size={16} />
             <span className="text-sm font-medium tracking-wide uppercase">Directory</span>
           </div>
           {query ? (
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
-                &quot;{query}&quot;
-              </h1>
-              <button 
-                onClick={handleEditSearch}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition group"
-              >
-                <PenLine size={14} className="opacity-70 group-hover:opacity-100" />
-                Edit
-              </button>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
+                  &quot;{query}&quot;
+                </h1>
+                <button
+                  onClick={handleEditSearch}
+                  title="Edit search"
+                  className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:text-[#D4AF37] transition shrink-0"
+                >
+                  <PenLine size={12} />
+                </button>
+                <a
+                  href="/directory"
+                  title="Clear search"
+                  className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition shrink-0"
+                >
+                  <X size={12} />
+                </a>
+              </div>
             </div>
           ) : (
-             <div className="flex items-center gap-4">
-              <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
-                All Members
-              </h1>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
+              All Members
+            </h1>
           )}
 
           <div className="mt-3 text-[13px] text-white/50 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-semibold text-white/80">{totalResults} {totalResults === 1 ? 'member' : 'members'}</span>
+            <span className="font-semibold text-white/80">
+              {totalResults}{" "}
+              {scope === "people"
+                ? totalResults === 1 ? "person" : "people"
+                : scope === "businesses"
+                ? totalResults === 1 ? "business" : "businesses"
+                : scope === "groups"
+                ? totalResults === 1 ? "group" : "groups"
+                : scope === "events"
+                ? totalResults === 1 ? "event" : "events"
+                : totalResults === 1 ? "result" : "results"}
+            </span>
             {query && <span>for &quot;{query}&quot;</span>}
             <span className="opacity-40 px-0.5 hidden sm:inline-block">•</span>
             <span className="inline-block flex-wrap w-full sm:w-auto">
@@ -126,30 +144,35 @@ export default function DirectorySearchContext({
           </div>
         </div>
 
-        {/* Actions Selector */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-full border border-white/10">
-            {["all", "people", "businesses", "groups", "events"].map((s) => (
-              <a
-                key={s}
-                href={`/directory?scope=${s}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase transition ${
-                  scope === s
-                    ? "bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
-                    : "text-white/60 border border-transparent hover:text-white"
-                }`}
-              >
-                {s}
-              </a>
-            ))}
+        {/* Actions Selector — scrolls horizontally on mobile, never expands the page */}
+        <div
+          className="overflow-x-auto shrink-0 w-full md:w-auto"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="flex items-center gap-3 w-max md:w-auto">
+            <div className="flex items-center gap-1 p-1 bg-white/5 rounded-2xl border border-white/10 shrink-0">
+              {["all", "people", "businesses", "groups", "events"].map((s) => (
+                <a
+                  key={s}
+                  href={`/directory?scope=${s}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase transition whitespace-nowrap ${
+                    scope === s
+                      ? "bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
+                      : "text-white/60 border border-transparent hover:text-white"
+                  }`}
+                >
+                  {s}
+                </a>
+              ))}
+            </div>
+
+            <button
+              onClick={onFilterToggle}
+              className={`shrink-0 px-4 py-2 rounded-2xl text-xs font-bold uppercase transition border whitespace-nowrap ${isFiltersOpen ? "bg-white/10 text-white border-white/20" : "bg-transparent text-white/60 border-white/10 hover:bg-white/5"}`}
+            >
+              Filters
+            </button>
           </div>
-          
-          <button 
-            onClick={onFilterToggle}
-            className={`px-4 py-2 rounded-full text-xs font-bold uppercase transition border ${isFiltersOpen ? "bg-white/10 text-white border-white/20" : "bg-transparent text-white/60 border-white/10 hover:bg-white/5"}`}
-          >
-            Filters
-          </button>
         </div>
 
         </div>

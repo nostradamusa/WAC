@@ -28,6 +28,7 @@ export type SearchFilters = {
   country?: string;
   industry?: string;
   specialty?: string;
+  skills?: string[];
   mentorOnly?: boolean;
   openToWork?: boolean;
   openToHire?: boolean;
@@ -115,6 +116,7 @@ export async function getPeopleDirectory(
       p_open_to_invest: filters.openToInvest || false,
       p_open_to_collaborate: filters.openToCollaborate || false,
       p_search_query: filters.q || null,
+      p_skills: filters.skills && filters.skills.length > 0 ? filters.skills : null,
     });
 
     if (error) throw error;
@@ -135,7 +137,7 @@ export async function getPeopleDirectory(
 
     return { data: people, error: null, count: people.length };
   } catch (err: any) {
-    console.error("Error fetching people directory:", err);
+    console.error("Error fetching people directory:", err?.message ?? err?.code ?? JSON.stringify(err), err);
     return { data: [], error: err, count: 0 };
   }
 }
@@ -237,6 +239,132 @@ export async function getEntitiesDirectory(filters: SearchFilters): Promise<{
     console.error("Error fetching entities directory:", err);
     return { businesses: [], organizations: [], error: err };
   }
+}
+
+// ─────────────────────────────────────────────
+// Search History  (localStorage primary, Supabase sync when available)
+// ─────────────────────────────────────────────
+
+export type RecentlyViewedItem = {
+  id: string;
+  entity_id: string;
+  entity_type: "profile" | "business" | "association";
+  name: string;
+  avatar_url: string | null;
+  username_or_slug: string | null;
+  verified: boolean;
+  viewed_at: string;
+};
+
+export type SearchHistoryItem = {
+  id: string;
+  term: string;
+  searched_at: string;
+};
+
+const LS_HISTORY_KEY = "wac_search_history";
+const LS_VIEWED_KEY  = "wac_recently_viewed";
+const MAX_LS_ITEMS   = 20;
+
+function lsGet<T>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(key) ?? "[]"); } catch { return []; }
+}
+
+function lsSet<T>(key: string, items: T[]): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch { /* quota */ }
+}
+
+export async function getRecentlyViewed(limit = 20): Promise<RecentlyViewedItem[]> {
+  // Try DB first; fall back to localStorage
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase
+        .from("recently_viewed")
+        .select("id, entity_id, entity_type, name, avatar_url, username_or_slug, verified, viewed_at")
+        .eq("user_id", user.id)
+        .order("viewed_at", { ascending: false })
+        .limit(limit);
+      if (!error && data?.length) return data as RecentlyViewedItem[];
+    }
+  } catch { /* fall through */ }
+  return lsGet<RecentlyViewedItem>(LS_VIEWED_KEY).slice(0, limit);
+}
+
+export async function saveRecentlyViewed(item: Omit<RecentlyViewedItem, "id" | "viewed_at">): Promise<void> {
+  const entry: RecentlyViewedItem = { ...item, id: item.entity_id, viewed_at: new Date().toISOString() };
+
+  // Always update localStorage immediately
+  const existing = lsGet<RecentlyViewedItem>(LS_VIEWED_KEY)
+    .filter(v => !(v.entity_id === item.entity_id && v.entity_type === item.entity_type));
+  lsSet(LS_VIEWED_KEY, [entry, ...existing].slice(0, MAX_LS_ITEMS));
+
+  // Best-effort DB sync
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("recently_viewed").upsert(
+        { user_id: user.id, ...item, viewed_at: entry.viewed_at },
+        { onConflict: "user_id,entity_id,entity_type" }
+      );
+    }
+  } catch { /* non-blocking */ }
+}
+
+export async function getSearchHistory(limit = 20): Promise<SearchHistoryItem[]> {
+  // Try DB first; fall back to localStorage
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase
+        .from("search_history")
+        .select("id, term, searched_at")
+        .eq("user_id", user.id)
+        .order("searched_at", { ascending: false })
+        .limit(limit);
+      if (!error && data?.length) return data as SearchHistoryItem[];
+    }
+  } catch { /* fall through */ }
+  return lsGet<SearchHistoryItem>(LS_HISTORY_KEY).slice(0, limit);
+}
+
+export async function saveSearchTerm(term: string): Promise<void> {
+  const trimmed = term.trim();
+  if (!trimmed) return;
+
+  const entry: SearchHistoryItem = { id: Date.now().toString(), term: trimmed, searched_at: new Date().toISOString() };
+
+  // Always update localStorage immediately
+  const existing = lsGet<SearchHistoryItem>(LS_HISTORY_KEY)
+    .filter(h => h.term.toLowerCase() !== trimmed.toLowerCase());
+  lsSet(LS_HISTORY_KEY, [entry, ...existing].slice(0, MAX_LS_ITEMS));
+
+  // Best-effort DB sync
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("search_history").upsert(
+        { user_id: user.id, term: trimmed, searched_at: entry.searched_at },
+        { onConflict: "user_id,lower(trim(term))" }
+      );
+    }
+  } catch { /* non-blocking */ }
+}
+
+export async function deleteSearchTerm(id: string): Promise<void> {
+  // Remove from localStorage
+  const existing = lsGet<SearchHistoryItem>(LS_HISTORY_KEY).filter(h => h.id !== id);
+  lsSet(LS_HISTORY_KEY, existing);
+
+  // Best-effort DB removal
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("search_history").delete().eq("id", id).eq("user_id", user.id);
+    }
+  } catch { /* non-blocking */ }
 }
 
 /**

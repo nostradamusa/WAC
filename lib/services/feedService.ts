@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { NetworkPost } from "@/lib/types/network-feed";
 
 // Types of reactions we support
-export type ReactionType = 'like' | 'heart' | 'laugh' | 'applause';
+export type ReactionType = 'like' | 'heart' | 'laugh' | 'fire' | 'applause' | 'smile';
 
 export async function togglePostReaction(
   postId: string, 
@@ -74,6 +74,47 @@ export async function togglePostReaction(
   } catch (err: any) {
     console.error("Exception in togglePostReaction:", err);
     return { success: false, error: err.message || "An unexpected error occurred." };
+  }
+}
+
+export async function toggleCommentReaction(
+  commentId: string,
+  reactionType: ReactionType = 'like'
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      return { success: false, error: "Authentication required." };
+    }
+    const userId = session.user.id;
+
+    const { data: existing, error: checkError } = await supabase
+      .from("comment_reactions")
+      .select("*")
+      .eq("comment_id", commentId)
+      .eq("profile_id", userId)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      return { success: false, error: "Failed to check existing reaction." };
+    }
+
+    if (existing) {
+      if (existing.reaction_type === reactionType) {
+        const { error } = await supabase.from("comment_reactions").delete().eq("id", existing.id);
+        if (error) return { success: false, error: error.message };
+      } else {
+        const { error } = await supabase.from("comment_reactions").update({ reaction_type: reactionType }).eq("id", existing.id);
+        if (error) return { success: false, error: error.message };
+      }
+    } else {
+      const { error } = await supabase.from("comment_reactions").insert({ comment_id: commentId, profile_id: userId, reaction_type: reactionType });
+      if (error) return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
 

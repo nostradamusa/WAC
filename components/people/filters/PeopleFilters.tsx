@@ -1,7 +1,12 @@
+"use client";
+
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { FormEvent } from "react";
+
 type PeopleFiltersProps = {
   country?: string;
   industry?: string;
-  specialty?: string;
+  skills?: string[];
   mentorOnly?: boolean;
   openToWork?: boolean;
   openToHire?: boolean;
@@ -11,12 +16,41 @@ type PeopleFiltersProps = {
 export default function PeopleFilters({
   country = "",
   industry = "",
-  specialty = "",
+  skills = [],
   mentorOnly = false,
   openToWork = false,
   openToHire = false,
   totalResults = 0,
 }: PeopleFiltersProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const params = new URLSearchParams();
+
+    const q = searchParams.get("q");
+    if (q) params.set("q", q);
+
+    const countryVal = formData.get("country") as string;
+    const industryVal = formData.get("industry") as string;
+    const skillsVal = formData.get("skills") as string;
+    const mentorVal = formData.get("mentor") === "true";
+    const workVal = formData.get("work") === "true";
+    const hireVal = formData.get("hire") === "true";
+
+    if (countryVal?.trim()) params.set("country", countryVal.trim());
+    if (industryVal?.trim()) params.set("industry", industryVal.trim());
+    if (skillsVal?.trim()) params.set("skills", skillsVal.trim());
+    if (mentorVal) params.set("mentor", "true");
+    if (workVal) params.set("work", "true");
+    if (hireVal) params.set("hire", "true");
+
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
   return (
     <section className="wac-card p-5">
       <div className="mb-5">
@@ -26,7 +60,7 @@ export default function PeopleFilters({
         </p>
       </div>
 
-      <form className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="country" className="mb-2 block text-sm font-medium">
             Country
@@ -56,45 +90,49 @@ export default function PeopleFilters({
         </div>
 
         <div>
-          <label htmlFor="specialty" className="mb-2 block text-sm font-medium">
-            Specialty
+          <label htmlFor="skills" className="mb-2 block text-sm font-medium">
+            Skills
           </label>
           <input
-            id="specialty"
+            id="skills"
             type="text"
-            name="specialty"
-            defaultValue={specialty}
-            placeholder="e.g. Cardiology"
+            name="skills"
+            defaultValue={skills.join(", ")}
+            placeholder="e.g. React.js, Python"
             className="w-full rounded-2xl border border-[var(--border)] bg-transparent px-4 py-3 outline-none transition focus:border-[var(--accent)]"
           />
+          <p className="mt-1 text-xs opacity-50">Comma-separated</p>
         </div>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm">
+        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm cursor-pointer hover:border-[var(--accent)]/50 transition">
           <input
             type="checkbox"
             name="mentor"
             value="true"
             defaultChecked={mentorOnly}
+            className="accent-[var(--accent)]"
           />
-          Open to mentoring only
+          Open to mentoring
         </label>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm">
+        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm cursor-pointer hover:border-[var(--accent)]/50 transition">
           <input
             type="checkbox"
             name="work"
             value="true"
             defaultChecked={openToWork}
+            className="accent-[var(--accent)]"
           />
           Open to work
         </label>
 
-        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm">
+        <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm cursor-pointer hover:border-[var(--accent)]/50 transition">
           <input
             type="checkbox"
             name="hire"
             value="true"
             defaultChecked={openToHire}
+            className="accent-[var(--accent)]"
           />
           Open to hire
         </label>

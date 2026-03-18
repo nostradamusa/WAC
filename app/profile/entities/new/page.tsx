@@ -21,37 +21,28 @@ export default function CreateEntityPage() {
     setError(null);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("You must be signed in to create an entity.");
 
-      if (!user) {
-        throw new Error("You must be signed in to create an entity.");
-      }
+      const resolvedSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-      const table = type === "business" ? "businesses" : "organizations";
+      // Atomic RPC: creates the entity + assigns caller as owner in one transaction.
+      // is_verified defaults to false — verification is a separate admin action.
+      const { error: rpcError } = await supabase.rpc("create_entity_with_owner", {
+        p_name:        name,
+        p_slug:        resolvedSlug,
+        p_description: description,
+        p_entity_type: type,
+      });
 
-      const { error: insertError } = await supabase.from(table).insert([
-        {
-          name,
-          slug: slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          description,
-          owner_id: user.id,
-          // Require approval/verification for real networks usually, but default to true for demo UX
-          is_verified: true,
-        },
-      ]);
-
-      if (insertError) {
-        if (insertError.code === "23505") {
-          throw new Error(
-            "That URL slug is already taken. Please try another.",
-          );
+      if (rpcError) {
+        if (rpcError.code === "23505") {
+          throw new Error("That URL slug is already taken. Please try another.");
         }
-        throw new Error(insertError.message);
+        throw new Error(rpcError.message);
       }
 
-      // Force a hard navigation so the ActorContext re-fetches the list from the DB
+      // Hard navigate so ActorProvider re-fetches the updated entity_roles list
       window.location.href = "/profile";
     } catch (err: any) {
       console.error(err);

@@ -21,6 +21,7 @@ export default async function DirectoryPage({
     country?: string;
     industry?: string;
     specialty?: string;
+    skills?: string;
     mentor?: string;
     work?: string;
     hire?: string;
@@ -40,6 +41,9 @@ export default async function DirectoryPage({
     country: params.country?.trim() ?? "",
     industry: params.industry?.trim() ?? "",
     specialty: params.specialty?.trim() ?? "",
+    skills: params.skills?.trim()
+      ? params.skills.split(",").map((s) => s.trim()).filter(Boolean)
+      : [],
     mentorOnly: params.mentor === "true",
     openToWork: params.work === "true",
     openToHire: params.hire === "true",
@@ -91,7 +95,8 @@ export default async function DirectoryPage({
   ];
 
   // TODO: Implement actual getEventsDirectory backend service once DB schema expands
-  const events: EventDirectoryEntry[] = fetchEvents ? mockEvents : [];
+  // Mock events are placeholder data — only show when browsing without a query
+  const events: EventDirectoryEntry[] = fetchEvents && !filters.q ? mockEvents : [];
 
   const totalResults = people.length + businesses.length + groups.length + events.length;
 

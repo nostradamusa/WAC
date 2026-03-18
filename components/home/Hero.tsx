@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import GlobalSearchOverlay from "@/components/layout/GlobalSearchOverlay";
+import {
+  Activity,
+  Search,
+  CalendarDays,
+  Users,
+  Briefcase,
+  HeartHandshake,
+  Building2,
+  ArrowRight,
+} from "lucide-react";
 
 export default function Hero() {
-  const router = useRouter();
-  const [query, setQuery] = useState("");
   const [isSignCheckComplete, setIsSignCheckComplete] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -26,113 +35,194 @@ export default function Hero() {
     return () => subscription.unsubscribe();
   }, []);
 
-  function handleSearch(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const cleanQuery = query.trim();
-    if (cleanQuery) {
-      router.push(`/directory?q=${encodeURIComponent(cleanQuery)}`);
-    } else {
-      router.push(`/directory`);
-    }
-  }
-
   return (
-    <section className="relative flex flex-col items-center justify-center pt-24 md:pt-32 pb-16 md:pb-24 text-center px-4 min-h-[50vh] md:min-h-0">
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(176,141,87,0.12)_0%,transparent_60%)] pointer-events-none" />
+    <>
+      <GlobalSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
-      <div className="relative z-10 max-w-5xl">
-        <div className="flex justify-center mb-6 md:mb-8">
-          <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(212,175,55,0.25)] animate-in zoom-in duration-700 relative">
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.3)_0%,transparent_60%)] mix-blend-overlay pointer-events-none"></div>
-             <img 
-               src="/images/wac-logo.jpg" 
-               alt="WAC Eagle Globe" 
-               className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95" 
-             />
+      {/* ── Mobile: Compact Launchpad ──────────────────────────────────── */}
+      <section className="md:hidden px-4 pt-5 pb-6 space-y-3.5">
+
+        {/* 1. Brand mark */}
+        <div className="flex items-center gap-3 py-1">
+          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[var(--accent)] flex items-center justify-center shadow-[0_0_14px_rgba(212,175,55,0.28)]">
+            <img
+              src="/images/wac-logo.jpg"
+              alt="WAC"
+              className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
+            />
+          </div>
+          <div>
+            <h1 className="font-serif text-[17px] leading-none text-white mb-[3px]">
+              World{" "}
+              <span className="text-[#D4AF37] italic font-light">Albanian</span>{" "}
+              Congress
+            </h1>
+            <p className="text-[8.5px] tracking-[0.38em] text-white/28 uppercase">
+              Connect · Build · Rise
+            </p>
           </div>
         </div>
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-serif tracking-tight mb-8 md:mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
-          World{" "}
-          <span className="text-[#D4AF37] italic font-light opacity-90">
-            Albanian
-          </span>{" "}
-          Congress
-        </h1>
-        <div className="mx-auto max-w-3xl px-2 mb-8 md:mb-16">
-          <p className="text-[4.5vw] sm:text-2xl md:text-3xl font-serif font-medium opacity-90 mb-4 sm:mb-6 leading-relaxed whitespace-nowrap">
-            The global network for <span className="text-[#D4AF37] opacity-100 drop-shadow-md italic font-serif">Albanians</span>.
-          </p>
-          <p className="text-base sm:text-xl md:text-2xl font-serif opacity-90 font-bold tracking-widest uppercase leading-relaxed max-w-2xl mx-auto">
-            Connect. Build. Rise.
-          </p>
+
+        {/* 2. Primary CTA — The Pulse */}
+        <Link
+          href="/community"
+          className="flex items-center gap-4 p-4 rounded-2xl bg-rose-500/[0.07] border border-rose-500/[0.14] transition-colors active:scale-[0.98] group"
+        >
+          <div className="w-10 h-10 rounded-full bg-rose-500/[0.14] flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5 text-rose-400" strokeWidth={1.8} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm text-white leading-none mb-1">The Pulse</p>
+            <p className="text-[11px] text-white/38 truncate">Community feed · latest from the diaspora</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-rose-400/50 transition shrink-0" />
+        </Link>
+
+        {/* 3. Quick-access grid — Directory · Events · People */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            {
+              href: "/directory",
+              icon: Search,
+              label: "Directory",
+              iconColor: "text-[#D4AF37]",
+              bg: "bg-[#D4AF37]/[0.08]",
+              border: "border-[#D4AF37]/[0.13]",
+            },
+            {
+              href: "/events",
+              icon: CalendarDays,
+              label: "Events",
+              iconColor: "text-emerald-400",
+              bg: "bg-emerald-400/[0.08]",
+              border: "border-emerald-400/[0.13]",
+            },
+            {
+              href: "/people",
+              icon: Users,
+              label: "People",
+              iconColor: "text-sky-400",
+              bg: "bg-sky-400/[0.08]",
+              border: "border-sky-400/[0.13]",
+            },
+          ].map(({ href, icon: Icon, label, iconColor, bg, border }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`flex flex-col items-center gap-2.5 py-4 px-2 rounded-2xl ${bg} border ${border} transition-colors active:scale-95`}
+            >
+              <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center`}>
+                <Icon className={`w-4 h-4 ${iconColor}`} strokeWidth={1.8} />
+              </div>
+              <span className={`text-[11px] font-semibold ${iconColor} leading-none`}>
+                {label}
+              </span>
+            </Link>
+          ))}
         </div>
 
-        {/* Integrated Search Bar - Hidden on mobile because of persistent top nav search */}
-        <div className="mx-auto max-w-2xl w-full hidden md:block">
-          <form onSubmit={handleSearch} className="relative flex items-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="absolute left-5 text-[#D4AF37] opacity-80"
+        {/* 4. Discovery pills — horizontal scroll */}
+        <div
+          className="flex gap-2 overflow-x-auto"
+          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+        >
+          {[
+            { href: "/jobs", icon: Briefcase, label: "Jobs" },
+            { href: "/businesses", icon: Building2, label: "Businesses" },
+            { href: "/organizations", icon: HeartHandshake, label: "Organizations" },
+            { href: "/groups", icon: Users, label: "Groups" },
+          ].map(({ href, icon: Icon, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/[0.04] border border-white/[0.07] text-[11px] text-white/45 hover:text-white/70 hover:border-white/[0.13] transition-colors whitespace-nowrap"
             >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              name="q"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for an Injury Lawyer in NJ from Struga..."
-              autoComplete="off"
-              spellCheck="false"
-              className="w-full rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-14 pr-36 text-lg shadow-2xl backdrop-blur-md outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 [&:-webkit-autofill]:bg-[rgba(0,0,0,0.4)] [&:-webkit-autofill]:[-webkit-text-fill-color:white] [&:-webkit-autofill]:[transition:background-color_5000s_ease-in-out_0s]"
-            />
-            <button
-              type="submit"
-              className="absolute right-3 top-3 bottom-3 rounded-full bg-[var(--accent)] px-8 font-bold text-[var(--deep-charcoal)] transition hover:opacity-90"
-            >
-              Search
-            </button>
-          </form>
+              <Icon className="w-3 h-3 opacity-60" strokeWidth={1.7} />
+              {label}
+            </Link>
+          ))}
+        </div>
 
-          <div className="h-4 md:h-8 mt-4 md:mt-6">
+        {/* 5. Join CTA — only when logged out */}
+        {isSignCheckComplete && !isLoggedIn && (
+          <Link
+            href="/login"
+            className="flex items-center justify-center w-full py-3 rounded-2xl bg-[var(--accent)] text-black text-sm font-bold tracking-wide transition hover:bg-[#F2D06B] active:scale-[0.98]"
+          >
+            Join the Network
+          </Link>
+        )}
+      </section>
+
+      {/* ── Desktop: Full Editorial Hero ──────────────────────────────── */}
+      <section className="relative hidden md:flex flex-col items-center justify-center pt-32 pb-24 text-center px-4 min-h-0">
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(176,141,87,0.12)_0%,transparent_60%)] pointer-events-none" />
+
+        <div className="relative z-10 max-w-5xl">
+          <div className="flex justify-center mb-8">
+            <div className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(212,175,55,0.25)] animate-in zoom-in duration-700 relative">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.3)_0%,transparent_60%)] mix-blend-overlay pointer-events-none" />
+              <img
+                src="/images/wac-logo.jpg"
+                alt="WAC Eagle Globe"
+                className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
+              />
+            </div>
+          </div>
+
+          <h1 className="text-6xl md:text-7xl font-serif tracking-tight mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
+            World{" "}
+            <span className="text-[#D4AF37] italic font-light opacity-90">Albanian</span>{" "}
+            Congress
+          </h1>
+
+          <div className="mx-auto max-w-3xl px-2 mb-16">
+            <p className="text-lg md:text-xl font-serif font-light text-white/55 mb-5 leading-relaxed tracking-wide">
+              The global network for{" "}
+              <span className="text-[#D4AF37] italic">Albanians</span>.
+            </p>
+            <p className="text-[10px] tracking-[0.45em] font-sans font-light text-white/35 uppercase">
+              Connect&nbsp;&nbsp;·&nbsp;&nbsp;Build&nbsp;&nbsp;·&nbsp;&nbsp;Rise
+            </p>
+          </div>
+
+          {/* Desktop search bar */}
+          <div className="mx-auto max-w-2xl w-full">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="group relative w-full flex items-center gap-5 rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-7 pr-7 shadow-2xl backdrop-blur-md outline-none transition hover:border-[var(--accent)]/60 hover:bg-[rgba(0,0,0,0.55)] cursor-pointer"
+            >
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-50" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#D4AF37]" />
+              </span>
+              <span className="flex-1 text-left select-none">
+                <span className="font-serif text-white/40 group-hover:text-white/60 transition text-lg tracking-wide">
+                  Search with{" "}
+                </span>
+                <span className="font-serif italic text-[#D4AF37] opacity-80 group-hover:opacity-100 transition text-lg font-light tracking-wide">
+                  Alban Intelligence
+                </span>
+                <span className="font-serif text-white/40 group-hover:text-white/60 transition text-lg tracking-wide">
+                  ...
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <div className="h-8 mt-6">
             {isSignCheckComplete && !isLoggedIn && (
               <div className="text-sm text-white/50 animate-in fade-in duration-500">
                 Not part of the network yet?{" "}
-                <Link
-                  href="/login"
-                  className="text-[#D4AF37] hover:underline opacity-90 transition font-medium"
-                >
+                <Link href="/login" className="text-[#D4AF37] hover:underline opacity-90 transition font-medium">
                   Create your profile
                 </Link>
               </div>
             )}
           </div>
         </div>
-        
-        {/* Mobile Login Prompt (when search is hidden) */}
-        <div className="md:hidden mt-2">
-           {isSignCheckComplete && !isLoggedIn && (
-              <div className="text-sm text-white/50 animate-in fade-in duration-500">
-                Not part of the network yet?{" "}
-                <Link
-                  href="/login"
-                  className="text-[#D4AF37] hover:underline opacity-90 transition font-medium"
-                >
-                  Create your profile
-                </Link>
-              </div>
-            )}
-        </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

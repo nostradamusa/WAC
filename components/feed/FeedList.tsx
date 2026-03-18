@@ -3,92 +3,127 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { NetworkPost } from "@/lib/types/network-feed";
-import { Star, Users } from "lucide-react";
+import { Activity, Users, ChevronDown, Check } from "lucide-react";
 import PostCard from "./PostCard";
 
+// ─── V1 feed query ────────────────────────────────────────────────────────────
+//
+// Pool distinction (using author intent columns that already exist):
+//   For You   → distribute_to_pulse = true   (discovery / global pool)
+//   Following → distribute_to_following = true (source-controlled pool)
+//
+// Sort applies to both pools:
+//   Top    → ORDER BY hot_score DESC (recency + engagement)
+//   Recent → ORDER BY created_at DESC (pure chronological)
+//
+// V2: Following will additionally filter to posts whose source_id is in
+// the current user's follows table (not yet built).
+
+async function fetchFeed(
+  tab: "foryou" | "following",
+  sortOpt: "top" | "recent",
+  userId: string | null,
+): Promise<NetworkPost[]> {
+  let query = supabase
+    .from("feed_posts")
+    .select(`
+      *,
+      author_profile:profiles!author_profile_id(full_name, username, headline, avatar_url, is_verified),
+      author_business:businesses(name, slug, business_type, logo_url, is_verified),
+      author_organization:organizations(name, slug, organization_type, logo_url, is_verified),
+      original_post:feed_posts!original_post_id(
+        *,
+        author_profile:profiles!author_profile_id(full_name, username, headline, avatar_url, is_verified),
+        author_business:businesses(name, slug, business_type, logo_url, is_verified),
+        author_organization:organizations(name, slug, organization_type, logo_url, is_verified)
+      )
+    `)
+    .eq("status", "published");
+
+  // Pool filter
+  if (tab === "following" && userId) {
+    // V2: filter to posts from accounts the user actually follows
+    const { data: followingIds } = await supabase.rpc("get_following_ids");
+    if (followingIds && followingIds.length > 0) {
+      query = query.in("source_id", followingIds);
+    } else {
+      // User follows nobody yet — return empty rather than the whole pulse
+      return [];
+    }
+  } else if (tab === "following") {
+    // Not signed in — fallback to distribute_to_following flag
+    query = query.eq("distribute_to_following", true);
+  } else {
+    query = query.eq("distribute_to_pulse", true);
+  }
+
+  // Sort
+  query = sortOpt === "top"
+    ? query.order("hot_score", { ascending: false })
+    : query.order("created_at", { ascending: false });
+
+  const { data, error } = await query.limit(20);
+  if (error) throw new Error(error.message || JSON.stringify(error));
+
+  let posts: NetworkPost[] = (data as any[]) || [];
+
+  // Hydrate user's own reactions
+  if (posts.length > 0 && userId) {
+    const postIds = posts.map((p) => p.id);
+    const { data: myReactions } = await supabase
+      .from("feed_likes")
+      .select("post_id, reaction_type")
+      .in("post_id", postIds)
+      .eq("profile_id", userId);
+
+    if (myReactions && myReactions.length > 0) {
+      const reactionMap = myReactions.reduce((acc: any, curr: any) => {
+        acc[curr.post_id] = curr.reaction_type;
+        return acc;
+      }, {});
+      posts = posts.map((p) => ({
+        ...p,
+        user_reaction_type: reactionMap[p.id] ?? null,
+      }));
+    }
+  }
+
+  return posts;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }) {
-  const [posts, setPosts] = useState<NetworkPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorLine, setErrorLine] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"foryou" | "following">("foryou");
-  const [sortBy, setSortBy] = useState<"top" | "recent">("top");
+  const [posts, setPosts]                     = useState<NetworkPost[]>([]);
+  const [isLoading, setIsLoading]             = useState(true);
+  const [errorLine, setErrorLine]             = useState<string | null>(null);
+  const [activeTab, setActiveTab]             = useState<"foryou" | "following">("foryou");
+  const [sortBy, setSortBy]                   = useState<"top" | "recent">("top");
   const [showSortOptions, setShowSortOptions] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 
-  async function fetchPosts(tab: "foryou" | "following", sortOpt: "top" | "recent") {
+  async function load(tab: "foryou" | "following", sort: "top" | "recent") {
     setIsLoading(true);
     setErrorLine(null);
     try {
-      let query = supabase
-        .from("feed_posts")
-        .select(`
-          *,
-          author_profile:profiles!author_profile_id(full_name, username, headline, avatar_url, is_verified),
-          author_business:businesses(name, slug, business_type, is_verified),
-          author_organization:organizations(name, slug, organization_type, is_verified),
-          original_post:feed_posts!original_post_id(
-            *,
-            author_profile:profiles!author_profile_id(full_name, username, headline, avatar_url, is_verified),
-            author_business:businesses(name, slug, business_type, is_verified),
-            author_organization:organizations(name, slug, organization_type, is_verified)
-          )
-        `);
-
-      if (sortOpt === "top") {
-        query = query.order("hot_score", { ascending: false });
-      } else {
-        query = query.order("created_at", { ascending: false });
-      }
-
-      const { data, error } = await query.limit(20);
-
-      if (error) {
-        throw new Error(error.message || JSON.stringify(error));
-      }
-
-      let fetchedPosts = (data as any[]) || [];
-
-      // Fetch user's reactions for these specific posts
-      if (fetchedPosts.length > 0) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.id) {
-          const postIds = fetchedPosts.map(p => p.id);
-          const { data: myReactions } = await supabase
-            .from("feed_likes")
-            .select("post_id, reaction_type")
-            .in("post_id", postIds)
-            .eq("profile_id", session.user.id);
-
-          if (myReactions && myReactions.length > 0) {
-            const reactionMap = myReactions.reduce((acc: any, curr: any) => {
-              acc[curr.post_id] = curr.reaction_type;
-              return acc;
-            }, {});
-
-            fetchedPosts = fetchedPosts.map(p => ({
-              ...p,
-              user_reaction_type: reactionMap[p.id] || null
-            }));
-          }
-        }
-      }
-
-      setPosts(fetchedPosts);
+      const { data: { session } } = await supabase.auth.getSession();
+      const fetched = await fetchFeed(tab, sort, session?.user?.id ?? null);
+      setPosts(fetched);
     } catch (err: any) {
       console.error("Error fetching feed:", err);
-      setErrorLine(err.message || "Unknown fetching error");
+      setErrorLine(err.message || "Unknown error");
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchPosts(activeTab, sortBy);
+    load(activeTab, sortBy);
   }, [refreshTrigger, activeTab, sortBy]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
         setShowSortOptions(false);
       }
     };
@@ -96,116 +131,115 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const forYouActive    = activeTab === "foryou";
+  const followingActive = activeTab === "following";
+
   return (
     <div className="space-y-4">
-      {/* Feed Toggle Header */}
-      <div className="wac-card overflow-hidden border-[var(--accent)]/30 bg-gradient-to-br from-[var(--surface-2)] to-[rgba(212,175,55,0.05)] mb-4">
+
+      {/* ── Feed header ── */}
+      <div className="rounded-2xl border border-[var(--accent)]/[0.18] bg-gradient-to-b from-[#0e0e0e] to-[rgba(212,175,55,0.03)]">
+
+        {/* For You | ⇅ | Following */}
         <div className="flex">
+
+          {/* For You */}
           <button
             onClick={() => setActiveTab("foryou")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 border-b-2 transition-all duration-300 ${
-              activeTab === "foryou"
-                ? "border-[var(--accent)] shadow-[0_4px_12px_rgba(212,175,55,0.15)] bg-white/[0.02]"
-                : "border-transparent opacity-60 hover:opacity-100 hover:bg-white/5"
+            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-[14px] transition-all duration-200 ${
+              forYouActive ? "text-[var(--accent)]" : "text-white/35 hover:text-white/55"
             }`}
           >
-            {activeTab === "foryou" && (
-              <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center shrink-0 drop-shadow-[0_0_8px_rgba(212,175,55,0.6)] bg-[var(--accent)]">
-                <img 
-                  src="/images/wac-logo.jpg" 
-                  alt="WAC" 
-                  className="w-full h-full object-cover scale-[1.4] mix-blend-multiply" 
-                />
+            <Activity
+              size={13}
+              strokeWidth={forYouActive ? 2.5 : 1.8}
+              className={forYouActive ? "fill-[var(--accent)]/20" : ""}
+            />
+            <span className="font-serif font-bold tracking-[0.08em] uppercase text-[13px]">For You</span>
+            {forYouActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[1.5px] w-10 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
+            )}
+          </button>
+
+          {/* Sort chevron — applies to whichever tab is active */}
+          <div ref={sortRef} className="relative flex items-center self-stretch">
+            <button
+              onClick={() => setShowSortOptions((v) => !v)}
+              aria-label="Sort feed"
+              className={`flex items-center gap-0.5 transition-all duration-150 ${
+                showSortOptions ? "text-[var(--accent)]" : "text-white/30 hover:text-white/55"
+              }`}
+            >
+              <ChevronDown size={11} strokeWidth={2} />
+              <span className="text-[9px] font-bold tracking-wide leading-none">
+                {sortBy === "top" ? "Top" : "Recent"}
+              </span>
+            </button>
+
+            {showSortOptions && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-28 bg-[#111] border border-[var(--accent)]/[0.15] rounded-xl shadow-2xl overflow-hidden z-20">
+                {(["top", "recent"] as const).map((opt) => {
+                  const selected = sortBy === opt;
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => { setSortBy(opt); setShowSortOptions(false); }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
+                        selected
+                          ? "text-[var(--accent)] bg-[var(--accent)]/[0.06] font-bold"
+                          : "text-white/60 hover:bg-white/[0.04] hover:text-white"
+                      }`}
+                    >
+                      {opt === "top" ? "Top" : "Recent"}
+                      {selected && <Check size={11} strokeWidth={2.5} className="shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            <span className={`font-serif font-bold tracking-wide uppercase text-[15px] transition-all duration-300 ${
-              activeTab === "foryou"
-                ? "text-[var(--accent)] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]"
-                : "text-[var(--accent)]"
-            }`}>
-              For You
-            </span>
-          </button>
+          </div>
 
+          {/* Following */}
           <button
             onClick={() => setActiveTab("following")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 border-b-2 transition-all duration-300 ${
-              activeTab === "following"
-                ? "border-[var(--accent)] shadow-[0_4px_12px_rgba(212,175,55,0.15)] bg-white/[0.02]"
-                : "border-transparent opacity-60 hover:opacity-100 hover:bg-white/5"
+            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-[14px] transition-all duration-200 ${
+              followingActive ? "text-[var(--accent)]" : "text-white/35 hover:text-white/55"
             }`}
           >
-            {activeTab === "following" && <Users className="w-4 h-4 text-[var(--accent)] fill-[var(--accent)] drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]" />}
-            <span className={`font-serif font-bold tracking-wide uppercase text-[15px] transition-all duration-300 ${
-              activeTab === "following"
-                ? "text-[var(--accent)] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]"
-                : "text-[var(--accent)]"
-            }`}>
-              Following
-            </span>
+            <Users
+              size={13}
+              strokeWidth={followingActive ? 2.5 : 1.8}
+              className={followingActive ? "fill-[var(--accent)]/20" : ""}
+            />
+            <span className="font-serif font-bold tracking-[0.08em] uppercase text-[13px]">Following</span>
+            {followingActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[1.5px] w-10 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
+            )}
           </button>
+
         </div>
       </div>
 
-      {/* Sort By Dropdown */}
-      <div className="flex justify-end items-center mb-6">
-        <div className="relative text-xs text-white/50 flex items-center gap-2 cursor-pointer transition-colors" ref={sortRef}>
-          <span>Sort by:</span>
-
-          <button
-            onClick={() => setShowSortOptions(!showSortOptions)}
-            className="flex items-center gap-1.5 text-white font-bold hover:text-[var(--accent)] transition-colors py-1 pl-2 pr-1 rounded-md hover:bg-white/5"
-          >
-            <span className="capitalize">{sortBy}</span>
-            <svg
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${showSortOptions ? 'rotate-180 text-[var(--accent)]' : ''}`}
-              xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-
-          {/* Custom Dropdown Menu */}
-          {showSortOptions && (
-            <div className="absolute right-0 top-full mt-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up">
-              <button
-                onClick={() => { setSortBy("top"); setShowSortOptions(false); }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${sortBy === 'top' ? 'text-[var(--accent)] bg-white/5 font-bold' : 'text-white/80 hover:bg-white/5 hover:text-white'}`}
-              >
-                Top
-              </button>
-              <div className="h-[1px] w-full bg-white/5 mx-auto" />
-              <button
-                onClick={() => { setSortBy("recent"); setShowSortOptions(false); }}
-                className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${sortBy === 'recent' ? 'text-[var(--accent)] bg-white/5 font-bold' : 'text-white/80 hover:bg-white/5 hover:text-white'}`}
-              >
-                Recent
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* States */}
+      {/* ── Feed states ── */}
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="wac-card p-5 h-40 animate-pulse bg-[rgba(255,255,255,0.02)]"></div>
+            <div key={n} className="wac-card p-5 h-40 animate-pulse bg-white/[0.02]" />
           ))}
         </div>
       ) : errorLine ? (
-        <div className="wac-card py-6 px-4 bg-red-500/10 border-red-500/20 text-red-500 text-center text-sm">
+        <div className="wac-card py-6 px-4 bg-red-500/10 border-red-500/20 text-red-400 text-center text-sm">
           Error loading feed: {errorLine}
         </div>
       ) : posts.length === 0 ? (
         <div className="wac-card py-12 text-center">
           <h3 className="text-xl font-serif text-[var(--accent)] mb-2">
-            {activeTab === "foryou" ? "Be the first to post!" : "No recent updates"}
+            {activeTab === "foryou" ? "Be the first to post!" : "No posts yet"}
           </h3>
-          <p className="opacity-60 text-sm">
+          <p className="opacity-50 text-sm">
             {activeTab === "foryou"
               ? "There are no global updates in the network feed yet."
-              : "When you follow members and groups, their updates will appear here."}
+              : "Follow people, businesses, or organizations to see their updates here."}
           </p>
         </div>
       ) : (

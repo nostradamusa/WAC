@@ -32,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[var(--background)] flex flex-col`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[var(--background)] flex flex-col overflow-x-hidden`}
         suppressHydrationWarning
       >
         <div id="google_translate_element" className="hidden"></div>
@@ -53,7 +53,7 @@ export default function RootLayout({
         </Script>
 
         <ActorProvider>
-          <div className="flex min-h-screen flex-col">
+          <div className="flex min-h-screen flex-col overflow-x-hidden">
             <Navbar />
             <main className="flex-1 pb-[72px] md:pb-0">{children}</main>
             <FloatingMessagingIcon />
