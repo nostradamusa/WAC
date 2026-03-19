@@ -135,88 +135,88 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
   const followingActive = activeTab === "following";
 
   return (
-    <div className="space-y-4">
+    <div>
 
-      {/* ── Feed header ── */}
-      <div className="rounded-2xl border border-[var(--accent)]/[0.18] bg-gradient-to-b from-[#0e0e0e] to-[rgba(212,175,55,0.03)]">
+      {/*
+        Sticky tab bar — sticks to top-0 of the parent overflow-y scroll column.
+        backdrop-blur-sm + bg-[var(--background)] ensures posts scrolling beneath
+        are fully occluded. border-b provides visual cut without being heavy.
+        No overflow-hidden ancestor between here and the scroll container.
+      */}
+      <div className="sticky top-0 z-10 bg-[var(--background)] backdrop-blur-sm border-b border-white/[0.08] py-3 mb-4 flex items-center justify-between">
 
-        {/* For You | ⇅ | Following */}
-        <div className="flex">
-
-          {/* For You */}
+        {/*
+          Lens control — pill-tray pattern (For You / Following).
+          Neutral white fill on active. NOT gold — mode selector, not filter.
+        */}
+        <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full">
           <button
             onClick={() => setActiveTab("foryou")}
-            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-[14px] transition-all duration-200 ${
-              forYouActive ? "text-[var(--accent)]" : "text-white/35 hover:text-white/55"
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
+              forYouActive
+                ? "bg-white/[0.12] text-white"
+                : "text-white/45 hover:text-white/70"
             }`}
           >
-            <Activity
-              size={13}
-              strokeWidth={forYouActive ? 2.5 : 1.8}
-              className={forYouActive ? "fill-[var(--accent)]/20" : ""}
-            />
-            <span className="font-serif font-bold tracking-[0.08em] uppercase text-[13px]">For You</span>
-            {forYouActive && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[1.5px] w-10 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
-            )}
+            <Activity size={11} strokeWidth={forYouActive ? 2.2 : 1.8} className="shrink-0" />
+            For You
           </button>
-
-          {/* Sort chevron — applies to whichever tab is active */}
-          <div ref={sortRef} className="relative flex items-center self-stretch">
-            <button
-              onClick={() => setShowSortOptions((v) => !v)}
-              aria-label="Sort feed"
-              className={`flex items-center gap-0.5 transition-all duration-150 ${
-                showSortOptions ? "text-[var(--accent)]" : "text-white/30 hover:text-white/55"
-              }`}
-            >
-              <ChevronDown size={11} strokeWidth={2} />
-              <span className="text-[9px] font-bold tracking-wide leading-none">
-                {sortBy === "top" ? "Top" : "Recent"}
-              </span>
-            </button>
-
-            {showSortOptions && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-28 bg-[#111] border border-[var(--accent)]/[0.15] rounded-xl shadow-2xl overflow-hidden z-20">
-                {(["top", "recent"] as const).map((opt) => {
-                  const selected = sortBy === opt;
-                  return (
-                    <button
-                      key={opt}
-                      onClick={() => { setSortBy(opt); setShowSortOptions(false); }}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
-                        selected
-                          ? "text-[var(--accent)] bg-[var(--accent)]/[0.06] font-bold"
-                          : "text-white/60 hover:bg-white/[0.04] hover:text-white"
-                      }`}
-                    >
-                      {opt === "top" ? "Top" : "Recent"}
-                      {selected && <Check size={11} strokeWidth={2.5} className="shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Following */}
           <button
             onClick={() => setActiveTab("following")}
-            className={`relative flex-1 flex items-center justify-center gap-2 px-5 py-[14px] transition-all duration-200 ${
-              followingActive ? "text-[var(--accent)]" : "text-white/35 hover:text-white/55"
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
+              followingActive
+                ? "bg-white/[0.12] text-white"
+                : "text-white/45 hover:text-white/70"
             }`}
           >
-            <Users
-              size={13}
-              strokeWidth={followingActive ? 2.5 : 1.8}
-              className={followingActive ? "fill-[var(--accent)]/20" : ""}
+            <Users size={11} strokeWidth={followingActive ? 2.2 : 1.8} className="shrink-0" />
+            Following
+          </button>
+        </div>
+
+        {/*
+          Sort — right side, outlined chip (secondary filter pattern).
+          Gold tint when open. Separate from lens tabs to preserve hierarchy.
+        */}
+        <div ref={sortRef} className="relative">
+          <button
+            onClick={() => setShowSortOptions((v) => !v)}
+            aria-label="Sort feed"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+              showSortOptions
+                ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] text-[#D4AF37]/80"
+                : "border-white/[0.10] text-white/40 hover:text-white/60 hover:border-white/[0.15]"
+            }`}
+          >
+            <span>{sortBy === "top" ? "Top" : "Recent"}</span>
+            <ChevronDown
+              size={10}
+              strokeWidth={2}
+              style={{ transform: showSortOptions ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}
             />
-            <span className="font-serif font-bold tracking-[0.08em] uppercase text-[13px]">Following</span>
-            {followingActive && (
-              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[1.5px] w-10 rounded-full bg-[var(--accent)] shadow-[0_0_8px_rgba(212,175,55,0.5)]" />
-            )}
           </button>
 
+          {showSortOptions && (
+            <div className="absolute right-0 top-full mt-1.5 w-28 bg-[#111] border border-white/[0.10] rounded-xl shadow-2xl overflow-hidden z-20">
+              {(["top", "recent"] as const).map((opt) => {
+                const selected = sortBy === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => { setSortBy(opt); setShowSortOptions(false); }}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
+                      selected
+                        ? "text-[#D4AF37] bg-[#D4AF37]/[0.06] font-semibold"
+                        : "text-white/55 hover:bg-white/[0.04] hover:text-white"
+                    }`}
+                  >
+                    {opt === "top" ? "Top" : "Recent"}
+                    {selected && <Check size={11} strokeWidth={2.5} className="shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -233,12 +233,15 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
         </div>
       ) : posts.length === 0 ? (
         <div className="wac-card py-12 text-center">
-          <h3 className="text-xl font-serif text-[var(--accent)] mb-2">
-            {activeTab === "foryou" ? "Be the first to post!" : "No posts yet"}
-          </h3>
-          <p className="opacity-50 text-sm">
+          <Activity size={28} className="mx-auto text-white/15 mb-4" strokeWidth={1.5} />
+          <h3 className="text-sm font-semibold text-white/50 mb-1.5">
             {activeTab === "foryou"
-              ? "There are no global updates in the network feed yet."
+              ? "The feed is quiet right now."
+              : "Nothing from your following yet."}
+          </h3>
+          <p className="text-xs text-white/30 max-w-xs mx-auto leading-relaxed">
+            {activeTab === "foryou"
+              ? "Posts from across the network will appear here as people and organizations publish."
               : "Follow people, businesses, or organizations to see their updates here."}
           </p>
         </div>
@@ -249,6 +252,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
           ))}
         </div>
       )}
+
     </div>
   );
 }

@@ -1,114 +1,51 @@
+import Link from "next/link";
+import { Map, BookOpen, ShieldCheck, ArrowRight } from "lucide-react";
+import SectionLabel from "@/components/ui/SectionLabel";
+
+const COMING = [
+  { icon: Map,        name: "Diaspora Map",      when: "Q2 2026" },
+  { icon: BookOpen,   name: "Resources & Guides", when: "Q3 2026" },
+  { icon: ShieldCheck, name: "Verified Network",  when: "Q4 2026" },
+];
+
+/**
+ * Homepage teaser only — not the standalone /vision page.
+ * Links to /vision for the full roadmap.
+ */
 export default function Vision() {
   return (
-    <section id="vision" className="py-24 px-4 bg-[var(--background)]">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center mb-16 relative z-10">
-          <h2 className="text-4xl font-serif tracking-tight sm:text-6xl mb-4 text-white">
-            <span className="text-[#D4AF37] italic font-light opacity-90">
-              Future
-            </span>{" "}
-            Capabilities
-          </h2>
-          <p className="text-xl opacity-70 max-w-2xl mx-auto leading-relaxed">
-            The World Albanian Congress platform is continuously evolving to
-            provide deeper value to the diaspora.
-          </p>
-        </div>
+    <section className="py-16 px-4 bg-[var(--background)]">
+      <div className="mx-auto max-w-screen-xl">
+        <SectionLabel label="Coming Next" variant="standard" className="mb-5" />
+        <div className="wac-card p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="wac-card p-8 flex flex-col text-center border-dashed border-white/20 opacity-70">
-            <div className="w-16 h-16 mx-auto rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-serif text-xl md:text-2xl font-normal text-white mb-4 leading-snug">
+              Three major capabilities in active development.
+            </h2>
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
+              {COMING.map(({ icon: Icon, name, when }) => (
+                <div key={name} className="flex items-center gap-2">
+                  {/* Silver/slate icon — Vision section-identity, signals "not yet live" */}
+                  <Icon size={13} className="text-slate-300/45 shrink-0" />
+                  <span className="text-sm text-white/55">{name}</span>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-white/30 bg-white/[0.04] border border-white/[0.07] px-1.5 py-0.5 rounded-full">
+                    {when}
+                  </span>
+                </div>
+              ))}
             </div>
-            <h3 className="text-xl font-bold mb-3">Mentorship</h3>
-            <p className="opacity-70 text-sm leading-relaxed">
-              Find experienced professionals willing to guide the next
-              generation.
-            </p>
           </div>
 
-          <div className="wac-card p-8 flex flex-col text-center border-dashed border-white/20 opacity-70">
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold mb-3">Hiring</h3>
-            <p className="opacity-70 text-sm leading-relaxed">
-              Discover talent and career opportunities within the diaspora.
-            </p>
-          </div>
+          {/* Tier 2: outlined gold — this is a secondary navigation action, not a conversion CTA */}
+          <Link
+            href="/vision"
+            className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#D4AF37]/30 text-[#D4AF37]/70 text-sm font-semibold hover:bg-[#D4AF37]/10 transition-colors whitespace-nowrap"
+          >
+            See the full roadmap
+            <ArrowRight size={13} />
+          </Link>
 
-          <div className="wac-card p-8 flex flex-col text-center border-dashed border-white/20 opacity-70">
-            <div className="w-16 h-16 mx-auto rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center text-[var(--accent)] mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold mb-3">Verification</h3>
-            <p className="opacity-70 text-sm leading-relaxed">
-              Interact with trusted, verified businesses and professionals.
-            </p>
-          </div>
-
-          <div className="wac-card p-8 flex flex-col text-center border-dashed border-white/20 opacity-70">
-            <div className="w-16 h-16 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-6">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold mb-3">Projects</h3>
-            <p className="opacity-70 text-sm leading-relaxed">
-              Collaborate on large-scale diaspora initiatives and funds.
-            </p>
-          </div>
         </div>
       </div>
     </section>

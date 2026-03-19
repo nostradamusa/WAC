@@ -113,10 +113,10 @@ export default async function DirectoryPage({
       eventsCount={events.length}
       results={
         <Suspense fallback={
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-             {[1, 2, 3, 4, 5, 6].map((i) => (
-               <div key={i} className="wac-card p-6 h-[250px] animate-pulse flex flex-col justify-between" />
-             ))}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="wac-card h-[220px] animate-pulse" />
+            ))}
           </div>
         }>
           <UnifiedResults

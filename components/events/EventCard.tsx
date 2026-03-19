@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Clock, Users, Building2 } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Building2 } from "lucide-react";
 
 export interface EventEntry {
   id: string;
@@ -24,7 +24,15 @@ export default function EventCard({ event }: { event: EventEntry }) {
   const isPast = new Date() > new Date(event.end_time);
 
   const monthStr = startDate.toLocaleDateString("en-US", { month: "short" });
-  const dayStr = startDate.getDate();
+  const dayStr   = startDate.getDate();
+
+  // Weekday + date gives temporal context the date block doesn't provide
+  const dateDisplay = startDate.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
   const timeStr = startDate.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -34,7 +42,6 @@ export default function EventCard({ event }: { event: EventEntry }) {
   const displayLocation =
     locationParts.length > 0 ? locationParts.join(", ") : event.country || "Virtual";
 
-  // Source context — resolved from available fields
   const sourceLabel =
     event.co_hosts?.length
       ? `By ${event.co_hosts[0].name}${event.co_hosts.length > 1 ? ` + ${event.co_hosts.length - 1} more` : ""}`
@@ -62,12 +69,12 @@ export default function EventCard({ event }: { event: EventEntry }) {
 
       {/* Main row: date block + title/meta + RSVP */}
       <div className="px-4 pt-2.5 pb-3.5 flex items-start gap-3">
-        {/* Date block */}
-        <div className="shrink-0 w-11 h-11 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 flex flex-col items-center justify-center">
-          <span className="text-[9px] uppercase font-bold tracking-wide text-[#D4AF37]/60 leading-none mb-0.5">
+        {/* Date block — teal (Events section-identity color) */}
+        <div className="shrink-0 w-11 h-11 rounded-xl bg-teal-500/10 border border-teal-500/20 flex flex-col items-center justify-center">
+          <span className="text-[9px] uppercase font-bold tracking-wide text-teal-400/60 leading-none mb-0.5">
             {monthStr}
           </span>
-          <span className="text-lg font-black text-[#D4AF37] leading-none">{dayStr}</span>
+          <span className="text-lg font-black text-teal-400 leading-none">{dayStr}</span>
         </div>
 
         {/* Title + meta */}
@@ -75,7 +82,13 @@ export default function EventCard({ event }: { event: EventEntry }) {
           <h3 className="text-sm font-semibold text-white leading-snug mb-1 group-hover:text-[#D4AF37] transition-colors line-clamp-2">
             {event.title}
           </h3>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/35">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/40">
+            {/* Date with weekday gives temporal context (is this next weekend?) */}
+            <span className="flex items-center gap-1">
+              <Calendar size={10} />
+              {dateDisplay}
+            </span>
+            <span className="text-white/15">·</span>
             <span className="flex items-center gap-1">
               <Clock size={10} />
               {timeStr}
@@ -92,11 +105,11 @@ export default function EventCard({ event }: { event: EventEntry }) {
           </div>
         </div>
 
-        {/* RSVP button */}
+        {/* RSVP — Tier 1: gold filled. stopPropagation prevents card navigation. */}
         {!isPast && (
           <button
-            onClick={(e) => e.preventDefault()}
-            className="shrink-0 mt-0.5 px-3 py-1.5 rounded-full text-[11px] font-bold border border-[#D4AF37]/30 text-[#D4AF37]/60 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] hover:border-[#D4AF37]/50 transition-colors"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            className="shrink-0 mt-0.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-[#D4AF37] text-black hover:bg-[#c9a430] transition-colors"
           >
             RSVP
           </button>
@@ -105,7 +118,7 @@ export default function EventCard({ event }: { event: EventEntry }) {
 
       {/* Footer: co-hosts or event type */}
       {(event.event_type || (event.co_hosts && event.co_hosts.length > 1)) && (
-        <div className="px-4 pb-3.5 pt-0 border-t border-white/[0.05] flex items-center justify-between mt-[-2px] pt-2.5">
+        <div className="px-4 pb-3.5 border-t border-white/[0.05] flex items-center justify-between pt-2.5">
           {event.co_hosts && event.co_hosts.length > 1 ? (
             <div className="flex items-center gap-1.5">
               <div className="flex -space-x-1.5">
@@ -132,7 +145,7 @@ export default function EventCard({ event }: { event: EventEntry }) {
           )}
 
           {event.event_type && (
-            <span className="text-[10px] text-white/30 bg-white/[0.04] border border-white/[0.07] px-2 py-0.5 rounded-full ml-auto">
+            <span className="text-[10px] text-white/45 bg-white/[0.06] border border-white/[0.10] px-2 py-0.5 rounded-full ml-auto">
               {event.event_type}
             </span>
           )}

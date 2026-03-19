@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import EventsResults from "@/components/events/EventsResults";
+import SectionLabel from "@/components/ui/SectionLabel";
 import {
   Calendar,
   MapPin,
@@ -13,25 +15,26 @@ import {
   Network,
 } from "lucide-react";
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type Lens = "for-you" | "my-network" | "discover";
 
-// ── Static featured seed events ────────────────────────────────────────────
+// ── Static featured seed events ────────────────────────────────────────────────
 
 const FEATURED: {
   id: string;
+  href: string;
   title: string;
   source: string;
-  sourceType: "org" | "group" | "person";
+  sourceType: "org" | "group";
   date: string;
   time: string;
   location: string;
   networkSignal: string;
-  type: string;
 }[] = [
   {
     id: "f1",
+    href: "/events/albanian-professionals-summer-gala",
     title: "Albanian Professionals Summer Gala",
     source: "Albanian Professionals Association",
     sourceType: "org",
@@ -39,10 +42,10 @@ const FEATURED: {
     time: "7:00 PM",
     location: "Manhattan, NY",
     networkSignal: "Arben + 14 attending",
-    type: "Networking",
   },
   {
     id: "f2",
+    href: "/events/wac-annual-leadership-summit",
     title: "WAC Annual Leadership Summit",
     source: "World Albanian Congress",
     sourceType: "org",
@@ -50,10 +53,10 @@ const FEATURED: {
     time: "9:00 AM",
     location: "Washington, D.C.",
     networkSignal: "22 from your network",
-    type: "Professional",
   },
   {
     id: "f3",
+    href: "/events/nyc-founders-circle-dinner",
     title: "NYC Founders Circle Dinner",
     source: "Albanian Founders Circle",
     sourceType: "group",
@@ -61,7 +64,6 @@ const FEATURED: {
     time: "7:30 PM",
     location: "Brooklyn, NY",
     networkSignal: "Blerina + 8 attending",
-    type: "Business",
   },
 ];
 
@@ -77,38 +79,34 @@ const EVENT_TYPES = [
   "Education",
 ];
 
-const TYPE_COLORS: Record<string, string> = {
-  Networking:   "text-emerald-400 bg-emerald-500/10 border-emerald-500/25",
-  Professional: "text-sky-400 bg-sky-500/10 border-sky-500/25",
-  Family:       "text-purple-400 bg-purple-500/10 border-purple-500/25",
-  Business:     "text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/25",
-  Social:       "text-rose-400 bg-rose-500/10 border-rose-500/25",
-  Youth:        "text-blue-400 bg-blue-500/10 border-blue-500/25",
-  Volunteer:    "text-green-400 bg-green-500/10 border-green-500/25",
-  Education:    "text-amber-400 bg-amber-500/10 border-amber-500/25",
-};
+const LENSES: { id: Lens; label: string; icon: React.ElementType }[] = [
+  { id: "for-you",    label: "For You",    icon: Sparkles },
+  { id: "my-network", label: "My Network", icon: Network  },
+  { id: "discover",   label: "Discover",   icon: Compass  },
+];
 
-function typeColor(type: string) {
-  return TYPE_COLORS[type] ?? "text-white/40 bg-white/5 border-white/10";
-}
+// ── Featured card ──────────────────────────────────────────────────────────────
 
-// ── Featured event card ────────────────────────────────────────────────────
-
-function FeaturedCard({ event }: { event: (typeof FEATURED)[0] }) {
-  const colorClass = typeColor(event.type);
+function FeaturedCard({ event }: { event: typeof FEATURED[0] }) {
   const SourceIcon = event.sourceType === "org" ? Building2 : Users;
 
   return (
-    <div className="wac-card shrink-0 w-[264px] sm:w-[288px] p-0 overflow-hidden hover:border-white/15 transition-colors cursor-pointer">
-      <div className="px-3.5 pt-3 pb-0 flex items-center gap-1.5">
+    <Link
+      href={event.href}
+      className="wac-card group flex flex-col p-0 overflow-hidden hover:border-white/15 transition-colors h-full"
+    >
+      {/* Source strip */}
+      <div className="px-4 pt-3.5 pb-0 flex items-center gap-1.5">
         <SourceIcon size={11} className="text-white/25 shrink-0" />
         <span className="text-[11px] text-white/30 truncate">{event.source}</span>
       </div>
-      <div className="px-3.5 pt-2 pb-3">
-        <h3 className="text-sm font-semibold text-white leading-snug mb-2 line-clamp-2">
+
+      {/* Body */}
+      <div className="px-4 pt-2 pb-4 flex flex-col flex-1">
+        <h3 className="text-sm font-semibold text-white leading-snug mb-2.5 line-clamp-2 group-hover:text-[#D4AF37] transition-colors">
           {event.title}
         </h3>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/35 mb-2.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/40 mb-3">
           <span className="flex items-center gap-1">
             <Calendar size={10} />
             {event.date}
@@ -124,76 +122,133 @@ function FeaturedCard({ event }: { event: (typeof FEATURED)[0] }) {
             <span className="truncate">{event.location}</span>
           </span>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="mt-auto flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Users size={10} className="text-white/20" />
-            <span className="text-[10px] text-white/25">{event.networkSignal}</span>
+            <span className="text-[10px] text-white/30">{event.networkSignal}</span>
           </div>
+          {/* Tier 1 CTA: gold filled */}
           <button
-            className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-colors ${colorClass}`}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            className="text-[10px] font-bold px-3.5 py-1.5 rounded-full bg-[#D4AF37] text-black hover:bg-[#c9a430] transition-colors"
           >
             RSVP
           </button>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
-// ── Lens definitions ───────────────────────────────────────────────────────
+// ── Page ───────────────────────────────────────────────────────────────────────
 
-const LENSES: { id: Lens; label: string; icon: React.ElementType }[] = [
-  { id: "for-you",    label: "For You",    icon: Sparkles },
-  { id: "my-network", label: "My Network", icon: Network  },
-  { id: "discover",   label: "Discover",   icon: Compass  },
-];
-
-// ── Main page ──────────────────────────────────────────────────────────────
-
-function EventsPageInner() {
+export default function EventsPage() {
   const [activeLens, setActiveLens] = useState<Lens>("for-you");
   const [activeType, setActiveType] = useState("All");
 
-  return (
-    <div className="min-h-screen bg-[var(--background)] pb-24">
-      <div className="max-w-5xl mx-auto px-4 pt-4 space-y-5">
+  const featuredLabel = activeLens === "for-you" ? "Recommended for You" : "From Your Network";
+  const browseLabel   = activeLens === "discover" ? "Discover Events" : "All Events";
 
-        {/* ── Lens switcher ──────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1 p-1 bg-white/5 border border-white/10 rounded-2xl w-fit">
-          {LENSES.map(({ id, label, icon: Icon }) => {
-            const active = activeLens === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setActiveLens(id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wide transition whitespace-nowrap ${
-                  active
-                    ? "bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
-                    : "text-white/60 border border-transparent hover:text-white"
-                }`}
-              >
-                <Icon size={12} strokeWidth={active ? 2.2 : 1.6} className="shrink-0" />
-                {label}
-              </button>
-            );
-          })}
+  return (
+    <div className="w-full min-h-screen bg-[var(--background)]">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
+
+        {/* ── Zone 1: Eyebrow ────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <Calendar size={13} className="text-white/30" strokeWidth={2} />
+          <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">
+            Events
+          </span>
         </div>
 
-        {/* ── Featured / network lane ────────────────────────────────────── */}
-        {activeLens !== "discover" && (
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25">
-                {activeLens === "for-you" ? "Recommended for You" : "From Your Network"}
-              </p>
-              <button className="text-[10px] text-white/25 hover:text-white/50 transition">
-                View all
+        {/* ── Zone 2: H1 — matches Directory brand pattern ────────────────── */}
+        <h1 className="font-serif text-4xl md:text-5xl font-normal text-white leading-[1.1]">
+          The{" "}
+          <span className="italic text-[#D4AF37]">Events</span>
+        </h1>
+
+        {/* ── Zone 3: Description ─────────────────────────────────────────── */}
+        <p className="mt-2 text-sm text-white/50">
+          Community events, summits &amp; gatherings
+        </p>
+
+        {/* ── Zone 4: Lens control (filled-segment switcher) ──────────────── */}
+        {/*
+          Mode selector — not a content filter. Neutral white fill on active
+          segment. Structurally heavier than the outlined chips below so the
+          hierarchy reads: mode first, category second.
+        */}
+        <div className="mt-5 flex items-center">
+          <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full">
+            {LENSES.map(({ id, label, icon: Icon }) => {
+              const active = activeLens === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveLens(id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap ${
+                    active
+                      ? "bg-white/[0.12] text-white"
+                      : "text-white/45 hover:text-white/70"
+                  }`}
+                >
+                  <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Zone 5: Category chips (outlined pill — secondary filter) ─────── */}
+        {/*
+          More breathing room (mt-4) from the lens above — visually separates
+          the two control levels so they don't read as one compound control.
+        */}
+        <div className="relative mt-4">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          >
+            {EVENT_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => setActiveType(type)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeType === type
+                    ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] text-[#D4AF37]/80"
+                    : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
+                }`}
+              >
+                {type}
               </button>
-            </div>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
+        </div>
+
+        {/* ── Featured / recommended section ──────────────────────────────── */}
+        {activeLens !== "discover" && (
+          <section className="mt-8">
+            <SectionLabel label={featuredLabel} variant="featured" className="mb-4" />
+
+            {/*
+              Mobile: horizontal scroll rail — fixed-width cards in a wrapper.
+              Desktop: 3-column grid — cards stretch to fill the column.
+              Same data, two different density treatments.
+            */}
             <div
-              className="flex gap-2.5 overflow-x-auto pb-1"
+              className="md:hidden flex gap-3 overflow-x-auto pb-1"
               style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
             >
+              {FEATURED.map((ev) => (
+                <div key={ev.id} className="shrink-0 w-[272px]">
+                  <FeaturedCard event={ev} />
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURED.map((ev) => (
                 <FeaturedCard key={ev.id} event={ev} />
               ))}
@@ -201,62 +256,28 @@ function EventsPageInner() {
           </section>
         )}
 
-        {/* ── Type chips — secondary filter ──────────────────────────────── */}
-        <div
-          className="flex gap-1.5 overflow-x-auto pb-0.5"
-          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-        >
-          {EVENT_TYPES.map((type) => (
-            <button
-              key={type}
-              onClick={() => setActiveType(type)}
-              className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors whitespace-nowrap ${
-                activeType === type
-                  ? "text-[#D4AF37]/80 border-[#D4AF37]/25 bg-[#D4AF37]/[0.06]"
-                  : "text-white/28 border-white/[0.06] hover:text-white/50 hover:border-white/[0.11]"
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-
-        {/* ── Events from DB ─────────────────────────────────────────────── */}
-        <section className="space-y-3.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/20">
-            {activeLens === "discover" ? "Discover Events" : "All Events"}
-            {activeType !== "All" && (
-              <span className="text-white/15 font-normal normal-case tracking-normal ml-1.5">
-                — {activeType}
-              </span>
-            )}
-          </p>
+        {/* ── Browse / all events section ──────────────────────────────────── */}
+        <section className="mt-8">
+          {/*
+            Section label uses browseLabel only — the active category chip
+            above already communicates which type is selected. Concatenating
+            "All Events · Networking" in small-caps tracking looks broken.
+          */}
+          <SectionLabel label={browseLabel} variant="standard" className="mb-4" />
           <Suspense
             fallback={
-              <div className="grid gap-3 md:grid-cols-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="wac-card h-24 animate-pulse" />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="wac-card h-28 animate-pulse" />
                 ))}
               </div>
             }
           >
-            <EventsResults
-              eventType={activeType !== "All" ? activeType : undefined}
-            />
+            <EventsResults eventType={activeType !== "All" ? activeType : undefined} />
           </Suspense>
         </section>
 
       </div>
     </div>
-  );
-}
-
-export default function EventsPage() {
-  return (
-    <main className="pt-14 md:pt-16">
-      <Suspense fallback={<div className="min-h-screen animate-pulse" />}>
-        <EventsPageInner />
-      </Suspense>
-    </main>
   );
 }

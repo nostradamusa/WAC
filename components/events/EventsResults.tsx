@@ -32,7 +32,6 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
 
         let eventData = (data as any[]) || [];
 
-        // Client-side filter by event type when provided
         if (eventType) {
           eventData = eventData.filter(
             (e: any) => e.event_type?.toLowerCase() === eventType.toLowerCase()
@@ -53,9 +52,9 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
 
   if (loading) {
     return (
-      <div className="grid gap-3 md:grid-cols-2">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="wac-card h-24 animate-pulse" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="wac-card h-28 animate-pulse" />
         ))}
       </div>
     );
@@ -79,7 +78,7 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {events.map((ev) => (
         <EventCard key={ev.id} event={ev} />
       ))}

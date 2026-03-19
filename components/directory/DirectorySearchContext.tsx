@@ -1,11 +1,57 @@
 "use client";
 
-import { Search, PenLine, X } from "lucide-react";
+import { Search, PenLine, X, SlidersHorizontal } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+
+// ── Scope config ──────────────────────────────────────────────────────────────
+
+const SCOPES = [
+  { value: "all",        label: "All" },
+  { value: "people",     label: "People" },
+  { value: "businesses", label: "Businesses" },
+  { value: "groups",     label: "Groups" },
+  { value: "events",     label: "Events" },
+] as const;
+
+type Scope = "all" | "people" | "businesses" | "groups" | "events";
+
+// ── Result summary helper ─────────────────────────────────────────────────────
+
+function buildResultSummary(
+  scope: Scope,
+  total: number,
+  people: number,
+  businesses: number,
+  groups: number,
+  events: number,
+): string {
+  if (scope !== "all") {
+    const labels: Record<Scope, [string, string]> = {
+      all:         ["result",   "results"],
+      people:      ["person",   "people"],
+      businesses:  ["business", "businesses"],
+      groups:      ["group",    "groups"],
+      events:      ["event",    "events"],
+    };
+    const [singular, plural] = labels[scope];
+    return `${total} ${total === 1 ? singular : plural}`;
+  }
+
+  const parts: string[] = [];
+  if (people > 0)     parts.push(`${people} ${people === 1 ? "person" : "people"}`);
+  if (businesses > 0) parts.push(`${businesses} ${businesses === 1 ? "business" : "businesses"}`);
+  if (groups > 0)     parts.push(`${groups} ${groups === 1 ? "group" : "groups"}`);
+  if (events > 0)     parts.push(`${events} ${events === 1 ? "event" : "events"}`);
+
+  if (parts.length === 0) return `${total} ${total === 1 ? "result" : "results"}`;
+  return `${total} ${total === 1 ? "result" : "results"} · ${parts.join(" · ")}`;
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type DirectorySearchContextProps = {
   query: string;
-  scope: "all" | "people" | "businesses" | "groups" | "events";
+  scope: Scope;
   onFilterToggle: () => void;
   isFiltersOpen: boolean;
   totalResults: number;
@@ -14,6 +60,8 @@ type DirectorySearchContextProps = {
   groupsCount: number;
   eventsCount: number;
 };
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function DirectorySearchContext({
   query,
@@ -26,34 +74,45 @@ export default function DirectorySearchContext({
   groupsCount,
   eventsCount,
 }: DirectorySearchContextProps) {
-  
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  
+  const router       = useRouter();
+  const pathname     = usePathname();
+
   const handleEditSearch = () => {
     window.dispatchEvent(new CustomEvent("open-global-search"));
   };
 
-  const getActiveFilters = () => {
-    const filters = [];
-    const country = searchParams.get("country");
-    const industry = searchParams.get("industry");
-    const specialty = searchParams.get("specialty");
-    const mentor = searchParams.get("mentor");
-    const work = searchParams.get("work");
-    const hire = searchParams.get("hire");
-    const invest = searchParams.get("invest");
-    const collab = searchParams.get("collab");
+  // Preserve all current params when switching scope
+  const buildScopeHref = (s: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (s === "all") {
+      params.delete("scope");
+    } else {
+      params.set("scope", s);
+    }
+    const qs = params.toString();
+    return qs ? `/directory?${qs}` : "/directory";
+  };
 
-    if (country) filters.push({ key: "country", label: country });
-    if (industry) filters.push({ key: "industry", label: industry });
-    if (specialty) filters.push({ key: "specialty", label: specialty });
-    if (mentor === "true") filters.push({ key: "mentor", label: "Mentoring" });
-    if (work === "true") filters.push({ key: "work", label: "Open to Work" });
-    if (hire === "true") filters.push({ key: "hire", label: "Hiring" });
-    if (invest === "true") filters.push({ key: "invest", label: "Investing" });
-    if (collab === "true") filters.push({ key: "collab", label: "Collaborating" });
+  const getActiveFilters = () => {
+    const filters: { key: string; label: string }[] = [];
+    const country   = searchParams.get("country");
+    const industry  = searchParams.get("industry");
+    const specialty = searchParams.get("specialty");
+    const mentor    = searchParams.get("mentor");
+    const work      = searchParams.get("work");
+    const hire      = searchParams.get("hire");
+    const invest    = searchParams.get("invest");
+    const collab    = searchParams.get("collab");
+
+    if (country)             filters.push({ key: "country",   label: country });
+    if (industry)            filters.push({ key: "industry",  label: industry });
+    if (specialty)           filters.push({ key: "specialty", label: specialty });
+    if (mentor  === "true")  filters.push({ key: "mentor",    label: "Mentoring" });
+    if (work    === "true")  filters.push({ key: "work",      label: "Open to Work" });
+    if (hire    === "true")  filters.push({ key: "hire",      label: "Hiring" });
+    if (invest  === "true")  filters.push({ key: "invest",    label: "Investing" });
+    if (collab  === "true")  filters.push({ key: "collab",    label: "Collaborating" });
     return filters;
   };
 
@@ -67,144 +126,144 @@ export default function DirectorySearchContext({
 
   const clearAllFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("country");
-    params.delete("industry");
-    params.delete("specialty");
-    params.delete("mentor");
-    params.delete("work");
-    params.delete("hire");
-    params.delete("invest");
-    params.delete("collab");
+    ["country", "industry", "specialty", "mentor", "work", "hire", "invest", "collab"].forEach(
+      (k) => params.delete(k),
+    );
     router.push(`${pathname}?${params.toString()}`);
   };
 
+  const resultSummary = buildResultSummary(
+    scope, totalResults, peopleCount, businessCount, groupsCount, eventsCount,
+  );
+
   return (
-    <div className="w-full relative z-10 py-6 sm:py-8 overflow-x-hidden">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 flex flex-col gap-6 min-w-0">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 min-w-0">
+    <div className="flex flex-col">
 
-        {/* Context Indicator */}
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-3 text-white/60 mb-2">
-            <Search size={16} />
-            <span className="text-sm font-medium tracking-wide uppercase">Directory</span>
-          </div>
-          {query ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
-                  &quot;{query}&quot;
-                </h1>
-                <button
-                  onClick={handleEditSearch}
-                  title="Edit search"
-                  className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:text-[#D4AF37] transition shrink-0"
-                >
-                  <PenLine size={12} />
-                </button>
-                <a
-                  href="/directory"
-                  title="Clear search"
-                  className="flex items-center justify-center w-7 h-7 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition shrink-0"
-                >
-                  <X size={12} />
-                </a>
-              </div>
-            </div>
-          ) : (
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight">
-              All Members
-            </h1>
-          )}
+      {/* ── Zone 1: Eyebrow label ─────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-1.5">
+        <Search size={13} className="text-white/30" strokeWidth={2} />
+        <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">
+          Directory
+        </span>
+      </div>
 
-          <div className="mt-3 text-[13px] text-white/50 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-semibold text-white/80">
-              {totalResults}{" "}
-              {scope === "people"
-                ? totalResults === 1 ? "person" : "people"
-                : scope === "businesses"
-                ? totalResults === 1 ? "business" : "businesses"
-                : scope === "groups"
-                ? totalResults === 1 ? "group" : "groups"
-                : scope === "events"
-                ? totalResults === 1 ? "event" : "events"
-                : totalResults === 1 ? "result" : "results"}
-            </span>
-            {query && <span>for &quot;{query}&quot;</span>}
-            <span className="opacity-40 px-0.5 hidden sm:inline-block">•</span>
-            <span className="inline-block flex-wrap w-full sm:w-auto">
-              {peopleCount > 0 && `${peopleCount} ${peopleCount === 1 ? 'person' : 'people'} `}
-              {peopleCount > 0 && (businessCount > 0 || groupsCount > 0 || eventsCount > 0) && "• "}
-              {businessCount > 0 && `${businessCount} ${businessCount === 1 ? 'business' : 'businesses'} `}
-              {businessCount > 0 && (groupsCount > 0 || eventsCount > 0) && "• "}
-              {groupsCount > 0 && `${groupsCount} ${groupsCount === 1 ? 'group' : 'groups'} `}
-              {groupsCount > 0 && eventsCount > 0 && "• "}
-              {eventsCount > 0 && `${eventsCount} ${eventsCount === 1 ? 'event' : 'events'}`}
-            </span>
+      {/* ── Zone 2: H1 ───────────────────────────────────────────────── */}
+      {query ? (
+        /* Search-results state: query in serif quotes + edit / clear */
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="font-serif text-3xl md:text-4xl font-normal text-white leading-[1.1]">
+            &ldquo;{query}&rdquo;
+          </h1>
+          <div className="flex items-center gap-1.5 translate-y-0.5">
+            <button
+              onClick={handleEditSearch}
+              title="Edit search"
+              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:text-[#D4AF37] transition-colors"
+            >
+              <PenLine size={12} />
+            </button>
+            <a
+              href="/directory"
+              title="Clear search"
+              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
+            >
+              <X size={12} />
+            </a>
           </div>
         </div>
+      ) : (
+        /* Browse state: canonical italic+roman serif split */
+        <h1 className="font-serif text-4xl md:text-5xl font-normal text-white leading-[1.1]">
+          The{" "}
+          <span className="italic text-[#D4AF37]">Directory</span>
+        </h1>
+      )}
 
-        {/* Actions Selector — scrolls horizontally on mobile, never expands the page */}
-        <div
-          className="overflow-x-auto shrink-0 w-full md:w-auto"
-          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-        >
-          <div className="flex items-center gap-3 w-max md:w-auto">
-            <div className="flex items-center gap-1 p-1 bg-white/5 rounded-2xl border border-white/10 shrink-0">
-              {["all", "people", "businesses", "groups", "events"].map((s) => (
+      {/* ── Zone 3: Result summary ────────────────────────────────────── */}
+      <p className="mt-2 text-sm text-white/50">{resultSummary}</p>
+
+      {/* ── Zone 4: Filter row ────────────────────────────────────────── */}
+      {/*
+        Scope tabs are filter chips (outlined pill style per standards).
+        They live here on their own line — never beside the H1.
+        FILTERS button is right-aligned with active-count badge.
+      */}
+      <div className="mt-5 flex items-center gap-2 min-w-0">
+
+        {/* Scope chip row — horizontally scrollable on mobile */}
+        <div className="relative flex-1 min-w-0">
+          <div
+            className="flex items-center gap-1.5 overflow-x-auto pb-1"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          >
+            {SCOPES.map(({ value, label }) => {
+              const isActive = scope === value;
+              return (
                 <a
-                  key={s}
-                  href={`/directory?scope=${s}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase transition whitespace-nowrap ${
-                    scope === s
-                      ? "bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
-                      : "text-white/60 border border-transparent hover:text-white"
+                  key={value}
+                  href={buildScopeHref(value)}
+                  className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
+                    isActive
+                      ? "border-white/20 bg-white/[0.08] text-white"
+                      : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
                   }`}
                 >
-                  {s}
+                  {label}
                 </a>
-              ))}
-            </div>
-
-            <button
-              onClick={onFilterToggle}
-              className={`shrink-0 px-4 py-2 rounded-2xl text-xs font-bold uppercase transition border whitespace-nowrap ${isFiltersOpen ? "bg-white/10 text-white border-white/20" : "bg-transparent text-white/60 border-white/10 hover:bg-white/5"}`}
-            >
-              Filters
-            </button>
+              );
+            })}
           </div>
+          {/* Right-fade mask signals chip overflow on small screens */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
         </div>
 
-        </div>
-        
-        {/* Active Filters Chips */}
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
-            <span className="text-[11px] font-bold text-white/40 uppercase tracking-widest mr-1">Filtered by:</span>
-            {activeFilters.map(filter => (
-              <div 
-                key={filter.key}
-                className="flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-xs text-white/80"
-              >
-                <span className="font-medium">{filter.label}</span>
-                <button 
-                  onClick={() => removeFilter(filter.key)}
-                  className="p-1 rounded-full hover:bg-white/10 hover:text-red-400 transition"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            <button 
-              onClick={clearAllFilters}
-              className="text-xs text-white/50 hover:text-white transition ml-2 font-medium"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-
+        {/* Filters button */}
+        <button
+          onClick={onFilterToggle}
+          className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+            isFiltersOpen || activeFilters.length > 0
+              ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] text-[#D4AF37]/80"
+              : "border-white/[0.12] text-white/55 hover:text-white/80 hover:border-white/18"
+          }`}
+        >
+          <SlidersHorizontal size={13} strokeWidth={2} />
+          <span>Filters</span>
+          {activeFilters.length > 0 && (
+            <span className="flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[#D4AF37] text-black text-[9px] font-bold leading-none">
+              {activeFilters.length}
+            </span>
+          )}
+        </button>
       </div>
+
+      {/* ── Active filter chips ───────────────────────────────────────── */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+          <span className="text-[11px] font-semibold text-white/30 uppercase tracking-[0.12em]">
+            Active:
+          </span>
+          {activeFilters.map((filter) => (
+            <div
+              key={filter.key}
+              className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.09] text-xs text-white/65"
+            >
+              <span>{filter.label}</span>
+              <button
+                onClick={() => removeFilter(filter.key)}
+                className="p-0.5 rounded-full hover:bg-white/10 hover:text-red-400 transition-colors"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={clearAllFilters}
+            className="text-[11px] text-white/30 hover:text-white/55 transition-colors ml-0.5"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
     </div>
   );
 }

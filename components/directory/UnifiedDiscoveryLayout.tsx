@@ -33,29 +33,32 @@ export default function UnifiedDiscoveryLayout({
   const [isFiltersOpen, setIsFiltersOpen] = useState(defaultFiltersOpen);
   const searchParams = useSearchParams();
 
-  // Close filters natively if user navigates / applies a filter.
+  // Close drawer when search params change (filter applied / scope changed)
   useEffect(() => {
     setIsFiltersOpen(false);
   }, [searchParams]);
 
-  // Prevent scrolling when drawer is open
+  // Prevent body scroll while drawer is open
   useEffect(() => {
-    if (isFiltersOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    document.body.style.overflow = isFiltersOpen ? "hidden" : "";
     return () => { document.body.style.overflow = "unset"; };
   }, [isFiltersOpen]);
 
   return (
-    <div className="flex flex-col w-full bg-[var(--background)] min-h-screen">
-      {/* QUICK CONTEXT INDICATOR (Replaces Hero) */}
-      <section className="w-full border-b border-white/5 bg-[#111] pt-20 md:pt-24 relative z-20 shadow-xl">
-        <DirectorySearchContext 
-          query={initialQuery} 
-          scope={scope} 
-          onFilterToggle={() => setIsFiltersOpen(!isFiltersOpen)}
+    <div className="w-full min-h-screen bg-[var(--background)]">
+
+      {/*
+        Standard content container — shared by header and results so both
+        align to the same horizontal grid. Replaces the prior mismatch of
+        max-w-4xl (header) vs max-w-[90rem] (results).
+      */}
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-16">
+
+        {/* ── Page header: eyebrow → H1 → count → filter row ─────────── */}
+        <DirectorySearchContext
+          query={initialQuery}
+          scope={scope}
+          onFilterToggle={() => setIsFiltersOpen((v) => !v)}
           isFiltersOpen={isFiltersOpen}
           totalResults={totalResults}
           peopleCount={peopleCount}
@@ -63,45 +66,46 @@ export default function UnifiedDiscoveryLayout({
           groupsCount={groupsCount}
           eventsCount={eventsCount}
         />
-      </section>
 
-      {/* 2. DISCOVERY GRID AREA */}
-      <section className="flex-1 w-full max-w-[90rem] mx-auto px-4 py-8 relative">
-        <div className="flex flex-col gap-8 items-start">
-          {/* Collapse/Expand Sidebar for Filters -> Now an Overlay Drawer */}
-          {isFiltersOpen && (
-            <>
-              {/* Dark Backdrop */}
-              <div 
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] animate-in fade-in duration-300" 
-                onClick={() => setIsFiltersOpen(false)} 
-              />
-              
-              {/* Slide-out Drawer */}
-              <aside className="fixed inset-y-0 right-0 w-full sm:max-w-md bg-[#111] border-l border-white/5 shadow-2xl z-[110] flex flex-col animate-in slide-in-from-right duration-300 overflow-hidden">
-                <div className="flex items-center justify-between p-6 border-b border-white/5 bg-[#1a1a1a]">
-                  <h2 className="text-lg font-bold text-white tracking-widest uppercase">Refine Results</h2>
-                  <button 
-                    onClick={() => setIsFiltersOpen(false)}
-                    className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                  {filtersConfig}
-                </div>
-              </aside>
-            </>
-          )}
+        {/* ── Results — mt-8 from filter row per spacing standards ──── */}
+        <main className="mt-8">
+          {results}
+        </main>
 
-          {/* RESULTS AREA */}
-          <main className={`flex-1 min-w-0 transition-all duration-300`}>
-            {results}
-          </main>
-        </div>
-      </section>
+      </div>
+
+      {/* ── Filter drawer ─────────────────────────────────────────────── */}
+      {isFiltersOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] animate-in fade-in duration-300"
+            onClick={() => setIsFiltersOpen(false)}
+          />
+
+          {/* Slide-out panel */}
+          <aside className="fixed inset-y-0 right-0 w-full sm:max-w-md bg-[#111] border-l border-white/[0.06] shadow-2xl z-[110] flex flex-col animate-in slide-in-from-right duration-300 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] bg-[#161616]">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-block w-[2px] h-[14px] rounded-full bg-[#D4AF37] opacity-70" />
+                <span className="text-xs font-semibold tracking-[0.14em] uppercase text-white/60">
+                  Refine Results
+                </span>
+              </div>
+              <button
+                onClick={() => setIsFiltersOpen(false)}
+                className="p-2 rounded-full hover:bg-white/[0.08] text-white/50 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {filtersConfig}
+            </div>
+          </aside>
+        </>
+      )}
     </div>
   );
 }

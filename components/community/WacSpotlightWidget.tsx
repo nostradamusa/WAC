@@ -8,17 +8,21 @@ export default function WacSpotlightWidget() {
   const [isFollowing, setIsFollowing] = useState(false);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--accent)]/[0.18] bg-gradient-to-b from-[#0e0e0e] to-[rgba(212,175,55,0.03)]">
+    /*
+      wac-card base with subtle gold tint border — signals "featured" without
+      a custom container. Consistent with the rest of the card system.
+    */
+    <div className="wac-card overflow-hidden border-[#D4AF37]/[0.18]">
 
-      {/* Header strip — same height / padding / font as FeedList tab header */}
-      <div className="flex items-center justify-between px-5 py-[14px] border-b border-[var(--accent)]/[0.12] bg-[var(--accent)]/[0.025]">
+      {/* Header strip */}
+      <div className="flex items-center justify-between px-5 py-[14px] border-b border-white/[0.06] bg-[#D4AF37]/[0.025]">
         <div className="flex items-center gap-2">
-          <Star className="w-3.5 h-3.5 text-[var(--accent)] fill-[var(--accent)]/80" />
-          <h3 className="font-serif font-bold tracking-[0.08em] uppercase text-[13px] text-[var(--accent)]">
+          <Star className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37]/80" />
+          <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/70">
             WAC Spotlight
-          </h3>
+          </span>
         </div>
-        <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-white/30">
+        <span className="text-[10px] font-bold tracking-[0.12em] uppercase text-white/25">
           Builder
         </span>
       </div>
@@ -28,12 +32,12 @@ export default function WacSpotlightWidget() {
 
         {/* Profile */}
         <div className="flex items-start gap-3.5 mb-4">
-          <div className="w-12 h-12 rounded-full bg-[var(--accent)]/10 border-2 border-[var(--accent)]/60 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-[0_0_16px_rgba(212,175,55,0.15)]">
-            <span className="font-serif font-bold text-base text-[var(--accent)]">AK</span>
+          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/40 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-[0_0_16px_rgba(212,175,55,0.10)]">
+            <span className="font-serif font-bold text-base text-[#D4AF37]">AK</span>
           </div>
           <div className="min-w-0">
             <h4 className="font-bold text-white text-[15px] leading-tight">Arben Krasniqi</h4>
-            <p className="text-xs text-[var(--accent)]/80 font-medium mt-0.5 mb-1.5">
+            <p className="text-xs text-[#D4AF37]/75 font-medium mt-0.5 mb-1.5">
               Founder – Atlantic Logistics
             </p>
             <div className="flex flex-wrap gap-2 text-[10px] text-white/40">
@@ -46,45 +50,55 @@ export default function WacSpotlightWidget() {
         </div>
 
         {/* Quote */}
-        <div className="rounded-xl p-4 mb-5 border border-[var(--accent)]/[0.08] bg-[var(--accent)]/[0.025]">
-          <p className="text-[12.5px] leading-relaxed italic text-white/75 mb-3">
-            "The biggest mistake I made early on was thinking I had to do it all alone. The moment I started hiring people smarter than me and leaning into our community network, Atlantic Logistics transformed."
+        <div className="rounded-xl p-4 mb-5 border border-[#D4AF37]/[0.08] bg-[#D4AF37]/[0.02]">
+          <p className="text-[12.5px] leading-relaxed italic text-white/70 mb-3">
+            "The biggest mistake I made early on was thinking I had to do it all alone. The moment I
+            started hiring people smarter than me and leaning into our community network, Atlantic
+            Logistics transformed."
           </p>
           <Link
             href="/spotlight/arben-krasniqi"
-            className="text-[var(--accent)] text-[11px] font-bold hover:underline flex items-center gap-1 w-max"
+            className="text-[#D4AF37]/70 text-[11px] font-bold hover:text-[#D4AF37] transition-colors flex items-center gap-1 w-max"
           >
             Read Full Interview <ChevronRight className="w-3 h-3" />
           </Link>
         </div>
 
-        {/* Connect section */}
+        {/* Actions */}
         <div>
-          <p className="text-[10px] font-bold tracking-[0.1em] uppercase text-white/30 mb-3">
-            Connect & Discover
+          <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-white/25 mb-3">
+            Connect &amp; Discover
           </p>
           <div className="flex flex-col gap-2">
+            {/* Follow / View Profile — Tier 3 ghost */}
             {!isFollowing ? (
               <button
                 onClick={() => setIsFollowing(true)}
-                className="w-full py-2.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.1] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/70 hover:text-white"
+                className="w-full py-2.5 border border-white/[0.12] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/55 hover:text-white/80 hover:border-white/[0.18]"
               >
                 <Plus className="w-3.5 h-3.5" /> Follow Arben
               </button>
             ) : (
               <Link
                 href="/spotlight/arben-krasniqi"
-                className="w-full py-2.5 bg-[var(--accent)]/[0.06] hover:bg-[var(--accent)]/[0.12] border border-[var(--accent)]/30 text-[var(--accent)] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2.5 border border-white/[0.12] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/55 hover:text-white/80 hover:border-white/[0.18]"
               >
                 <User className="w-3.5 h-3.5" /> View Profile
               </Link>
             )}
-            <button className="w-full py-2.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/[0.1] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/70 hover:text-white">
+
+            {/* Message — Tier 3 ghost; routes to messages compose in V2 */}
+            <Link
+              href="/messages?to=arben-krasniqi"
+              className="w-full py-2.5 border border-white/[0.12] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/55 hover:text-white/80 hover:border-white/[0.18]"
+            >
               <MessageCircle className="w-3.5 h-3.5" /> Message
-            </button>
+            </Link>
+
+            {/* Directory deep-link — Tier 2 outlined gold (higher signal, navigates away) */}
             <Link
               href="/directory?q=logistics"
-              className="w-full py-2.5 bg-[var(--accent)]/[0.08] hover:bg-[var(--accent)]/[0.15] border border-[var(--accent)]/40 text-[var(--accent)] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors mt-1"
+              className="w-full py-2.5 border border-[#D4AF37]/30 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-[#D4AF37]/70 hover:bg-[#D4AF37]/10"
             >
               <Users className="w-3.5 h-3.5" /> See Albanian founders in Logistics
             </Link>

@@ -2,66 +2,75 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import { EventDirectoryEntry } from "@/lib/types/event-directory";
 
-export default function EventCard({
-  event,
-}: {
-  event: EventDirectoryEntry;
-}) {
+export default function EventCard({ event }: { event: EventDirectoryEntry }) {
   const locationParts = [event.city, event.state, event.country].filter(Boolean);
   const locationString = locationParts.length > 0 ? locationParts.join(", ") : "Global / Digital";
 
-  // Dummy date parsing for the card icon
-  const dateObj = new Date(event.date);
-  const monthString = dateObj.toLocaleDateString("en-US", { month: "short" }) || "TBD";
-  const dayString = dateObj.getDate() || "--";
+  // Parse date components directly to avoid UTC midnight timezone offset bug.
+  // new Date("2026-10-15") is UTC midnight — getDate() returns the wrong day
+  // for users in UTC-offset timezones. Parsing the parts avoids this entirely.
+  const [yearStr, monthStr, dayStr] = event.date.split("-");
+  const year  = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10) - 1; // 0-indexed for Date constructor
+  const day   = parseInt(dayStr, 10);
+  const dateLocal   = new Date(year, month, day);
+  const monthString = dateLocal.toLocaleDateString("en-US", { month: "short" });
 
   return (
     <Link
       href={`/events/${event.slug}`}
-      className="wac-card group flex flex-col justify-between p-6 transition hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.02)] h-full min-h-[300px]"
+      className="wac-card group flex flex-col p-0 overflow-hidden hover:border-white/15 transition-colors h-full"
     >
-      <div>
-        <div className="mb-4 flex items-start gap-4">
-          <div className="flex h-14 w-14 flex-col shrink-0 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 group-hover:bg-rose-500/20 transition-colors">
-            <span className="text-[10px] uppercase font-bold tracking-widest leading-none mt-1">{monthString}</span>
-            <span className="text-xl font-black leading-none mt-1">{dayString}</span>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-1 w-full">
-              <h3 className="text-lg sm:text-xl font-bold group-hover:text-[var(--accent)] transition-colors line-clamp-2">
-                {event.name}
-              </h3>
-            </div>
-
-            <p className="text-sm font-medium flex items-center gap-1.5 mt-2 text-[#D4AF37]">
-              <CalendarDays size={14} />
-              {event.date} • {event.time}
-            </p>
-            
-            <p className="text-xs sm:text-sm opacity-60 flex items-center gap-1.5 mt-1.5 truncate">
-              <MapPin size={14} className="shrink-0" />
-              <span className="truncate">{event.location} - {locationString}</span>
-            </p>
-          </div>
+      {/* Header: date block + title/meta */}
+      <div className="px-4 pt-4 pb-3 flex items-start gap-3">
+        {/* Date block — teal (Events section-identity color) */}
+        <div className="shrink-0 w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex flex-col items-center justify-center">
+          <span className="text-[9px] uppercase font-bold tracking-wide text-teal-400/60 leading-none mb-0.5">
+            {monthString}
+          </span>
+          <span className="text-lg font-black text-teal-400 leading-none">{day}</span>
         </div>
 
-        <p className="text-[14px] opacity-80 leading-relaxed line-clamp-4 mt-4">
-          {event.description}
-        </p>
+        {/* Title + meta */}
+        <div className="flex-1 min-w-0 pt-0.5">
+          <h3 className="text-sm font-semibold text-white leading-snug mb-1.5 group-hover:text-[#D4AF37] transition-colors line-clamp-2">
+            {event.name}
+          </h3>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/40">
+            <span className="flex items-center gap-1">
+              <CalendarDays size={10} />
+              {event.date}
+              {event.time && <> · {event.time}</>}
+            </span>
+            {locationString && (
+              <>
+                <span className="text-white/15">·</span>
+                <span className="flex items-center gap-1 min-w-0">
+                  <MapPin size={10} className="shrink-0" />
+                  <span className="truncate">{locationString}</span>
+                </span>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-6 pt-4 border-t border-[var(--border)] flex items-center justify-between opacity-90 group-hover:opacity-100 transition-opacity">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-rose-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-rose-400 border border-rose-500/30">
-            Event
-          </span>
-        </div>
+      {/* Description */}
+      {event.description && (
+        <p className="px-4 pb-3 text-xs text-white/45 leading-relaxed line-clamp-2">
+          {event.description}
+        </p>
+      )}
 
+      {/* Footer */}
+      <div className="mt-auto px-4 pb-3.5 border-t border-white/[0.05] pt-2.5 flex items-center justify-between">
+        <span className="text-[10px] text-teal-400/70 bg-teal-500/[0.08] border border-teal-500/20 px-2.5 py-0.5 rounded-full">
+          Event
+        </span>
         {event.attendees_count > 0 && (
-          <div className="text-xs font-medium text-white/50 flex items-center gap-1.5">
-            <Users size={14} />
-            {event.attendees_count} attending
+          <div className="flex items-center gap-1 text-[11px] text-white/35">
+            <Users size={11} />
+            <span>{event.attendees_count} attending</span>
           </div>
         )}
       </div>

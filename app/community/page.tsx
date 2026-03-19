@@ -1,38 +1,43 @@
 import CommunityHub from "@/components/community/CommunityHub";
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { Activity } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Community Hub | World Albanian Congress",
-  description: "For Every Generation. All Under One Roof.",
+  title: "The Pulse | World Albanian Congress",
+  description: "What the Albanian world is talking about.",
 };
 
 export default function CommunityPage() {
   return (
     <main className="min-h-screen flex flex-col pt-14 bg-[var(--background)]">
 
-      {/* Page Identity Header — desktop only */}
-      <div className="hidden md:block sticky top-14 z-40 bg-[var(--background)]/95 backdrop-blur-md border-b border-white/[0.05]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20 shrink-0">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
+      {/*
+        Sticky page identity header — desktop only.
+        Height ~76px (py-5 + content). CommunityHub accounts for this
+        in its viewport height calc: h-[calc(100vh-8.25rem)].
+        backdrop-blur-md + solid bg ensures posts scrolling beneath
+        don't bleed through.
+      */}
+      <div className="hidden md:block sticky top-14 z-40 bg-[var(--background)]/95 backdrop-blur-md border-b border-white/[0.07]">
+        <div className="max-w-[80rem] mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-rose-500/[0.08] border border-rose-500/[0.15] shrink-0">
+            <Activity size={16} className="text-rose-400" strokeWidth={2} />
           </div>
           <div>
-            <h1 className="text-base font-bold text-white tracking-tight leading-none">
-              The Pulse
+            <h1 className="font-serif text-[15px] font-normal text-white leading-none mb-0.5">
+              The{" "}
+              <span className="italic text-rose-400">Pulse</span>
             </h1>
-            <p className="text-[11px] text-white/35 mt-0.5 leading-none">
+            <p className="text-[10px] text-white/35 leading-none">
               What the Albanian world is talking about
             </p>
           </div>
         </div>
       </div>
 
-      <Suspense fallback={<div className="p-12 text-center opacity-50">Loading Hub...</div>}>
-        <CommunityHub />
-      </Suspense>
+      {/* CommunityHub owns its own full-viewport scrollable layout */}
+      <CommunityHub />
+
     </main>
   );
 }
