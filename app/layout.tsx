@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
@@ -11,6 +11,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-garamond",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -30,9 +37,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[var(--background)] flex flex-col overflow-x-hidden`}
+        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased min-h-screen bg-[var(--background)] flex flex-col overflow-x-hidden`}
         suppressHydrationWarning
       >
         <div id="google_translate_element" className="hidden"></div>
@@ -43,11 +50,13 @@ export default function RootLayout({
         <Script id="google-translate-config" strategy="afterInteractive">
           {`
             function googleTranslateElementInit() {
-              new google.translate.TranslateElement({
-                pageLanguage: 'en',
-                includedLanguages: 'sq,en',
-                autoDisplay: false
-              }, 'google_translate_element');
+              try {
+                new google.translate.TranslateElement({
+                  pageLanguage: 'en',
+                  includedLanguages: 'sq,en',
+                  autoDisplay: false
+                }, 'google_translate_element');
+              } catch(e) {}
             }
           `}
         </Script>

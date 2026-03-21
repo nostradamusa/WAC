@@ -1,6 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --font-serif: var(--font-garamond), "Playfair Display", Georgia, serif;
+  --font-sans:  var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Explicit override so font-serif reliably renders Playfair Display on all pages.
+   Placed outside @layer so it wins regardless of Tailwind utility order. */
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-garamond), "Playfair Display", Georgia, serif;
+  }
+}
+.font-serif {
+  font-family: var(--font-garamond), "Playfair Display", Georgia, serif;
+}
+
 :root {
   --background: #151311;
   --foreground: #f3ede3;
@@ -35,6 +51,20 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Suppress Google Translate injected toolbar — it shifts body position and
+   overlaps fixed headers, especially on mobile. */
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip,
+.goog-tooltip-content {
+  display: none !important;
+}
+body {
+  top: 0 !important;
+  position: static !important;
 }
 
 body {
@@ -87,7 +117,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.4);
+  box-shadow: 0 0 0 2px rgba(176, 141, 87, 0.4);
   background: rgba(255, 248, 239, 0.05);
 }
 
@@ -445,3 +475,94 @@ body {
 .wac-select-search:focus {
   border-color: rgba(176, 141, 87, 0.4);
 }
+
+/* ─── WAC Control Typography System ────────────────────────────────────────
+ *
+ * Consistent typographic and visual treatment for all interactive controls.
+ * Elegance must carry from headlines through every button, chip, and tab.
+ *
+ * 1. PAGE HEADLINES
+ *    font-serif tracking-tight text-white
+ *    italic accent span: italic font-light opacity-90 text-[section-accent]
+ *
+ * 2. SECTION EYEBROW / LABEL  (via SectionLabel component)
+ *    text-[11px] font-semibold tracking-[0.14em] uppercase
+ *
+ * 3. BODY / SUPPORTING COPY
+ *    primary body:     text-sm text-white/55 leading-relaxed
+ *    secondary / meta: text-xs text-white/38
+ *    fine print:       text-[10px] text-white/28
+ *
+ * 4. PRIMARY CTA  (gold filled — use .wac-btn-primary in CSS or match inline)
+ *    text-xs font-semibold tracking-[0.06em]
+ *    sm  (inline card):    px-4  py-1.5
+ *    md  (page-level):     px-5  py-2
+ *    lg  (hero / modal):   px-6  py-2.5
+ *
+ * 5. SECONDARY CTA  (outline / ghost — .wac-btn-secondary or match inline)
+ *    text-xs font-medium tracking-[0.04em]
+ *    Same padding tiers as primary.
+ *
+ * 6. SEGMENTED CONTROLS / LENS TABS
+ *    Container: p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full
+ *    Item:      px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em]
+ *    Active:    bg-[section-accent]/[0.12] text-[section-accent]
+ *    Inactive:  text-white/42 hover:text-white/65
+ *
+ * 7. FILTER / CATEGORY CHIPS
+ *    px-3.5 py-1.5 rounded-full border text-xs font-medium tracking-[0.02em]
+ *    Active:   border-[accent]/30 bg-[accent]/[0.08] text-[accent]/80
+ *    Inactive: border-white/[0.12] text-white/50 hover:text-white/75
+ *
+ * 8. STATUS BADGES  (read-only, non-interactive)
+ *    text-[10px] font-semibold uppercase tracking-[0.08em] rounded-full px-2 py-0.5
+ *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Primary CTA — gold fill */
+.wac-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  background-color: #b08d57;
+  color: #151311;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.wac-btn-primary:hover:not(:disabled) { background-color: #9a7545; }
+.wac-btn-primary:disabled             { opacity: 0.3; cursor: not-allowed; }
+
+/* Secondary CTA — outline / ghost */
+.wac-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.50);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.wac-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.20);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Size modifiers */
+.wac-btn-sm { padding: 0.375rem 1rem;   } /* px-4 py-1.5 */
+.wac-btn-md { padding: 0.5rem 1.25rem;  } /* px-5 py-2   */
+.wac-btn-lg { padding: 0.625rem 1.5rem; } /* px-6 py-2.5 */

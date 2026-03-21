@@ -316,9 +316,9 @@ export default function PostComments({ postId }: { postId: string }) {
           <Link href={cAuthorLink} className="shrink-0 group">
             <div className={`relative ${isReply ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden bg-black/20 border border-[var(--border)] group-hover:border-[var(--accent)] transition`}>
               {cAuthorAvatar ? (
-                <Image src={cAuthorAvatar} alt={cAuthorName} fill className="object-cover" />
+                <Image src={cAuthorAvatar} alt={cAuthorName} fill sizes="32px" className="object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center font-bold text-[#D4AF37] text-xs">
+                <div className="w-full h-full flex items-center justify-center font-bold text-[#b08d57] text-xs">
                   {cAuthorName.charAt(0)}
                 </div>
               )}
@@ -402,7 +402,7 @@ export default function PostComments({ postId }: { postId: string }) {
                       setReplyingToName(cAuthorName);
                     }
                   }}
-                  className={`text-[11px] font-semibold transition ${isActiveReplyTarget ? 'text-[#D4AF37]' : 'text-white/40 hover:text-[#D4AF37]'}`}
+                  className={`text-[11px] font-semibold transition ${isActiveReplyTarget ? 'text-[#b08d57]' : 'text-white/40 hover:text-[#b08d57]'}`}
                 >
                   Reply
                 </button>
@@ -414,7 +414,7 @@ export default function PostComments({ postId }: { postId: string }) {
                 >
                   <button
                     onClick={() => handleCommentReaction(comment.id, commentReactions[comment.id] || 'like')}
-                    className={`text-[11px] font-semibold transition flex items-center gap-1 ${commentReactions[comment.id] ? 'text-[#D4AF37]' : 'text-white/40 hover:text-pink-400'}`}
+                    className={`text-[11px] font-semibold transition flex items-center gap-1 ${commentReactions[comment.id] ? 'text-[#b08d57]' : 'text-white/40 hover:text-pink-400'}`}
                   >
                     <ReactionIcon
                       type={commentReactions[comment.id] || 'heart'}
@@ -460,10 +460,10 @@ export default function PostComments({ postId }: { postId: string }) {
                         </span>
                       ))}
                     </div>
-                    <span className="text-[11px] text-white/40 group-hover:text-[#D4AF37] transition font-semibold ml-0.5">
+                    <span className="text-[11px] text-white/40 group-hover:text-[#b08d57] transition font-semibold ml-0.5">
                       {getTotalReactionCount(comment.id)}
                     </span>
-                    <span className="text-[11px] text-white/30 group-hover:text-[#D4AF37]/70 transition">
+                    <span className="text-[11px] text-white/30 group-hover:text-[#b08d57]/70 transition">
                       {dominantLabel}
                     </span>
                   </button>
@@ -500,7 +500,7 @@ export default function PostComments({ postId }: { postId: string }) {
             {/* Composer row */}
             <form onSubmit={handleReplySubmit} className="flex items-end gap-2">
               {/* Current user avatar */}
-              <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] text-[10px] font-bold shrink-0 mb-[3px]">
+              <div className="w-6 h-6 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-[10px] font-bold shrink-0 mb-[3px]">
                 {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
               </div>
 
@@ -578,8 +578,8 @@ export default function PostComments({ postId }: { postId: string }) {
               {mentionSuggestions.map((suggestion, idx) => {
                 const isOrg = suggestion.type === 'organization';
                 const isBiz = suggestion.type === 'business';
-                const typeColor = isOrg ? 'text-green-400' : isBiz ? 'text-blue-400' : 'text-[#D4AF37]';
-                const bgBorderColor = isOrg ? 'border-green-500/30' : isBiz ? 'border-blue-500/30' : 'border-[#D4AF37]/30';
+                const typeColor = isOrg ? 'text-green-400' : isBiz ? 'text-blue-400' : 'text-[#b08d57]';
+                const bgBorderColor = isOrg ? 'border-green-500/30' : isBiz ? 'border-blue-500/30' : 'border-[#b08d57]/30';
                 return (
                   <button
                     key={`${suggestion.id}-${idx}`}
@@ -590,7 +590,7 @@ export default function PostComments({ postId }: { postId: string }) {
                   >
                     <div className={`relative w-8 h-8 flex-shrink-0 rounded-full overflow-hidden bg-black/40 border ${bgBorderColor}`}>
                       {suggestion.avatar_url ? (
-                        <Image src={suggestion.avatar_url} alt={suggestion.name} fill className="object-cover" />
+                        <Image src={suggestion.avatar_url} alt={suggestion.name} fill sizes="32px" className="object-cover" />
                       ) : (
                         <div className={`w-full h-full flex items-center justify-center font-bold text-xs ${typeColor}`}>
                           {suggestion.name.charAt(0)}
@@ -616,13 +616,15 @@ export default function PostComments({ postId }: { postId: string }) {
         )}
 
         {/* Current user avatar */}
-        <div className="w-8 h-8 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] text-xs font-bold shrink-0 mb-1">
+        <div className="w-8 h-8 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-xs font-bold shrink-0 mb-1">
           {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
         </div>
 
         <form onSubmit={handleSubmit} className="relative flex-1">
           <div className="relative">
             <textarea
+              id={`comment-textarea-${postId}`}
+              name={`comment-textarea-${postId}`}
               ref={textareaRef}
               value={newContent}
               onChange={handleTextChange}
@@ -691,7 +693,7 @@ export default function PostComments({ postId }: { postId: string }) {
                 onClick={() => setReactionsModal(prev => prev ? { ...prev, tab: 'all' } : null)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition whitespace-nowrap ${
                   reactionsModal!.tab === 'all'
-                    ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25'
+                    ? 'bg-[#b08d57]/15 text-[#b08d57] border border-[#b08d57]/25'
                     : 'text-white/40 hover:text-white hover:bg-white/5'
                 }`}
               >
@@ -710,7 +712,7 @@ export default function PostComments({ postId }: { postId: string }) {
                     onClick={() => setReactionsModal(prev => prev ? { ...prev, tab: type } : null)}
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition whitespace-nowrap ${
                       reactionsModal!.tab === type
-                        ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25'
+                        ? 'bg-[#b08d57]/15 text-[#b08d57] border border-[#b08d57]/25'
                         : 'text-white/40 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -734,7 +736,7 @@ export default function PostComments({ postId }: { postId: string }) {
                     {r.profile?.avatar_url ? (
                       <Image src={r.profile.avatar_url} alt={r.profile.full_name || ''} width={40} height={40} className="rounded-full border border-white/[0.08]" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/15 flex items-center justify-center text-sm font-bold text-[#D4AF37]">
+                      <div className="w-10 h-10 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/15 flex items-center justify-center text-sm font-bold text-[#b08d57]">
                         {r.profile?.full_name?.charAt(0) || '?'}
                       </div>
                     )}
@@ -746,7 +748,7 @@ export default function PostComments({ postId }: { postId: string }) {
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-sm text-white truncate">{r.profile?.full_name || 'Unknown'}</span>
                       {r.profile?.is_verified && (
-                        <svg className="w-3 h-3 text-[#D4AF37] shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                        <svg className="w-3 h-3 text-[#b08d57] shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M10.081.9C11.239.199 12.761.199 13.919.9l1.455.882c.49.297 1.05.438 1.611.408l1.7-.091c1.353-.072 2.553.844 2.89 2.158l.423 1.64c.143.553.438 1.05.85 1.45L24 8.527c.974.945.974 2.505 0 3.45l-1.152 1.118c-.412.4-.707.897-.85 1.45l-.423 1.64c-.337 1.314-1.537 2.23-2.89 2.158l-1.7-.091c-.56-.03-1.121.111-1.611.408l-1.455.882c-1.158.701-2.68.701-3.838 0l-1.455-.882c-.49-.297-1.05-.438-1.611-.408l-1.7.091c-1.353.072-2.553-.844-2.89-2.158l-.423-1.64c-.143-.553-.438-1.05-.85-1.45L0 11.977c-.974-.945-.974-2.505 0-3.45l1.152-1.118c.412-.4.707-.897.85-1.45l.423-1.64c.337-1.314 1.537-2.23 2.89-2.158l1.7.091c.56.03 1.121-.111 1.611-.408L10.081.9z"/>
                         </svg>
                       )}

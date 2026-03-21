@@ -19,7 +19,7 @@ export default function LivingNetwork() {
       <div className="mx-auto max-w-[90rem]">
         <div className="text-center mb-16 relative z-10">
           <h2 className="text-4xl font-serif tracking-tight sm:text-6xl text-white">
-            <span className="text-[#D4AF37] italic font-light opacity-90">
+            <span className="text-[#b08d57] italic font-light opacity-90">
               Global
             </span>{" "}
             Reach

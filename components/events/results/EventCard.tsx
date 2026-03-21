@@ -33,7 +33,7 @@ export default function EventCard({ event }: { event: EventDirectoryEntry }) {
 
         {/* Title + meta */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <h3 className="text-sm font-semibold text-white leading-snug mb-1.5 group-hover:text-[#D4AF37] transition-colors line-clamp-2">
+          <h3 className="text-sm font-semibold text-white leading-snug mb-1.5 group-hover:text-[#b08d57] transition-colors line-clamp-2">
             {event.name}
           </h3>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/40">

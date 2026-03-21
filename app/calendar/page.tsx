@@ -18,7 +18,7 @@ export default function CalendarPage() {
             Personalized Events
           </div>
           <h1 className="text-4xl md:text-5xl font-serif tracking-tight mb-4 text-white">
-            <span className="text-[#D4AF37] italic font-light opacity-90">
+            <span className="text-[#b08d57] italic font-light opacity-90">
               My
             </span>{" "}
             Calendar

@@ -7,14 +7,14 @@ import DirectorySearchContext from "./DirectorySearchContext";
 
 type UnifiedDiscoveryLayoutProps = {
   initialQuery: string;
-  scope: "all" | "people" | "businesses" | "groups" | "events";
+  scope: "all" | "people" | "businesses" | "organizations" | "events";
   results: ReactNode;
   filtersConfig: ReactNode;
   defaultFiltersOpen?: boolean;
   totalResults: number;
   peopleCount: number;
   businessCount: number;
-  groupsCount: number;
+  organizationsCount: number;
   eventsCount: number;
 };
 
@@ -27,7 +27,7 @@ export default function UnifiedDiscoveryLayout({
   totalResults,
   peopleCount,
   businessCount,
-  groupsCount,
+  organizationsCount,
   eventsCount,
 }: UnifiedDiscoveryLayoutProps) {
   const [isFiltersOpen, setIsFiltersOpen] = useState(defaultFiltersOpen);
@@ -41,7 +41,7 @@ export default function UnifiedDiscoveryLayout({
   // Prevent body scroll while drawer is open
   useEffect(() => {
     document.body.style.overflow = isFiltersOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = "unset"; };
+    return () => { document.body.style.overflow = ""; };
   }, [isFiltersOpen]);
 
   return (
@@ -49,8 +49,7 @@ export default function UnifiedDiscoveryLayout({
 
       {/*
         Standard content container — shared by header and results so both
-        align to the same horizontal grid. Replaces the prior mismatch of
-        max-w-4xl (header) vs max-w-[90rem] (results).
+        align to the same horizontal grid.
       */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-16">
 
@@ -63,11 +62,11 @@ export default function UnifiedDiscoveryLayout({
           totalResults={totalResults}
           peopleCount={peopleCount}
           businessCount={businessCount}
-          groupsCount={groupsCount}
+          organizationsCount={organizationsCount}
           eventsCount={eventsCount}
         />
 
-        {/* ── Results — mt-8 from filter row per spacing standards ──── */}
+        {/* ── Results ───────────────────────────────────────────────── */}
         <main className="mt-8">
           {results}
         </main>
@@ -87,7 +86,7 @@ export default function UnifiedDiscoveryLayout({
           <aside className="fixed inset-y-0 right-0 w-full sm:max-w-md bg-[#111] border-l border-white/[0.06] shadow-2xl z-[110] flex flex-col animate-in slide-in-from-right duration-300 overflow-hidden">
             <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] bg-[#161616]">
               <div className="flex items-center gap-2.5">
-                <span className="inline-block w-[2px] h-[14px] rounded-full bg-[#D4AF37] opacity-70" />
+                <span className="inline-block w-[2px] h-[14px] rounded-full bg-[#b08d57] opacity-70" />
                 <span className="text-xs font-semibold tracking-[0.14em] uppercase text-white/60">
                   Refine Results
                 </span>

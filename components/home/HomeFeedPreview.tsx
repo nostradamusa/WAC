@@ -13,7 +13,7 @@ export default function HomeFeedPreview() {
         <div className="text-center mb-16 relative z-10">
           <h2 className="text-4xl font-serif tracking-tight sm:text-6xl mb-4 text-white">
             The{" "}
-            <span className="text-[#D4AF37] italic font-light opacity-90">
+            <span className="text-[#b08d57] italic font-light opacity-90">
               Next
             </span>{" "}
             Generation
@@ -39,15 +39,15 @@ export default function HomeFeedPreview() {
           </Link>
 
           {/* Stage 2 */}
-          <Link href="/groups?tab=future-pathways" className="wac-card p-8 flex flex-col relative group hover:border-[#D4AF37]/50 transition-all text-left">
-            <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 text-[#D4AF37] flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
+          <Link href="/groups?tab=future-pathways" className="wac-card p-8 flex flex-col relative group hover:border-[#b08d57]/50 transition-all text-left">
+            <div className="w-12 h-12 rounded-full bg-[#b08d57]/10 text-[#b08d57] flex items-center justify-center mb-6 transition-transform group-hover:scale-110">
               <Rocket className="w-6 h-6" />
             </div>
-            <h3 className="font-bold text-xl mb-3 text-white group-hover:text-[#D4AF37] transition-colors">Future Pathways</h3>
+            <h3 className="font-bold text-xl mb-3 text-white group-hover:text-[#b08d57] transition-colors">Future Pathways</h3>
             <p className="opacity-70 text-sm leading-relaxed mb-8 flex-1">
               Charting the course from high school to career. Access dynamic mentorship, trade internships, and connect with Industry Heavyweights to accelerate your trajectory.
             </p>
-            <span className="flex items-center gap-2 text-sm font-bold text-[#D4AF37] group-hover:text-[#F3E5AB] transition-colors uppercase tracking-wider mt-auto">
+            <span className="flex items-center gap-2 text-sm font-bold text-[#b08d57] group-hover:text-[#F3E5AB] transition-colors uppercase tracking-wider mt-auto">
               Accelerate Trajectory <ArrowRight className="w-4 h-4" />
             </span>
           </Link>

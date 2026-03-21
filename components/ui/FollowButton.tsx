@@ -57,7 +57,7 @@ export default function FollowButton({ followingType, followingId, size = "md", 
       <button
         onClick={handleToggle}
         disabled={isLoading}
-        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all disabled:opacity-50 ${
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all disabled:opacity-50 ${
           isFollowing
             ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]"
             : "border-white/20 text-white/55 hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"

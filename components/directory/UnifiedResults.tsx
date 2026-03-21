@@ -114,10 +114,10 @@ function RowList({ items }: { items: DirectoryRowProps[] }) {
 
 type UnifiedResultsProps = {
   query?: string;
-  scope: "all" | "people" | "businesses" | "groups" | "events";
+  scope: "all" | "people" | "businesses" | "organizations" | "events";
   people: EnrichedDirectoryPerson[];
   businesses: BusinessProfile[];
-  groups: OrganizationDirectoryEntry[];
+  organizations: OrganizationDirectoryEntry[];
   events: EventDirectoryEntry[];
 };
 
@@ -128,11 +128,11 @@ export default function UnifiedResults({
   scope,
   people,
   businesses,
-  groups,
+  organizations,
   events,
 }: UnifiedResultsProps) {
 
-  const totalResults = people.length + businesses.length + groups.length + events.length;
+  const totalResults = people.length + businesses.length + organizations.length + events.length;
 
   // ── Empty state ───────────────────────────────────────────────────────────
 
@@ -179,13 +179,13 @@ export default function UnifiedResults({
     </>
   );
 
-  if (scope === "groups") return (
+  if (scope === "organizations") return (
     <>
       <div className="md:hidden">
-        <RowList items={groups.map(orgRow)} />
+        <RowList items={organizations.map(orgRow)} />
       </div>
       <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {groups.map((g) => <OrganizationCard key={g.id} organization={g} />)}
+        {organizations.map((o) => <OrganizationCard key={o.id} organization={o} />)}
       </div>
     </>
   );
@@ -205,17 +205,17 @@ export default function UnifiedResults({
 
   const topPeople = people.slice(0, 2);
   const topBiz    = businesses.slice(0, 2);
-  const topGroups = groups.slice(0, 2);
+  const topOrgs   = organizations.slice(0, 2);
   const topEvents = (query && query.length > 2) ? events.slice(0, 2) : [];
 
   const hasTopMatches =
-    topPeople.length > 0 || topBiz.length > 0 || topGroups.length > 0 || topEvents.length > 0;
+    topPeople.length > 0 || topBiz.length > 0 || topOrgs.length > 0 || topEvents.length > 0;
 
   const topMatchLabel = query ? "Top Matches" : "Suggested for You";
 
   const restPeople = people.slice(topPeople.length);
   const restBiz    = businesses.slice(topBiz.length);
-  const restGroups = groups.slice(topGroups.length);
+  const restOrgs   = organizations.slice(topOrgs.length);
   const restEvents = events.slice(topEvents.length);
 
   return (
@@ -232,7 +232,7 @@ export default function UnifiedResults({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {topPeople.map((p) => <PersonCard key={p.id} person={p} />)}
             {topBiz.map((b)    => <BusinessCard key={b.id} business={b} />)}
-            {topGroups.map((g) => <OrganizationCard key={g.id} organization={g} />)}
+            {topOrgs.map((o)   => <OrganizationCard key={o.id} organization={o} />)}
             {topEvents.map((e) => <EventCard key={e.id} event={e} />)}
           </div>
         </section>
@@ -276,19 +276,19 @@ export default function UnifiedResults({
         </section>
       )}
 
-      {/* ── Groups / Organizations ────────────────────────────────────── */}
-      {restGroups.length > 0 && (
+      {/* ── Organizations ────────────────────────────────────────────── */}
+      {restOrgs.length > 0 && (
         <section>
           <SectionLabel
-            label={hasTopMatches ? "More Groups" : "Groups"}
-            action={{ label: "View all", href: buildScopeUrl(query, "groups") }}
+            label={hasTopMatches ? "More Organizations" : "Organizations"}
+            action={{ label: "View all", href: buildScopeUrl(query, "organizations") }}
             className="mb-4"
           />
           <div className="md:hidden">
-            <RowList items={restGroups.map(orgRow)} />
+            <RowList items={restOrgs.map(orgRow)} />
           </div>
           <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {restGroups.map((g) => <OrganizationCard key={g.id} organization={g} />)}
+            {restOrgs.map((o) => <OrganizationCard key={o.id} organization={o} />)}
           </div>
         </section>
       )}

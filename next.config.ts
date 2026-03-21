@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // CSP is handled by middleware.ts (nonce-based strict CSP).
+  // No static headers needed here.
   images: {
     remotePatterns: [
       {
@@ -14,6 +16,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "i.pravatar.cc",
+      },
+      {
+        protocol: "https",
+        hostname: "lprqscfivflnyutrpzdn.supabase.co",
       },
     ],
   },

@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { ChevronLeft, Briefcase, Landmark, Loader2 } from "lucide-react";
 
 export default function CreateEntityPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [type, setType] = useState<"business" | "organization">("business");
+  const initialType = searchParams.get("type") === "organization" ? "organization" : "business";
+  const [type, setType] = useState<"business" | "organization">(initialType);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -52,217 +55,157 @@ export default function CreateEntityPage() {
   };
 
   return (
-    <div className="wac-page max-w-2xl">
-      <div className="mb-8">
+    <div className="w-full min-h-screen bg-[var(--background)]">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
+
+        {/* Back link */}
         <Link
           href="/profile"
-          className="text-sm opacity-60 hover:opacity-100 hover:text-[var(--accent)] transition flex items-center gap-2 mb-6"
+          className="inline-flex items-center gap-1.5 text-sm text-white/45 hover:text-white/80 transition-colors mb-8"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
+          <ChevronLeft size={15} strokeWidth={2} />
           Back to Profile
         </Link>
 
-        <h1 className="text-3xl font-serif tracking-tight mb-2 text-white">
-          <span className="text-[#D4AF37] italic font-light opacity-90">
-            Create
-          </span>{" "}
-          an Entity
-        </h1>
-        <p className="opacity-70">
-          Establish an official presence for your business or organization on
-          the World Albanian Congress network.
-        </p>
-      </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-snug mb-2">
+            <span className="italic font-light opacity-90 text-[#b08d57]">Create</span> an Entity
+          </h1>
+          <p className="text-sm text-white/50 leading-relaxed">
+            Establish an official presence for your business or organization on the World Albanian Congress network.
+          </p>
+        </div>
 
-      <div className="wac-card p-6 md:p-10">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-bold opacity-80 mb-3 uppercase tracking-wider">
-              Entity Type
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setType("business")}
-                className={`py-4 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
-                  type === "business"
-                    ? "bg-[rgba(212,175,55,0.08)] border-[#D4AF37] text-white"
-                    : "bg-[rgba(255,255,255,0.02)] border-[var(--border)] opacity-60 hover:opacity-100"
-                }`}
-              >
-                <div className="text-blue-400">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                    <line x1="4" x2="4" y1="22" y2="15" />
-                  </svg>
-                </div>
-                <span className="font-bold">Business</span>
-              </button>
+        {/* Form card */}
+        <div className="wac-card p-6 md:p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
 
-              <button
-                type="button"
-                onClick={() => setType("organization")}
-                className={`py-4 rounded-xl border text-center transition flex flex-col items-center gap-2 ${
-                  type === "organization"
-                    ? "bg-[rgba(212,175,55,0.08)] border-[#D4AF37] text-white"
-                    : "bg-[rgba(255,255,255,0.02)] border-[var(--border)] opacity-60 hover:opacity-100"
-                }`}
-              >
-                <div className="text-emerald-400">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            {/* Entity type selector */}
+            <div>
+              <label className="block text-xs font-semibold tracking-[0.15em] uppercase text-white/40 mb-3">
+                Entity Type
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { value: "business",     label: "Business",     icon: Briefcase },
+                  { value: "organization", label: "Organization", icon: Landmark  },
+                ] as const).map(({ value, label, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setType(value)}
+                    className={`py-4 rounded-xl border transition-all flex flex-col items-center gap-2.5 ${
+                      type === value
+                        ? "bg-[#b08d57]/[0.08] border-[#b08d57]/50 text-[#b08d57]"
+                        : "bg-white/[0.02] border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/[0.15]"
+                    }`}
                   >
-                    <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.488 4m-7.488-4A8.997 8.997 0 0 0 4.512 7m14.976 4h-15m15 4h-15" />
-                  </svg>
-                </div>
-                <span className="font-bold">Organization</span>
-              </button>
+                    <Icon size={22} strokeWidth={1.6} />
+                    <span className="text-sm font-semibold">{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-bold opacity-80 mb-2">
-              Entity Name
-            </label>
-            <input
-              required
-              type="text"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                // Auto-generate a slug if they haven't explicitly edited it yet
-                if (
-                  !slug ||
-                  slug ===
-                    name
-                      .slice(0, -1)
-                      .toLowerCase()
-                      .replace(/[^a-z0-9]+/g, "-")
-                ) {
-                  setSlug(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-                  );
-                }
-              }}
-              placeholder="e.g. Acme Corporation"
-              className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold opacity-80 mb-2">
-              Profile URL (Slug)
-            </label>
-            <div className="flex">
-              <span className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-[var(--border)] bg-[rgba(255,255,255,0.05)] text-sm opacity-60">
-                wac.app/{type}s/
-              </span>
+            {/* Entity name */}
+            <div>
+              <label className="block text-sm font-semibold text-white/60 mb-2">
+                Entity Name
+              </label>
               <input
+                id="entity-name"
+                name="entity-name"
                 required
                 type="text"
-                value={slug}
-                onChange={(e) =>
-                  setSlug(
-                    e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ""),
-                  )
-                }
-                placeholder="acme-corp"
-                className="flex-1 rounded-r-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)]"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (
+                    !slug ||
+                    slug === name.slice(0, -1).toLowerCase().replace(/[^a-z0-9]+/g, "-")
+                  ) {
+                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+                  }
+                }}
+                placeholder="e.g. Acme Corporation"
+                className="w-full rounded-xl border border-white/[0.09] bg-white/[0.02] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none transition focus:border-[#b08d57]/50 focus:bg-white/[0.03]"
               />
             </div>
-            <p className="text-xs opacity-50 mt-2">
-              Only lowercase letters, numbers, and hyphens.
-            </p>
-          </div>
 
-          <div>
-            <label className="block text-sm font-bold opacity-80 mb-2">
-              Short Description
-            </label>
-            <textarea
-              required
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={`What does your ${type} do?`}
-              className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm outline-none transition focus:border-[var(--accent)] resize-vertical"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-900/40 border border-red-500/50 text-red-200 p-4 rounded-xl text-sm font-medium">
-              {error}
+            {/* Slug */}
+            <div>
+              <label className="block text-sm font-semibold text-white/60 mb-2">
+                Profile URL (Slug)
+              </label>
+              <div className="flex">
+                <span className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-white/[0.09] bg-white/[0.04] text-sm text-white/35">
+                  wac.app/{type}s/
+                </span>
+                <input
+                  id="entity-slug"
+                  name="entity-slug"
+                  required
+                  type="text"
+                  value={slug}
+                  onChange={(e) =>
+                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ""))
+                  }
+                  placeholder="acme-corp"
+                  className="flex-1 rounded-r-xl border border-white/[0.09] bg-white/[0.02] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none transition focus:border-[#b08d57]/50"
+                />
+              </div>
+              <p className="text-xs text-white/30 mt-2">
+                Only lowercase letters, numbers, and hyphens.
+              </p>
             </div>
-          )}
 
-          <div className="pt-4 border-t border-[var(--border)]">
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full wac-button-primary py-4 text-base font-bold shadow-lg flex justify-center items-center gap-2 ${
-                loading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
-            >
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Creating...
-                </>
-              ) : (
-                <>Create {type === "business" ? "Business" : "Organization"}</>
-              )}
-            </button>
-          </div>
-        </form>
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-semibold text-white/60 mb-2">
+                Short Description
+              </label>
+              <textarea
+                id="entity-description"
+                name="entity-description"
+                required
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={`What does your ${type} do?`}
+                className="w-full rounded-xl border border-white/[0.09] bg-white/[0.02] px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none transition focus:border-[#b08d57]/50 resize-vertical"
+              />
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-900/30 border border-red-500/40 text-red-300 p-4 rounded-xl text-sm">
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <div className="pt-2 border-t border-white/[0.06]">
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#b08d57] text-black text-sm font-bold transition-colors ${
+                  loading ? "opacity-60 cursor-not-allowed" : "hover:bg-[#9a7545]"
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  <>Create {type === "business" ? "Business" : "Organization"}</>
+                )}
+              </button>
+            </div>
+
+          </form>
+        </div>
       </div>
     </div>
   );

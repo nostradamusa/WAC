@@ -7,8 +7,10 @@ import GlobalSearchOverlay from "@/components/layout/GlobalSearchOverlay";
 import {
   Activity,
   Search,
+  Compass,
   CalendarDays,
   Users,
+  Network,
   Briefcase,
   HeartHandshake,
   Building2,
@@ -44,7 +46,7 @@ export default function Hero() {
 
         {/* 1. Brand mark */}
         <div className="flex items-center gap-3 py-1">
-          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[var(--accent)] flex items-center justify-center shadow-[0_0_14px_rgba(212,175,55,0.28)]">
+          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[var(--accent)] flex items-center justify-center shadow-[0_0_14px_rgba(176,141,87,0.28)] border-2 border-[#b08d57]/60">
             <img
               src="/images/wac-logo.jpg"
               alt="WAC"
@@ -54,7 +56,7 @@ export default function Hero() {
           <div>
             <h1 className="font-serif text-[17px] leading-none text-white mb-[3px]">
               World{" "}
-              <span className="text-[#D4AF37] italic font-light">Albanian</span>{" "}
+              <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
               Congress
             </h1>
             <p className="text-[8.5px] tracking-[0.38em] text-white/28 uppercase">
@@ -83,11 +85,11 @@ export default function Hero() {
           {[
             {
               href: "/directory",
-              icon: Search,
+              icon: Compass,
               label: "Directory",
-              iconColor: "text-[#D4AF37]",
-              bg: "bg-[#D4AF37]/[0.08]",
-              border: "border-[#D4AF37]/[0.13]",
+              iconColor: "text-[#b08d57]",
+              bg: "bg-[#b08d57]/[0.08]",
+              border: "border-[#b08d57]/[0.13]",
             },
             {
               href: "/events",
@@ -130,7 +132,7 @@ export default function Hero() {
             { href: "/jobs", icon: Briefcase, label: "Jobs" },
             { href: "/businesses", icon: Building2, label: "Businesses" },
             { href: "/organizations", icon: HeartHandshake, label: "Organizations" },
-            { href: "/groups", icon: Users, label: "Groups" },
+            { href: "/groups", icon: Network, label: "Groups" },
           ].map(({ href, icon: Icon, label }) => (
             <Link
               key={href}
@@ -160,7 +162,7 @@ export default function Hero() {
 
         <div className="relative z-10 max-w-5xl">
           <div className="flex justify-center mb-8">
-            <div className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(212,175,55,0.25)] animate-in zoom-in duration-700 relative">
+            <div className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(176,141,87,0.25)] animate-in zoom-in duration-700 relative border-[3px] border-[#b08d57]/60">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.3)_0%,transparent_60%)] mix-blend-overlay pointer-events-none" />
               <img
                 src="/images/wac-logo.jpg"
@@ -170,16 +172,16 @@ export default function Hero() {
             </div>
           </div>
 
-          <h1 className="text-6xl md:text-7xl font-serif tracking-tight mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
+          <h1 className="text-5xl md:text-6xl font-serif tracking-tight mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
             World{" "}
-            <span className="text-[#D4AF37] italic font-light opacity-90">Albanian</span>{" "}
+            <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
             Congress
           </h1>
 
           <div className="mx-auto max-w-3xl px-2 mb-16">
             <p className="text-lg md:text-xl font-serif font-light text-white/55 mb-5 leading-relaxed tracking-wide">
               The global network for{" "}
-              <span className="text-[#D4AF37] italic">Albanians</span>.
+              <span className="text-[#b08d57] italic font-light opacity-90">Albanians</span>.
             </p>
             <p className="text-[10px] tracking-[0.45em] font-sans font-light text-white/35 uppercase">
               Connect&nbsp;&nbsp;·&nbsp;&nbsp;Build&nbsp;&nbsp;·&nbsp;&nbsp;Rise
@@ -194,18 +196,15 @@ export default function Hero() {
               className="group relative w-full flex items-center gap-5 rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-7 pr-7 shadow-2xl backdrop-blur-md outline-none transition hover:border-[var(--accent)]/60 hover:bg-[rgba(0,0,0,0.55)] cursor-pointer"
             >
               <span className="relative flex h-2.5 w-2.5 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-50" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#D4AF37]" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b08d57] opacity-50" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#b08d57]" />
               </span>
               <span className="flex-1 text-left select-none">
                 <span className="font-serif text-white/40 group-hover:text-white/60 transition text-lg tracking-wide">
                   Search with{" "}
                 </span>
-                <span className="font-serif italic text-[#D4AF37] opacity-80 group-hover:opacity-100 transition text-lg font-light tracking-wide">
+                <span className="font-serif italic font-light opacity-90 text-[#b08d57] transition text-lg tracking-wide">
                   Alban Intelligence
-                </span>
-                <span className="font-serif text-white/40 group-hover:text-white/60 transition text-lg tracking-wide">
-                  ...
                 </span>
               </span>
             </button>
@@ -215,7 +214,7 @@ export default function Hero() {
             {isSignCheckComplete && !isLoggedIn && (
               <div className="text-sm text-white/50 animate-in fade-in duration-500">
                 Not part of the network yet?{" "}
-                <Link href="/login" className="text-[#D4AF37] hover:underline opacity-90 transition font-medium">
+                <Link href="/login" className="text-[#b08d57] hover:underline opacity-90 transition font-medium">
                   Create your profile
                 </Link>
               </div>

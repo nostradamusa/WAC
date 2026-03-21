@@ -9,14 +9,20 @@ export const metadata: Metadata = {
 
 export default function CommunityPage() {
   return (
+    /*
+      Mobile: no pt-14 here — navbar clearance is handled inside
+      CommunityHub's scroll content (pt-14 on the inner wrapper).
+      This prevents any layout shift when the navbar hides/shows,
+      because nothing about this outer container needs to change.
+
+      Desktop: pt-14 stays, so the sticky Pulse header can sit at top-14.
+    */
     <main className="min-h-screen flex flex-col pt-14 bg-[var(--background)]">
 
       {/*
         Sticky page identity header — desktop only.
         Height ~76px (py-5 + content). CommunityHub accounts for this
-        in its viewport height calc: h-[calc(100vh-8.25rem)].
-        backdrop-blur-md + solid bg ensures posts scrolling beneath
-        don't bleed through.
+        in its desktop height calc: h-[calc(100vh-8.25rem)].
       */}
       <div className="hidden md:block sticky top-14 z-40 bg-[var(--background)]/95 backdrop-blur-md border-b border-white/[0.07]">
         <div className="max-w-[80rem] mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
@@ -35,7 +41,6 @@ export default function CommunityPage() {
         </div>
       </div>
 
-      {/* CommunityHub owns its own full-viewport scrollable layout */}
       <CommunityHub />
 
     </main>

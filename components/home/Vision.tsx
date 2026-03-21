@@ -40,7 +40,7 @@ export default function Vision() {
           {/* Tier 2: outlined gold — this is a secondary navigation action, not a conversion CTA */}
           <Link
             href="/vision"
-            className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#D4AF37]/30 text-[#D4AF37]/70 text-sm font-semibold hover:bg-[#D4AF37]/10 transition-colors whitespace-nowrap"
+            className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#b08d57]/30 text-[#b08d57]/70 text-sm font-semibold hover:bg-[#b08d57]/10 transition-colors whitespace-nowrap"
           >
             See the full roadmap
             <ArrowRight size={13} />

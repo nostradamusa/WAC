@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Bookmark, Share2, Briefcase, MapPin, UserPlus } from "lucide-react";
+import { Bookmark, Share2, Briefcase, MapPin, UserPlus, X } from "lucide-react";
 import type { BusinessProfile } from "@/lib/types/business-directory";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import FollowButton from "@/components/ui/FollowButton";
@@ -33,8 +34,9 @@ function buildLocation(b: BusinessProfile) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function BusinessCard({ business }: { business: BusinessProfile }) {
-  const [isSaved, setIsSaved]     = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [isSaved,         setIsSaved]         = useState(false);
+  const [showToast,       setShowToast]       = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   const displayName  = business.name;
   const profileHref  = `/businesses/${business.slug}`;
@@ -64,13 +66,13 @@ export default function BusinessCard({ business }: { business: BusinessProfile }
       <div className="relative h-16 shrink-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-800/50 to-slate-800/45" />
 
-        {/* Save / share — hover reveal */}
+          {/* Save / share — hover reveal */}
         <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={handleSave}
             className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
           >
-            <Bookmark size={10} className={isSaved ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white"} />
+            <Bookmark size={10} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : "text-white"} />
           </button>
           <button
             onClick={handleShare}
@@ -79,29 +81,35 @@ export default function BusinessCard({ business }: { business: BusinessProfile }
             <Share2 size={10} className="text-white" />
           </button>
         </div>
+      </div>
 
-        {/* Logo / initials — overlaps banner edge */}
-        <div className="absolute bottom-0 left-4 translate-y-1/2 z-10">
-          {business.logo_url ? (
+      {/* Logo / initials — anchored to article, bridges banner/body boundary */}
+      <div className="absolute left-4 top-10 z-20">
+        {business.logo_url ? (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAvatarModal(true); }}
+            className="block rounded-full hover:opacity-90 transition-opacity cursor-zoom-in"
+            aria-label="View logo"
+          >
             <img
               src={business.logo_url}
               alt={displayName}
-              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md"
+              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md ring-1 ring-white/[0.12]"
             />
-          ) : (
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-blue-500/20 flex items-center justify-center shadow-md">
-              {initials ? (
-                <span className="text-sm font-semibold uppercase text-blue-300">{initials}</span>
-              ) : (
-                <Briefcase size={18} className="text-blue-300" strokeWidth={1.5} />
-              )}
-            </div>
-          )}
-        </div>
+          </button>
+        ) : (
+          <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-blue-500/20 flex items-center justify-center shadow-md ring-1 ring-blue-500/[0.15]">
+            {initials ? (
+              <span className="text-sm font-semibold uppercase text-blue-300">{initials}</span>
+            ) : (
+              <Briefcase size={18} className="text-blue-300" strokeWidth={1.5} />
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col px-4 pt-9 pb-4">
+      <div className="flex flex-1 flex-col px-4 pt-14 pb-4">
 
         {/* Name + verified */}
         <div className="flex items-center gap-1 min-w-0 mb-0.5">
@@ -146,7 +154,7 @@ export default function BusinessCard({ business }: { business: BusinessProfile }
           <FollowButton followingType="business" followingId={business.id} size="sm" className="flex-1" />
           <Link
             href={profileHref}
-            className="flex-1 flex items-center justify-center py-1.5 rounded-xl border border-[#D4AF37]/50 text-[#D4AF37] text-xs font-semibold hover:bg-[#D4AF37]/[0.06] transition-colors"
+            className="flex-1 flex items-center justify-center py-1.5 px-3 rounded-full bg-[#b08d57] text-black text-xs font-bold hover:bg-[#9a7545] transition-colors"
           >
             View
           </Link>
@@ -155,12 +163,36 @@ export default function BusinessCard({ business }: { business: BusinessProfile }
 
       {/* Toast */}
       <div
-        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
+        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
           showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
         }`}
       >
         Link copied!
       </div>
+
+      {/* Logo lightbox */}
+      {showAvatarModal && business.logo_url && createPortal(
+        <div
+          className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer animate-in fade-in duration-150"
+          onClick={() => setShowAvatarModal(false)}
+        >
+          <div className="relative max-w-[280px] w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={business.logo_url}
+              alt={displayName}
+              className="w-full aspect-square rounded-3xl object-cover shadow-2xl"
+            />
+            <p className="text-center text-sm text-white/55 font-medium">{displayName}</p>
+            <button
+              onClick={() => setShowAvatarModal(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 transition-colors"
+            >
+              <X size={13} className="text-white/70" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </article>
   );
 }

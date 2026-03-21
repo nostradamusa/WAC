@@ -3,13 +3,25 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Search, Activity, CalendarDays, Bell } from "lucide-react";
+import { Compass, Activity, CalendarDays, Network, Bell } from "lucide-react";
 import { useScrollDirection } from "@/lib/hooks/useScrollDirection";
 import { useNotificationCount } from "@/lib/hooks/useUnreadCounts";
 import { supabase } from "@/lib/supabase";
 
+const NAV_ITEMS = [
+  { name: "Directory", href: "/directory",     icon: Compass,      isPulse: false, isAlerts: false },
+  { name: "Events",    href: "/events",         icon: CalendarDays, isPulse: false, isAlerts: false },
+  { name: "Pulse",     href: "/community",     icon: Activity,     isPulse: true,  isAlerts: false },
+  { name: "Groups",    href: "/groups",         icon: Network,      isPulse: false, isAlerts: false },
+  { name: "Alerts",    href: "/notifications",  icon: Bell,         isPulse: false, isAlerts: true  },
+];
+
+function isRouteActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
 export default function MobileBottomNav() {
-  const pathname  = usePathname();
+  const pathname       = usePathname();
   const scrollDirection = useScrollDirection();
   const [mounted, setMounted]     = useState(false);
   const [userId, setUserId]       = useState<string | null>(null);
@@ -26,15 +38,7 @@ export default function MobileBottomNav() {
 
   const notifCount = useNotificationCount(userId, userEmail);
 
-  const navItems = [
-    { name: "Home",      href: "/",             icon: null,     imageSrc: "/images/wac-logo.jpg" },
-    { name: "Directory", href: "/directory",     icon: Search,   imageSrc: null },
-    { name: "The Pulse", href: "/community",     icon: Activity, imageSrc: null },
-    { name: "Events",    href: "/events",        icon: CalendarDays, imageSrc: null },
-    { name: "Alerts",    href: "/notifications", icon: Bell,     imageSrc: null },
-  ];
-
-  if (pathname === "/post") return null;
+  if (pathname === "/post" || pathname === "/stories/new") return null;
 
   return (
     <nav
@@ -44,11 +48,9 @@ export default function MobileBottomNav() {
       }`}
     >
       <div className="flex items-center justify-around max-w-md mx-auto px-1 py-1.5">
-        {navItems.map((item) => {
-          const isActive = mounted ? pathname === item.href : false;
-          const isPulse  = item.href === "/community";
-          const isAlerts = item.name === "Alerts";
-          const Icon     = item.icon;
+        {NAV_ITEMS.map((item) => {
+          const isActive = mounted ? isRouteActive(pathname, item.href) : false;
+          const { icon: Icon, isPulse, isAlerts } = item;
 
           return (
             <Link
@@ -63,46 +65,32 @@ export default function MobileBottomNav() {
               }`}
             >
               {isPulse ? (
-                // ── Pulse: circular container, center of gravity ─────────────
+                // ── Pulse: circular container — live/real-time identity ─────────
                 <div className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
                   isActive
-                    ? "bg-[var(--accent)]/[0.13] ring-1 ring-[var(--accent)]/35 drop-shadow-[0_0_20px_rgba(212,175,55,0.55)]"
-                    : "bg-white/[0.05] ring-1 ring-white/[0.07] group-hover:bg-[var(--accent)]/[0.07] group-hover:ring-[var(--accent)]/20"
+                    ? "bg-rose-500/[0.13] ring-1 ring-rose-500/35 drop-shadow-[0_0_20px_rgba(244,63,94,0.45)]"
+                    : "bg-white/[0.05] ring-1 ring-white/[0.07] group-hover:bg-rose-500/[0.07] group-hover:ring-rose-500/20"
                 }`}>
                   <Activity
                     size={24}
                     strokeWidth={isActive ? 2.2 : 1.6}
                     className={`transition-colors ${
-                      isActive ? "text-[var(--accent)]" : "text-white/40 group-hover:text-[var(--accent)]"
+                      isActive ? "text-rose-400" : "text-white/40 group-hover:text-rose-400/70"
                     }`}
                   />
                 </div>
               ) : (
-                // ── Standard items ───────────────────────────────────────────
+                // ── Standard items ────────────────────────────────────────────
                 <div className={`relative flex items-center justify-center w-12 h-12 transition-all duration-200 ${
                   isActive
-                    ? "drop-shadow-[0_0_10px_rgba(212,175,55,0.75)]"
-                    : "group-hover:drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+                    ? "drop-shadow-[0_0_10px_rgba(176,141,87,0.75)]"
+                    : "group-hover:drop-shadow-[0_0_10px_rgba(176,141,87,0.5)]"
                 }`}>
-                  {Icon ? (
-                    <Icon size={26} strokeWidth={isActive ? 2.1 : 1.6} />
-                  ) : item.imageSrc ? (
-                    <div className={`w-7 h-7 rounded-full overflow-hidden border-2 flex items-center justify-center bg-[var(--accent)] transition-all ${
-                      isActive
-                        ? "border-[var(--accent)] shadow-[0_0_10px_rgba(212,175,55,0.5)]"
-                        : "border-white/20 group-hover:border-[var(--accent)]/40"
-                    }`}>
-                      <img
-                        src={item.imageSrc}
-                        alt=""
-                        className="w-full h-full object-cover scale-[1.4] mix-blend-multiply"
-                      />
-                    </div>
-                  ) : null}
+                  <Icon size={24} strokeWidth={isActive ? 2.1 : 1.6} />
 
                   {/* Active dot */}
                   {isActive && (
-                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(212,175,55,1)]" />
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(176,141,87,1)]" />
                   )}
 
                   {/* Notification badge */}

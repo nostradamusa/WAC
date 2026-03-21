@@ -10,7 +10,7 @@ export default function WhyItExists() {
           <SectionLabel label="Our Purpose" variant="standard" className="mb-5" />
           <h2 className="font-serif text-3xl md:text-4xl font-normal text-white leading-[1.2]">
             The network the{" "}
-            <span className="italic text-[#D4AF37]">Albanian diaspora</span>{" "}
+            <span className="italic text-[#b08d57]">Albanian diaspora</span>{" "}
             has been missing.
           </h2>
         </div>

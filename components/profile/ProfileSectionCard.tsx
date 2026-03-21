@@ -63,7 +63,7 @@ export default function ProfileSectionCard({
                     type="button"
                     onClick={onSave}
                     disabled={isSaving}
-                    className="px-3 py-1.5 text-xs rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs rounded-full border border-[#b08d57]/40 bg-[#b08d57]/10 text-[#b08d57] hover:bg-[#b08d57]/20 transition disabled:opacity-50"
                   >
                     {isSaving ? "Saving…" : saveLabel}
                   </button>

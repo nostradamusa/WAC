@@ -72,19 +72,19 @@ export default function JobsPage() {
                  <div>
                     <label className="text-xs font-bold opacity-60 uppercase mb-2 block">Job Type</label>
                     <div className="space-y-2">
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Full-time</label>
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Part-time</label>
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Contract</label>
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Internship</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="job-type-full" name="job-type-full" type="checkbox" className="accent-[var(--accent)]" /> Full-time</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="job-type-part" name="job-type-part" type="checkbox" className="accent-[var(--accent)]" /> Part-time</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="job-type-contract" name="job-type-contract" type="checkbox" className="accent-[var(--accent)]" /> Contract</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="job-type-intern" name="job-type-intern" type="checkbox" className="accent-[var(--accent)]" /> Internship</label>
                     </div>
                  </div>
 
                  <div className="pt-4 border-t border-white/10">
                     <label className="text-xs font-bold opacity-60 uppercase mb-2 block">Location Model</label>
                     <div className="space-y-2">
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> On-site</label>
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Hybrid</label>
-                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Remote</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="location-onsite" name="location-onsite" type="checkbox" className="accent-[var(--accent)]" /> On-site</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="location-hybrid" name="location-hybrid" type="checkbox" className="accent-[var(--accent)]" /> Hybrid</label>
+                       <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="location-remote" name="location-remote" type="checkbox" className="accent-[var(--accent)]" /> Remote</label>
                     </div>
                  </div>
               </div>

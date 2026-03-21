@@ -33,12 +33,12 @@ export default function ProfileCard({
     <section
       id={id}
       style={{ ...style, zIndex }}
-      className={`wac-card p-5 sm:p-6 md:p-8 border-t-2 border-t-[#D4AF37]/40 relative transition-transform duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl ${
-        isHighlighted ? "scale-[1.01] shadow-[0_0_0_2px_var(--accent),0_0_40px_rgba(212,175,55,0.2)]" : ""
+      className={`wac-card p-5 sm:p-6 md:p-8 border-t-2 border-t-[#b08d57]/40 relative transition-transform duration-300 ease-in-out hover:-translate-y-1 hover:shadow-2xl ${
+        isHighlighted ? "scale-[1.01] shadow-[0_0_0_2px_var(--accent),0_0_40px_rgba(176,141,87,0.2)]" : ""
       }`}
     >
       <h2 className="text-xl font-bold mb-2 flex items-center gap-3 text-white">
-        <Icon size={20} className="text-[#D4AF37]" /> {title}
+        <Icon size={20} className="text-[#b08d57]" /> {title}
       </h2>
       <p className="text-sm opacity-70 mb-5 pb-5 border-b border-white/10">
         {description}

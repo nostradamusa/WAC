@@ -34,14 +34,14 @@ export default function LanguageToggle() {
     <div className="flex items-center justify-center gap-1.5 text-xs font-bold bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.05)] rounded-full px-3 py-1.5 transition-all w-max md:mr-1">
       <button 
         onClick={() => toggleLanguage('sq')}
-        className={`transition-all hover:text-white tracking-wider ${lang === 'sq' ? 'text-[#D4AF37] opacity-100 drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]' : 'text-white/60'} focus:outline-none`}
+        className={`transition-all hover:text-white tracking-wider ${lang === 'sq' ? 'text-[#b08d57] opacity-100 drop-shadow-[0_0_8px_rgba(176,141,87,0.5)]' : 'text-white/60'} focus:outline-none`}
       >
         SQ
       </button>
       <span className="opacity-20 text-white font-light">|</span>
       <button 
         onClick={() => toggleLanguage('en')}
-        className={`transition-all hover:text-white tracking-wider ${lang === 'en' ? 'text-[#D4AF37] opacity-100 drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]' : 'text-white/60'} focus:outline-none`}
+        className={`transition-all hover:text-white tracking-wider ${lang === 'en' ? 'text-[#b08d57] opacity-100 drop-shadow-[0_0_8px_rgba(176,141,87,0.5)]' : 'text-white/60'} focus:outline-none`}
       >
         EN
       </button>

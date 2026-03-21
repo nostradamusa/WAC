@@ -6,14 +6,14 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 // ── Scope config ──────────────────────────────────────────────────────────────
 
 const SCOPES = [
-  { value: "all",        label: "All" },
-  { value: "people",     label: "People" },
-  { value: "businesses", label: "Businesses" },
-  { value: "groups",     label: "Groups" },
-  { value: "events",     label: "Events" },
+  { value: "all",           label: "All" },
+  { value: "people",        label: "People" },
+  { value: "businesses",    label: "Businesses" },
+  { value: "organizations", label: "Organizations" },
+  { value: "events",        label: "Events" },
 ] as const;
 
-type Scope = "all" | "people" | "businesses" | "groups" | "events";
+type Scope = "all" | "people" | "businesses" | "organizations" | "events";
 
 // ── Result summary helper ─────────────────────────────────────────────────────
 
@@ -22,26 +22,26 @@ function buildResultSummary(
   total: number,
   people: number,
   businesses: number,
-  groups: number,
+  organizations: number,
   events: number,
 ): string {
   if (scope !== "all") {
     const labels: Record<Scope, [string, string]> = {
-      all:         ["result",   "results"],
-      people:      ["person",   "people"],
-      businesses:  ["business", "businesses"],
-      groups:      ["group",    "groups"],
-      events:      ["event",    "events"],
+      all:           ["result",       "results"],
+      people:        ["person",       "people"],
+      businesses:    ["business",     "businesses"],
+      organizations: ["organization", "organizations"],
+      events:        ["event",        "events"],
     };
     const [singular, plural] = labels[scope];
     return `${total} ${total === 1 ? singular : plural}`;
   }
 
   const parts: string[] = [];
-  if (people > 0)     parts.push(`${people} ${people === 1 ? "person" : "people"}`);
-  if (businesses > 0) parts.push(`${businesses} ${businesses === 1 ? "business" : "businesses"}`);
-  if (groups > 0)     parts.push(`${groups} ${groups === 1 ? "group" : "groups"}`);
-  if (events > 0)     parts.push(`${events} ${events === 1 ? "event" : "events"}`);
+  if (people        > 0) parts.push(`${people}        ${people        === 1 ? "person"       : "people"}`);
+  if (businesses    > 0) parts.push(`${businesses}    ${businesses    === 1 ? "business"     : "businesses"}`);
+  if (organizations > 0) parts.push(`${organizations} ${organizations === 1 ? "organization" : "organizations"}`);
+  if (events        > 0) parts.push(`${events}        ${events        === 1 ? "event"        : "events"}`);
 
   if (parts.length === 0) return `${total} ${total === 1 ? "result" : "results"}`;
   return `${total} ${total === 1 ? "result" : "results"} · ${parts.join(" · ")}`;
@@ -57,7 +57,7 @@ type DirectorySearchContextProps = {
   totalResults: number;
   peopleCount: number;
   businessCount: number;
-  groupsCount: number;
+  organizationsCount: number;
   eventsCount: number;
 };
 
@@ -71,7 +71,7 @@ export default function DirectorySearchContext({
   totalResults,
   peopleCount,
   businessCount,
-  groupsCount,
+  organizationsCount,
   eventsCount,
 }: DirectorySearchContextProps) {
   const searchParams = useSearchParams();
@@ -133,32 +133,24 @@ export default function DirectorySearchContext({
   };
 
   const resultSummary = buildResultSummary(
-    scope, totalResults, peopleCount, businessCount, groupsCount, eventsCount,
+    scope, totalResults, peopleCount, businessCount, organizationsCount, eventsCount,
   );
 
   return (
     <div className="flex flex-col">
 
-      {/* ── Zone 1: Eyebrow label ─────────────────────────────────────── */}
-      <div className="flex items-center gap-2 mb-1.5">
-        <Search size={13} className="text-white/30" strokeWidth={2} />
-        <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">
-          Directory
-        </span>
-      </div>
-
       {/* ── Zone 2: H1 ───────────────────────────────────────────────── */}
       {query ? (
         /* Search-results state: query in serif quotes + edit / clear */
         <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="font-serif text-3xl md:text-4xl font-normal text-white leading-[1.1]">
+          <h1 className="font-serif text-2xl md:text-3xl font-normal text-white leading-tight">
             &ldquo;{query}&rdquo;
           </h1>
           <div className="flex items-center gap-1.5 translate-y-0.5">
             <button
               onClick={handleEditSearch}
               title="Edit search"
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-[#D4AF37]/10 hover:border-[#D4AF37]/30 hover:text-[#D4AF37] transition-colors"
+              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-[#b08d57]/10 hover:border-[#b08d57]/30 hover:text-[#b08d57] transition-colors"
             >
               <PenLine size={12} />
             </button>
@@ -172,15 +164,14 @@ export default function DirectorySearchContext({
           </div>
         </div>
       ) : (
-        /* Browse state: canonical italic+roman serif split */
-        <h1 className="font-serif text-4xl md:text-5xl font-normal text-white leading-[1.1]">
-          The{" "}
-          <span className="italic text-[#D4AF37]">Directory</span>
+        /* Browse state: italic serif headline */
+        <h1 className="font-serif text-3xl md:text-4xl tracking-tight leading-tight">
+          <span className="italic font-light opacity-90 text-[#b08d57]">Directory</span>
         </h1>
       )}
 
       {/* ── Zone 3: Result summary ────────────────────────────────────── */}
-      <p className="mt-2 text-sm text-white/50">{resultSummary}</p>
+      <p className="mt-1.5 text-sm text-white/40">{resultSummary}</p>
 
       {/* ── Zone 4: Filter row ────────────────────────────────────────── */}
       {/*
@@ -188,7 +179,7 @@ export default function DirectorySearchContext({
         They live here on their own line — never beside the H1.
         FILTERS button is right-aligned with active-count badge.
       */}
-      <div className="mt-5 flex items-center gap-2 min-w-0">
+      <div className="mt-4 flex items-center gap-2 min-w-0">
 
         {/* Scope chip row — horizontally scrollable on mobile */}
         <div className="relative flex-1 min-w-0">
@@ -204,7 +195,7 @@ export default function DirectorySearchContext({
                   href={buildScopeHref(value)}
                   className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
                     isActive
-                      ? "border-white/20 bg-white/[0.08] text-white"
+                      ? "border-[#b08d57]/30 bg-[#b08d57]/[0.08] text-[#b08d57]/90"
                       : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
                   }`}
                 >
@@ -222,14 +213,14 @@ export default function DirectorySearchContext({
           onClick={onFilterToggle}
           className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
             isFiltersOpen || activeFilters.length > 0
-              ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] text-[#D4AF37]/80"
+              ? "border-[#b08d57]/30 bg-[#b08d57]/[0.08] text-[#b08d57]/80"
               : "border-white/[0.12] text-white/55 hover:text-white/80 hover:border-white/18"
           }`}
         >
           <SlidersHorizontal size={13} strokeWidth={2} />
           <span>Filters</span>
           {activeFilters.length > 0 && (
-            <span className="flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[#D4AF37] text-black text-[9px] font-bold leading-none">
+            <span className="flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[#b08d57] text-black text-[9px] font-bold leading-none">
               {activeFilters.length}
             </span>
           )}

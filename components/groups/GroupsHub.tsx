@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getGroups, categoryToPathway, type GroupListItem } from "@/lib/services/groupService";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import {
   Baby,
@@ -8,7 +10,9 @@ import {
   Briefcase,
   Plane,
   Users,
+  Network,
   Plus,
+  BookMarked,
 } from "lucide-react";
 import SectionLabel from "@/components/ui/SectionLabel";
 
@@ -17,65 +21,64 @@ import SectionLabel from "@/components/ui/SectionLabel";
 type PathwayId = "family" | "career" | "industry" | "travel";
 
 interface Pathway {
-  id: PathwayId;
-  title: string;
-  tagline: string;
-  icon: React.ElementType;
-  // Icon accent — pathway-specific, used for avatar bg and icon color only
-  iconBg: string;
-  iconColor: string;
+  id:         PathwayId;
+  title:      string;
+  tagline:    string;
+  icon:       React.ElementType;
+  iconBg:     string;
+  iconColor:  string;
   groupCount: number;
 }
 
 interface Group {
-  id: string;
-  name: string;
-  pathway: PathwayId;
-  category: string;
+  id:          string;
+  slug:        string;
+  name:        string;
+  pathway:     PathwayId;
+  category:    string;
   description: string;
-  members: number;
-  activity: string;
-  isNew?: boolean;
+  members:     number;
+  activity:    string;
+  isNew?:      boolean;
 }
 
 // ── Static seed data ───────────────────────────────────────────────────────────
-// Replace with DB queries once the groups table is live.
 
 const PATHWAYS: Pathway[] = [
   {
-    id: "family",
-    title: "Family & Roots",
-    tagline: "Raise children with their Albanian identity",
-    icon: Baby,
-    iconBg: "bg-purple-500/15",
-    iconColor: "text-purple-400",
+    id:         "family",
+    title:      "Family & Roots",
+    tagline:    "Raise children with their Albanian identity",
+    icon:       Baby,
+    iconBg:     "bg-purple-500/15",
+    iconColor:  "text-purple-400",
     groupCount: 3,
   },
   {
-    id: "career",
-    title: "Career & Momentum",
-    tagline: "Grow professionally within the network",
-    icon: TrendingUp,
-    iconBg: "bg-sky-500/15",
-    iconColor: "text-sky-400",
+    id:         "career",
+    title:      "Career & Momentum",
+    tagline:    "Grow professionally within the network",
+    icon:       TrendingUp,
+    iconBg:     "bg-sky-500/15",
+    iconColor:  "text-sky-400",
     groupCount: 3,
   },
   {
-    id: "industry",
-    title: "Industry & Influence",
-    tagline: "Connect with peers in your professional field",
-    icon: Briefcase,
-    iconBg: "bg-[#D4AF37]/15",
-    iconColor: "text-[#D4AF37]",
+    id:         "industry",
+    title:      "Industry & Influence",
+    tagline:    "Connect with peers in your professional field",
+    icon:       Briefcase,
+    iconBg:     "bg-[#b08d57]/15",
+    iconColor:  "text-[#b08d57]",
     groupCount: 3,
   },
   {
-    id: "travel",
-    title: "Travel & Lifestyle",
-    tagline: "Stay connected across borders",
-    icon: Plane,
-    iconBg: "bg-emerald-500/15",
-    iconColor: "text-emerald-400",
+    id:         "travel",
+    title:      "Travel & Lifestyle",
+    tagline:    "Stay connected across borders",
+    icon:       Plane,
+    iconBg:     "bg-emerald-500/15",
+    iconColor:  "text-emerald-400",
     groupCount: 2,
   },
 ];
@@ -95,108 +98,135 @@ const CATEGORIES = [
 
 const GROUPS: Group[] = [
   {
-    id: "1",
-    name: "Albanian Parents Network",
-    pathway: "family",
-    category: "Parenting & Family",
+    id:          "1",
+    slug:        "albanian-parents-network",
+    name:        "Albanian Parents Network",
+    pathway:     "family",
+    category:    "Parenting & Family",
     description: "Connecting Albanian parents across North America to share resources, school programs, and community events.",
-    members: 214,
-    activity: "12 posts this week",
+    members:     214,
+    activity:    "12 posts this week",
   },
   {
-    id: "2",
-    name: "Shkolla Shqipe Coordinators",
-    pathway: "family",
-    category: "Education & Mentorship",
+    id:          "2",
+    slug:        "shkolla-shqipe-coordinators",
+    name:        "Shkolla Shqipe Coordinators",
+    pathway:     "family",
+    category:    "Education & Mentorship",
     description: "For teachers and organizers of Albanian language schools. Share curriculum, coordinate schedules, and grow enrollment.",
-    members: 87,
-    activity: "5 posts this week",
+    members:     87,
+    activity:    "5 posts this week",
   },
   {
-    id: "3",
-    name: "Albanian Moms NYC",
-    pathway: "family",
-    category: "Parenting & Family",
+    id:          "3",
+    slug:        "albanian-moms-nyc",
+    name:        "Albanian Moms NYC",
+    pathway:     "family",
+    category:    "Parenting & Family",
     description: "A local group for Albanian mothers in the New York metro area. Playdates, school advice, and mutual support.",
-    members: 63,
-    activity: "9 posts this week",
-    isNew: true,
+    members:     63,
+    activity:    "9 posts this week",
+    isNew:       true,
   },
   {
-    id: "4",
-    name: "Early Career Albanians",
-    pathway: "career",
-    category: "Career & Professional",
+    id:          "4",
+    slug:        "early-career-albanians",
+    name:        "Early Career Albanians",
+    pathway:     "career",
+    category:    "Career & Professional",
     description: "For professionals in their 20s and 30s. Jobs, mentors, skill-building, and peer support across all industries.",
-    members: 341,
-    activity: "28 posts this week",
+    members:     341,
+    activity:    "28 posts this week",
   },
   {
-    id: "5",
-    name: "WAC Mentorship Network",
-    pathway: "career",
-    category: "Education & Mentorship",
+    id:          "5",
+    slug:        "wac-mentorship-network",
+    name:        "WAC Mentorship Network",
+    pathway:     "career",
+    category:    "Education & Mentorship",
     description: "Matching experienced professionals with students and early-career members. Applications open each semester.",
-    members: 259,
-    activity: "Active",
+    members:     259,
+    activity:    "Active",
   },
   {
-    id: "6",
-    name: "Albanian Women in Leadership",
-    pathway: "career",
-    category: "Career & Professional",
+    id:          "6",
+    slug:        "albanian-women-in-leadership",
+    name:        "Albanian Women in Leadership",
+    pathway:     "career",
+    category:    "Career & Professional",
     description: "A professional circle for Albanian women in executive, founder, and leadership roles across all sectors.",
-    members: 118,
-    activity: "11 posts this week",
-    isNew: true,
+    members:     118,
+    activity:    "11 posts this week",
+    isNew:       true,
   },
   {
-    id: "7",
-    name: "Albanian Tech & AI",
-    pathway: "industry",
-    category: "Industry Circles",
+    id:          "7",
+    slug:        "albanian-tech-ai",
+    name:        "Albanian Tech & AI",
+    pathway:     "industry",
+    category:    "Industry Circles",
     description: "Engineers, founders, and builders in tech. Weekly threads, startup spotlights, hiring opportunities, and AI discussions.",
-    members: 193,
-    activity: "41 posts this week",
+    members:     193,
+    activity:    "41 posts this week",
   },
   {
-    id: "8",
-    name: "Albanian Founders Circle",
-    pathway: "industry",
-    category: "Business & Founder",
+    id:          "8",
+    slug:        "albanian-founders-circle",
+    name:        "Albanian Founders Circle",
+    pathway:     "industry",
+    category:    "Business & Founder",
     description: "For entrepreneurs building companies. Fundraising, co-founder search, investor introductions, and founder AMAs.",
-    members: 97,
-    activity: "14 posts this week",
-    isNew: true,
+    members:     97,
+    activity:    "14 posts this week",
+    isNew:       true,
   },
   {
-    id: "9",
-    name: "Albanian Real Estate Circle",
-    pathway: "industry",
-    category: "Business & Founder",
+    id:          "9",
+    slug:        "albanian-real-estate-circle",
+    name:        "Albanian Real Estate Circle",
+    pathway:     "industry",
+    category:    "Business & Founder",
     description: "Agents, investors, and developers across residential and commercial real estate. Deals, resources, and market intel.",
-    members: 128,
-    activity: "8 posts this week",
+    members:     128,
+    activity:    "8 posts this week",
   },
   {
-    id: "10",
-    name: "Summer Eagles",
-    pathway: "travel",
-    category: "Travel & Lifestyle",
+    id:          "10",
+    slug:        "summer-eagles",
+    name:        "Summer Eagles",
+    pathway:     "travel",
+    category:    "Travel & Lifestyle",
     description: "For diaspora who spend extended time back in the Balkans. Logistics, property management, local meetups, and long-stay guides.",
-    members: 176,
-    activity: "19 posts this week",
+    members:     176,
+    activity:    "19 posts this week",
   },
   {
-    id: "11",
-    name: "OriginAL — Balkans Travelers",
-    pathway: "travel",
-    category: "Travel & Lifestyle",
+    id:          "11",
+    slug:        "original-balkans-travelers",
+    name:        "OriginAL — Balkans Travelers",
+    pathway:     "travel",
+    category:    "Travel & Lifestyle",
     description: "Young diaspora adults exploring Albania, Kosovo, and North Macedonia for the first time. Trip coordination and cultural immersion.",
-    members: 142,
-    activity: "22 posts this week",
+    members:     142,
+    activity:    "22 posts this week",
   },
 ];
+
+// ── DB → local Group conversion ────────────────────────────────────────────────
+
+function dbToGroup(item: GroupListItem): Group {
+  return {
+    id:          item.id,
+    slug:        item.slug,
+    name:        item.name,
+    pathway:     categoryToPathway(item.category),
+    category:    item.category,
+    description: item.description ?? "",
+    members:     item.member_count,
+    activity:    "Active",
+    isNew:       true,
+  };
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -213,17 +243,15 @@ function getInitials(name: string) {
 function GroupCard({ group, pathway }: { group: Group; pathway: Pathway }) {
   return (
     <Link
-      href={`/groups/${group.id}`}
+      href={`/groups/${group.slug}`}
       className="wac-card group relative flex flex-col p-4 hover:border-white/15 transition-colors"
     >
-      {/* NEW badge — card-level corner overlay, not inline with the title */}
       {group.isNew && (
-        <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25">
+        <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/25">
           New
         </span>
       )}
 
-      {/* Top: avatar + name + category */}
       <div className="flex items-start gap-3 mb-2.5">
         <div
           className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs ${pathway.iconBg} ${pathway.iconColor}`}
@@ -231,20 +259,17 @@ function GroupCard({ group, pathway }: { group: Group; pathway: Pathway }) {
           {getInitials(group.name)}
         </div>
         <div className="flex-1 min-w-0 pt-0.5">
-          {/* Right-pad when NEW badge is present to avoid overlap */}
-          <h3 className={`font-semibold text-sm text-white leading-snug group-hover:text-[#D4AF37] transition-colors ${group.isNew ? "pr-10" : "pr-2"}`}>
+          <h3 className={`font-semibold text-sm text-white leading-snug group-hover:text-amber-400 transition-colors ${group.isNew ? "pr-10" : "pr-2"}`}>
             {group.name}
           </h3>
           <span className="text-[10px] text-white/35">{group.category}</span>
         </div>
       </div>
 
-      {/* Description */}
       <p className="text-[11px] text-white/45 leading-relaxed line-clamp-2 mb-3">
         {group.description}
       </p>
 
-      {/* Footer: metadata + Join CTA */}
       <div className="mt-auto flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-[10px] text-white/30 min-w-0">
           <span className="flex items-center gap-1 shrink-0">
@@ -254,10 +279,9 @@ function GroupCard({ group, pathway }: { group: Group; pathway: Pathway }) {
           <span className="text-white/15">·</span>
           <span className="truncate">{group.activity}</span>
         </div>
-        {/* Tier 1 CTA: gold filled. stopPropagation prevents Link navigation. */}
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          className="shrink-0 text-[11px] font-bold px-3.5 py-1.5 rounded-full bg-[#D4AF37] text-black hover:bg-[#c9a430] transition-colors"
+          className="shrink-0 wac-btn-primary wac-btn-sm"
         >
           Join
         </button>
@@ -268,21 +292,61 @@ function GroupCard({ group, pathway }: { group: Group; pathway: Pathway }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
+type ViewMode = "all" | "mine";
+
 export default function GroupsHub() {
-  const [activePathway, setActivePathway] = useState<PathwayId | "all">("all");
+  const [viewMode,       setViewMode]       = useState<ViewMode>("all");
+  const [activePathway,  setActivePathway]  = useState<PathwayId | "all">("all");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [dbGroups,       setDbGroups]       = useState<Group[]>([]);
+  const [myGroupSlugs,   setMyGroupSlugs]   = useState<Set<string>>(new Set());
+  const [isLoggedIn,     setIsLoggedIn]     = useState(false);
+
+  useEffect(() => {
+    getGroups().then(items => setDbGroups(items.map(dbToGroup)));
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setIsLoggedIn(true);
+      supabase
+        .from("group_members")
+        .select("group_id, groups!inner(slug)")
+        .eq("profile_id", user.id)
+        .eq("status", "active")
+        .then(({ data }) => {
+          if (data) {
+            const slugs = new Set(data.map((row: any) => row.groups?.slug).filter(Boolean));
+            setMyGroupSlugs(slugs);
+          }
+        });
+    });
+  }, []);
 
   const handlePathwayClick = (pathwayId: PathwayId) => {
     setActivePathway(prev => prev === pathwayId ? "all" : pathwayId);
     setActiveCategory("All");
+    setViewMode("all");
   };
 
   const handleCategoryClick = (category: string) => {
     setActiveCategory(category);
     setActivePathway("all");
+    setViewMode("all");
   };
 
-  const filteredGroups = GROUPS.filter(g => {
+  const handleViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    setActivePathway("all");
+    setActiveCategory("All");
+  };
+
+  const allGroups = [
+    ...dbGroups,
+    ...GROUPS.filter(g => !dbGroups.some(d => d.slug === g.slug)),
+  ];
+
+  const filteredGroups = allGroups.filter(g => {
+    if (viewMode === "mine") return myGroupSlugs.has(g.slug);
     if (activeCategory !== "All") return g.category === activeCategory;
     if (activePathway !== "all") return g.pathway === activePathway;
     return true;
@@ -290,127 +354,148 @@ export default function GroupsHub() {
 
   const activePathwayData = PATHWAYS.find(p => p.id === activePathway);
 
-  // Section label for the groups list
-  const groupsLabel = activePathway !== "all"
-    ? activePathwayData?.title ?? "Groups"
-    : activeCategory !== "All"
-    ? activeCategory
-    : "All Groups";
+  const groupsLabel =
+    viewMode === "mine"
+      ? "My Groups"
+      : activePathway !== "all"
+      ? activePathwayData?.title ?? "Groups"
+      : activeCategory !== "All"
+      ? activeCategory
+      : "All Groups";
 
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
 
-        {/* ── Zone 1: Eyebrow ──────────────────────────────────────────────── */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <Users size={13} className="text-white/30" strokeWidth={2} />
-          <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">
-            Groups
-          </span>
-        </div>
-
-        {/* ── Zone 2: H1 — matches Directory / Events brand pattern ────────── */}
-        <h1 className="font-serif text-4xl md:text-5xl font-normal text-white leading-[1.1]">
+        {/* ── Zone 2: H1 ───────────────────────────────────────────────────── */}
+        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
           The{" "}
-          <span className="italic text-[#D4AF37]">Groups</span>
+          <span className="italic font-light opacity-90 text-amber-400">Groups</span>
         </h1>
 
-        {/* ── Zone 3: Description ──────────────────────────────────────────── */}
+        {/* ── Zone 3: Subtitle ─────────────────────────────────────────────── */}
         <p className="mt-2 text-sm text-white/50">
           Communities organized around career, family, culture &amp; lifestyle
         </p>
 
-        {/* ── Featured Pathways ────────────────────────────────────────────── */}
-        {/*
-          Pathway cards are the top-level organizing lens for Groups.
-          Each pathway has its own icon color for scanability, but the card
-          base and active state use the unified wac-card system.
-          Active state: brand gold border + subtle gold tint (Groups section-identity).
-          Per-pathway colors apply to icons and avatars only — not card backgrounds.
-        */}
-        <section className="mt-8">
-          <SectionLabel
-            label="Featured Pathways"
-            variant="featured"
-            action={
-              activePathway !== "all"
-                ? { label: "Clear filter", href: "#" }
-                : undefined
-            }
-            className="mb-4"
-          />
+        {/* ── Zone 4: View mode tabs ────────────────────────────────────────── */}
+        <div className="mt-6 flex items-center gap-1.5">
+          <button
+            onClick={() => handleViewMode("all")}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] border transition-colors ${
+              viewMode === "all"
+                ? "border-amber-400/30 bg-amber-500/[0.08] text-amber-400"
+                : "border-white/[0.10] text-white/45 hover:text-white/70 hover:border-white/18"
+            }`}
+          >
+            All Groups
+          </button>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {PATHWAYS.map(pathway => {
-              const Icon = pathway.icon;
-              const isActive = activePathway === pathway.id;
-              return (
-                <button
-                  key={pathway.id}
-                  onClick={() => handlePathwayClick(pathway.id)}
-                  className={`wac-card text-left flex flex-col gap-3 p-4 transition-all ${
-                    isActive
-                      ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.04]"
-                      : "hover:border-white/12"
-                  }`}
-                >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${pathway.iconBg}`}>
-                    <Icon className={`w-4 h-4 ${pathway.iconColor}`} strokeWidth={1.8} />
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-semibold leading-snug mb-1 ${isActive ? "text-[#D4AF37]" : "text-white/80"}`}>
-                      {pathway.title}
-                    </p>
-                    <p className="text-[10px] text-white/35 leading-relaxed">
-                      {pathway.tagline}
-                    </p>
-                  </div>
-                  <p className={`text-[10px] font-semibold ${isActive ? "text-[#D4AF37]/70" : "text-white/30"}`}>
-                    {pathway.groupCount} {pathway.groupCount === 1 ? "group" : "groups"}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ── Browse by Category ───────────────────────────────────────────── */}
-        {/*
-          Outlined pills — same spec as Events and Directory category chips.
-          Horizontally scrollable with right-fade overflow indicator.
-          Selecting a category clears the active pathway.
-        */}
-        <section className="mt-8">
-          <SectionLabel label="Browse by Category" variant="standard" className="mb-4" />
-          <div className="relative">
-            <div
-              className="flex items-center gap-1.5 overflow-x-auto pb-1"
-              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+          {isLoggedIn && (
+            <button
+              onClick={() => handleViewMode("mine")}
+              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] border transition-colors ${
+                viewMode === "mine"
+                  ? "border-amber-400/30 bg-amber-500/[0.08] text-amber-400"
+                  : "border-white/[0.10] text-white/45 hover:text-white/70 hover:border-white/18"
+              }`}
             >
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => handleCategoryClick(cat)}
-                  className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
-                    activeCategory === cat
-                      ? "border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] text-[#D4AF37]/80"
-                      : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+              <BookMarked size={13} strokeWidth={1.8} />
+              My Groups
+              {myGroupSlugs.size > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  viewMode === "mine" ? "bg-amber-400/20 text-amber-400" : "bg-white/[0.08] text-white/40"
+                }`}>
+                  {myGroupSlugs.size}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* ── Featured Pathways (hidden in My Groups mode) ─────────────────── */}
+        {viewMode === "all" && (
+          <section className="mt-8">
+            <SectionLabel
+              label="Featured Pathways"
+              variant="featured"
+              action={
+                activePathway !== "all"
+                  ? { label: "Clear filter", onClick: () => setActivePathway("all") }
+                  : undefined
+              }
+              className="mb-4"
+            />
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {PATHWAYS.map(pathway => {
+                const Icon     = pathway.icon;
+                const isActive = activePathway === pathway.id;
+                return (
+                  <button
+                    key={pathway.id}
+                    onClick={() => handlePathwayClick(pathway.id)}
+                    className={`wac-card text-left flex flex-col gap-3 p-4 transition-all ${
+                      isActive
+                        ? "border-amber-400/30 bg-amber-500/[0.04]"
+                        : "hover:border-white/12"
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${pathway.iconBg}`}>
+                      <Icon className={`w-4 h-4 ${pathway.iconColor}`} strokeWidth={1.8} />
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-semibold leading-snug mb-1 ${isActive ? "text-amber-400" : "text-white/80"}`}>
+                        {pathway.title}
+                      </p>
+                      <p className="text-[10px] text-white/35 leading-relaxed">
+                        {pathway.tagline}
+                      </p>
+                    </div>
+                    <p className={`text-[10px] font-semibold ${isActive ? "text-amber-400/70" : "text-white/30"}`}>
+                      {pathway.groupCount} {pathway.groupCount === 1 ? "group" : "groups"}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
-          </div>
-        </section>
+          </section>
+        )}
+
+        {/* ── Browse by Category (hidden in My Groups mode) ────────────────── */}
+        {viewMode === "all" && (
+          <section className="mt-8">
+            <SectionLabel label="Browse by Category" variant="standard" className="mb-4" />
+            <div className="relative">
+              <div
+                className="flex items-center gap-1.5 overflow-x-auto pb-1"
+                style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+              >
+                {CATEGORIES.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => handleCategoryClick(cat)}
+                    className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
+                      activeCategory === cat
+                        ? "border-amber-400/30 bg-amber-500/[0.08] text-amber-400/80"
+                        : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              {/* Fade affordance for overflow */}
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-[var(--background)] to-transparent" />
+            </div>
+          </section>
+        )}
 
         {/* ── Groups list ──────────────────────────────────────────────────── */}
         <section className="mt-8">
           <SectionLabel
             label={`${groupsLabel} · ${filteredGroups.length} ${filteredGroups.length === 1 ? "group" : "groups"}`}
             variant="standard"
-            action={{ label: "Suggest a group", href: "#" }}
             className="mb-4"
           />
 
@@ -421,33 +506,45 @@ export default function GroupsHub() {
                 return <GroupCard key={group.id} group={group} pathway={pathway} />;
               })}
             </div>
+          ) : viewMode === "mine" ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <BookMarked className="w-8 h-8 text-white/20 mb-4" strokeWidth={1.5} />
+              <h3 className="text-base font-semibold text-white/50 mb-1.5">No groups joined yet</h3>
+              <p className="text-sm text-white/30 leading-relaxed max-w-xs">
+                Switch to All Groups to browse and join communities.
+              </p>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Users className="w-8 h-8 text-white/20 mb-4" strokeWidth={1.5} />
+              <Network className="w-8 h-8 text-white/20 mb-4" strokeWidth={1.5} />
               <h3 className="text-base font-semibold text-white/50 mb-1.5">No groups found</h3>
-              <p className="text-sm text-white/30 max-w-sm leading-relaxed">
-                No groups in this category yet. Be the first to suggest one.
+              <p className="text-sm text-white/30 leading-relaxed">
+                No groups in this category yet. Be the first to create one.
               </p>
             </div>
           )}
         </section>
 
-        {/* ── Start a Group CTA ────────────────────────────────────────────── */}
-        <section className="mt-10 p-5 md:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.07] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="font-semibold text-sm text-white mb-0.5">
-              Don&apos;t see your community?
-            </h3>
-            <p className="text-[11px] text-white/40 leading-relaxed">
-              Groups can form around any shared interest, city, profession, or life stage.
-            </p>
-          </div>
-          {/* Tier 1 CTA: gold filled */}
-          <button className="shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#D4AF37] text-black text-xs font-bold hover:bg-[#c9a430] transition-colors">
-            <Plus className="w-3.5 h-3.5" />
-            Propose a Group
-          </button>
-        </section>
+        {/* ── Secondary CTA ────────────────────────────────────────────────── */}
+        {viewMode === "all" && (
+          <section className="mt-10 p-5 md:p-6 rounded-2xl bg-white/[0.025] border border-white/[0.07] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-sm text-white mb-0.5">
+                Don&apos;t see your community?
+              </h3>
+              <p className="text-[11px] text-white/40 leading-relaxed">
+                Groups can form around any shared interest, city, profession, or life stage.
+              </p>
+            </div>
+            <Link
+              href="/groups/new"
+              className="shrink-0 flex items-center gap-2 px-5 py-2 rounded-full border border-amber-400/25 text-amber-400/60 text-xs font-medium tracking-[0.04em] hover:border-amber-400/45 hover:text-amber-400 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create a Group
+            </Link>
+          </section>
+        )}
 
       </div>
     </div>

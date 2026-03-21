@@ -67,7 +67,7 @@ export default function NewMessageFAB() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className={`fixed right-4 md:right-6 w-14 h-14 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.4)] hover:scale-110 z-[60] overflow-hidden group transition-all duration-300 ease-in-out ${
+        className={`fixed right-4 md:right-6 w-14 h-14 bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(176,141,87,0.4)] hover:scale-110 z-[60] overflow-hidden group transition-all duration-300 ease-in-out ${
           scrollDirection === "down" ? "bottom-6" : "bottom-24 md:bottom-6"
         }`}
       >
@@ -128,7 +128,7 @@ export default function NewMessageFAB() {
                         <div className="flex flex-col flex-1">
                            <div className="flex items-center gap-1">
                               <span className="font-semibold text-sm">{contact.name}</span>
-                              {contact.is_verified && <CheckCircle2 size={12} className="text-[#D4AF37]" />}
+                              {contact.is_verified && <CheckCircle2 size={12} className="text-[#b08d57]" />}
                               <span className="text-[10px] ml-auto px-1.5 py-0.5 rounded bg-white/10 capitalize">{contact.type}</span>
                            </div>
                            <span className="text-xs text-white/50">{contact.headline}</span>

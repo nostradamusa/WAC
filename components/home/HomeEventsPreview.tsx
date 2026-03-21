@@ -7,7 +7,7 @@ export default function HomeEventsPreview() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <h2 className="text-4xl font-serif tracking-tight sm:text-6xl mb-4 text-white">
-              <span className="text-[#D4AF37] italic font-light opacity-90">
+              <span className="text-[#b08d57] italic font-light opacity-90">
                 Upcoming
               </span>{" "}
               Events

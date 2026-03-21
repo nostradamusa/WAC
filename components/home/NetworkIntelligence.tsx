@@ -19,7 +19,7 @@ export default function NetworkIntelligence({
             <SectionLabel label="People You Should Know" variant="standard" className="mb-5" />
             <h2 className="font-serif text-3xl md:text-4xl font-normal text-white leading-[1.2] mb-5">
               A directory stores profiles. A living network{" "}
-              <span className="italic text-[#D4AF37]">connects</span> them.
+              <span className="italic text-[#b08d57]">connects</span> them.
             </h2>
             <p className="text-[15px] text-white/55 leading-[1.75]">
               The platform surfaces Albanian professionals matched to your industry,
@@ -31,7 +31,7 @@ export default function NetworkIntelligence({
                   const loginBtn = document.getElementById("wac-global-login");
                   if (loginBtn) loginBtn.click();
                 }}
-                className="mt-8 px-6 py-2.5 rounded-full bg-[#D4AF37] text-black text-sm font-bold hover:bg-[#c9a430] transition-colors"
+                className="mt-8 px-6 py-2.5 rounded-full bg-[#b08d57] text-black text-sm font-bold hover:bg-[#9a7545] transition-colors"
               >
                 Sign In to See Your Matches
               </button>
@@ -40,7 +40,7 @@ export default function NetworkIntelligence({
 
           {/* Right: personalized recommendations or sign-in prompt */}
           <div className="relative">
-            <div className="absolute inset-0 bg-[#D4AF37]/[0.06] blur-[70px] rounded-full pointer-events-none" />
+            <div className="absolute inset-0 bg-[#b08d57]/[0.06] blur-[70px] rounded-full pointer-events-none" />
             <div className="relative z-10">
               {userId ? (
                 <div className="wac-heritage-glow rounded-[24px]">
@@ -52,8 +52,8 @@ export default function NetworkIntelligence({
                   not a theatrical "sleeping algorithm" dead state.
                 */
                 <div className="wac-card p-8 flex flex-col items-center text-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 flex items-center justify-center">
-                    <Users size={20} className="text-[#D4AF37]/70" />
+                  <div className="w-12 h-12 rounded-full bg-[#b08d57]/10 flex items-center justify-center">
+                    <Users size={20} className="text-[#b08d57]/70" />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-white mb-1.5">

@@ -48,11 +48,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-24">
       <div className="w-full max-w-md p-8 rounded-2xl bg-[var(--foreground)]/5 border border-[var(--foreground)]/10 text-center">
-        <div className="flex h-16 w-16 mx-auto mb-6 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] shadow-md">
+        <div className="flex h-16 w-16 mx-auto mb-6 items-center justify-center overflow-hidden rounded-full border-2 border-[#b08d57]/60 bg-[var(--accent)] shadow-[0_0_20px_rgba(176,141,87,0.3)]">
           <img
             src="/images/wac-logo.jpg"
             alt="World Albanian Congress Logo"
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
           />
         </div>
 
@@ -128,6 +128,8 @@ export default function LoginPage() {
 
             <form onSubmit={handleEmailLogin} className="space-y-3">
               <input
+                id="login-email"
+                name="email"
                 type="email"
                 placeholder="Enter your email address"
                 value={email}

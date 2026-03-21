@@ -22,7 +22,7 @@ export default function MembersPreview() {
       <div className="mx-auto max-w-7xl">
         <div className="text-center mb-16 relative z-10">
           <h2 className="text-4xl font-serif tracking-tight sm:text-6xl mb-4 text-white">
-            <span className="text-[#D4AF37] italic font-light opacity-90">
+            <span className="text-[#b08d57] italic font-light opacity-90">
               Members
             </span>{" "}
             of the Network

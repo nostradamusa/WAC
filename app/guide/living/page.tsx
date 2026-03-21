@@ -28,7 +28,7 @@ export default function LivingHubPage() {
               Life Stages & Resources
             </span>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-serif tracking-tight mb-6">
-              The <span className="text-[#D4AF37] italic font-light opacity-90">Homeland</span> Living Hub
+              The <span className="text-[#b08d57] italic font-light opacity-90">Homeland</span> Living Hub
             </h1>
             <p className="text-lg sm:text-xl opacity-70 leading-relaxed mb-10 max-w-2xl">
               Whether you are visiting for the summer, planning a permanent relocation, raising children in the diaspora, or investing in real estate back home. This is your ultimate blueprint.

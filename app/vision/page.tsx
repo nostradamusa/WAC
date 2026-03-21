@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Compass,
-  Users,
   Network,
-  Calendar,
+  CalendarDays,
   MessageSquare,
   Map,
   BookOpen,
@@ -41,7 +40,7 @@ function StatusBadge({
   }
   if (status === "building") {
     return (
-      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#D4AF37]/[0.08] border border-[#D4AF37]/20 text-[#D4AF37]/70">
+      <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#b08d57]/[0.08] border border-[#b08d57]/20 text-[#b08d57]/70">
         {when ? `In Development · ${when}` : "In Development"}
       </span>
     );
@@ -80,7 +79,7 @@ function LiveCard({
       >
         <Icon size={18} className={iconColor} />
       </div>
-      <h3 className="text-sm font-semibold text-white mb-1.5 group-hover:text-[#D4AF37] transition-colors">
+      <h3 className="text-sm font-semibold text-white mb-1.5 group-hover:text-[#b08d57] transition-colors">
         {name}
       </h3>
       <p className="text-xs text-white/45 leading-relaxed flex-1">{description}</p>
@@ -221,10 +220,10 @@ export default function VisionPage() {
           Italic gold lands on the most specific, meaningful phrase.
           max-w-3xl keeps the line lengths readable at lg breakpoint.
         */}
-        <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-normal text-white leading-[1.15] max-w-3xl">
+        <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl tracking-tight text-white leading-snug max-w-3xl">
           Building the digital infrastructure{" "}
           of the{" "}
-          <span className="italic text-[#D4AF37]">Albanian diaspora.</span>
+          <span className="italic font-light opacity-90 text-[#b08d57]">Albanian diaspora.</span>
         </h1>
 
         {/* ── Zone 3: Description ──────────────────────────────────────── */}
@@ -243,9 +242,9 @@ export default function VisionPage() {
           <SectionLabel label="Available Today" variant="featured" className="mb-5" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <LiveCard
-              icon={Users}
-              iconBg="bg-[#D4AF37]/10"
-              iconColor="text-[#D4AF37]/80"
+              icon={Compass}
+              iconBg="bg-[#b08d57]/10"
+              iconColor="text-[#b08d57]/80"
               name="The Directory"
               description="Find Albanian professionals, businesses, and organizations across 50+ countries."
               href="/directory"
@@ -259,7 +258,7 @@ export default function VisionPage() {
               href="/groups"
             />
             <LiveCard
-              icon={Calendar}
+              icon={CalendarDays}
               iconBg="bg-teal-500/10"
               iconColor="text-teal-400/80"
               name="Events"
@@ -372,13 +371,13 @@ export default function VisionPage() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
               <Link
                 href="/login"
-                className="px-5 py-2.5 rounded-full text-sm font-semibold bg-[#D4AF37] text-black hover:bg-[#c9a430] transition-colors whitespace-nowrap text-center"
+                className="px-5 py-2.5 rounded-full text-sm font-semibold bg-[#b08d57] text-black hover:bg-[#9a7545] transition-colors whitespace-nowrap text-center"
               >
                 Join the Network
               </Link>
               <Link
                 href="/directory"
-                className="px-5 py-2.5 rounded-full text-sm font-semibold border border-[#D4AF37]/30 text-[#D4AF37]/70 hover:bg-[#D4AF37]/10 transition-colors whitespace-nowrap text-center"
+                className="px-5 py-2.5 rounded-full text-sm font-semibold border border-[#b08d57]/30 text-[#b08d57]/70 hover:bg-[#b08d57]/10 transition-colors whitespace-nowrap text-center"
               >
                 Explore Today
               </Link>

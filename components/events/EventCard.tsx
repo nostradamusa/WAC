@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Calendar, MapPin, Clock, Users, Building2 } from "lucide-react";
+import { CalendarDays, MapPin, Clock, Users, Building2 } from "lucide-react";
 
 export interface EventEntry {
   id: string;
@@ -79,13 +79,13 @@ export default function EventCard({ event }: { event: EventEntry }) {
 
         {/* Title + meta */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-white leading-snug mb-1 group-hover:text-[#D4AF37] transition-colors line-clamp-2">
+          <h3 className="text-sm font-semibold text-white leading-snug mb-1 group-hover:text-[#b08d57] transition-colors line-clamp-2">
             {event.title}
           </h3>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/40">
             {/* Date with weekday gives temporal context (is this next weekend?) */}
             <span className="flex items-center gap-1">
-              <Calendar size={10} />
+              <CalendarDays size={10} />
               {dateDisplay}
             </span>
             <span className="text-white/15">·</span>
@@ -105,11 +105,11 @@ export default function EventCard({ event }: { event: EventEntry }) {
           </div>
         </div>
 
-        {/* RSVP — Tier 1: gold filled. stopPropagation prevents card navigation. */}
+        {/* RSVP — Tier 1 gold CTA. stopPropagation prevents card navigation. */}
         {!isPast && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            className="shrink-0 mt-0.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-[#D4AF37] text-black hover:bg-[#c9a430] transition-colors"
+            className="shrink-0 mt-0.5 wac-btn-primary wac-btn-sm"
           >
             RSVP
           </button>

@@ -173,7 +173,7 @@ export default function NotificationsPage() {
                      cursor-pointer group relative flex gap-3 p-3 rounded-2xl border transition-all duration-300
                      ${notification.read 
                         ? 'bg-transparent border-transparent hover:bg-white/[0.02]' 
-                        : 'bg-white/[0.03] border-[var(--accent)]/20 shadow-[0_0_15px_rgba(212,175,55,0.05)]'
+                        : 'bg-white/[0.03] border-[var(--accent)]/20 shadow-[0_0_15px_rgba(176,141,87,0.05)]'
                      }
                   `}
                >

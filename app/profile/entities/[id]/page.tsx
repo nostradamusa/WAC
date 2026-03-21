@@ -315,13 +315,13 @@ export default function EditEntityPage({
             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-3 flex-wrap">
               {name || "Unnamed Entity"}
               {isVerified && (
-                <span className="text-[10px] uppercase font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-full border border-[#D4AF37]/30 flex items-center gap-1">
+                <span className="text-[10px] uppercase font-bold text-[#b08d57] bg-[#b08d57]/10 px-2.5 py-1 rounded-full border border-[#b08d57]/30 flex items-center gap-1">
                   <CheckCircle size={12} /> Verified
                 </span>
               )}
             </h1>
             <div className="flex flex-wrap items-center gap-2 text-sm opacity-80">
-              <span className="font-medium text-[#D4AF37]">
+              <span className="font-medium text-[#b08d57]">
                 {category || (type === "business" ? "Business" : "Organization")}
               </span>
               <span className="w-1 h-1 rounded-full bg-white/30" />
@@ -378,7 +378,7 @@ export default function EditEntityPage({
         {/* SECTION 1: IDENTITY */}
         <section className="wac-card p-6 md:p-8">
           <div className="flex items-center gap-2.5 mb-1">
-            <Globe size={18} className="text-[#D4AF37]" />
+            <Globe size={18} className="text-[#b08d57]" />
             <h2 className="text-lg font-bold text-white">Identity</h2>
           </div>
           <p className="text-sm opacity-60 mb-6 ml-[26px]">
@@ -440,7 +440,7 @@ export default function EditEntityPage({
         {/* SECTION 2: DETAILS */}
         <section className="wac-card p-6 md:p-8">
           <div className="flex items-center gap-2.5 mb-1">
-            <EntityIcon size={18} className="text-[#D4AF37]" />
+            <EntityIcon size={18} className="text-[#b08d57]" />
             <h2 className="text-lg font-bold text-white">
               {type === "business" ? "Business" : "Organization"} Details
             </h2>
@@ -552,7 +552,7 @@ export default function EditEntityPage({
         {/* SECTION 3: BRANDING */}
         <section className="wac-card p-6 md:p-8">
           <div className="flex items-center gap-2.5 mb-1">
-            <ImageIcon size={18} className="text-[#D4AF37]" />
+            <ImageIcon size={18} className="text-[#b08d57]" />
             <h2 className="text-lg font-bold text-white">Visual Branding</h2>
           </div>
           <p className="text-sm opacity-60 mb-6 ml-[26px]">
@@ -628,7 +628,7 @@ export default function EditEntityPage({
         {/* SECTION 4: SOCIAL PRESENCE */}
         <section className="wac-card p-6 md:p-8">
           <div className="flex items-center gap-2.5 mb-1">
-            <LinkIcon size={18} className="text-[#D4AF37]" />
+            <LinkIcon size={18} className="text-[#b08d57]" />
             <h2 className="text-lg font-bold text-white">Social Presence</h2>
           </div>
           <p className="text-sm opacity-60 mb-6 ml-[26px]">
@@ -706,14 +706,14 @@ export default function EditEntityPage({
         {type === "organization" && (
           <section className="wac-card p-6 md:p-8">
             <div className="flex items-center gap-2.5 mb-1">
-              <Calendar size={18} className="text-[#D4AF37]" />
+              <Calendar size={18} className="text-[#b08d57]" />
               <h2 className="text-lg font-bold text-white">
                 Event Calendar Sync
               </h2>
             </div>
             <p className="text-sm opacity-60 mb-6 ml-[26px]">
               Paste an{" "}
-              <span className="font-mono text-[#D4AF37]/80">.ics</span> link
+              <span className="font-mono text-[#b08d57]/80">.ics</span> link
               (e.g. from Google Calendar) and WAC will automatically import and
               keep your events synchronized.
             </p>
@@ -754,7 +754,7 @@ export default function EditEntityPage({
         {/* SECTION 6: VISIBILITY */}
         <section className="wac-card p-6 md:p-8">
           <div className="flex items-center gap-2.5 mb-1">
-            <Settings size={18} className="text-[#D4AF37]" />
+            <Settings size={18} className="text-[#b08d57]" />
             <h2 className="text-lg font-bold text-white">
               Visibility &amp; Settings
             </h2>
@@ -963,7 +963,7 @@ function TeamSection({
   return (
     <section className="wac-card p-6 md:p-8 mb-6">
       <div className="flex items-center gap-2.5 mb-1">
-        <Users size={18} className="text-[#D4AF37]" />
+        <Users size={18} className="text-[#b08d57]" />
         <h2 className="text-lg font-bold text-white">Team &amp; Members</h2>
       </div>
       <p className="text-sm opacity-60 mb-6 ml-[26px]">

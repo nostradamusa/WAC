@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Building2, Users, ChevronRight, MessageCircle, Plus, User } from "lucide-react";
+import { Star, Building2, Users, ChevronRight, Plus, User } from "lucide-react";
 import { useState } from "react";
 
 export default function WacSpotlightWidget() {
@@ -12,12 +12,12 @@ export default function WacSpotlightWidget() {
       wac-card base with subtle gold tint border — signals "featured" without
       a custom container. Consistent with the rest of the card system.
     */
-    <div className="wac-card overflow-hidden border-[#D4AF37]/[0.18]">
+    <div className="wac-card overflow-hidden border-[#b08d57]/[0.18]">
 
       {/* Header strip */}
-      <div className="flex items-center justify-between px-5 py-[14px] border-b border-white/[0.06] bg-[#D4AF37]/[0.025]">
+      <div className="flex items-center justify-between px-5 py-[14px] border-b border-white/[0.06] bg-[#b08d57]/[0.025]">
         <div className="flex items-center gap-2">
-          <Star className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37]/80" />
+          <Star className="w-3.5 h-3.5 text-[#b08d57] fill-[#b08d57]/80" />
           <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/70">
             WAC Spotlight
           </span>
@@ -32,12 +32,12 @@ export default function WacSpotlightWidget() {
 
         {/* Profile */}
         <div className="flex items-start gap-3.5 mb-4">
-          <div className="w-12 h-12 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/40 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-[0_0_16px_rgba(212,175,55,0.10)]">
-            <span className="font-serif font-bold text-base text-[#D4AF37]">AK</span>
+          <div className="w-12 h-12 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/40 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-[0_0_16px_rgba(176,141,87,0.10)]">
+            <span className="font-serif font-bold text-base text-[#b08d57]">AK</span>
           </div>
           <div className="min-w-0">
             <h4 className="font-bold text-white text-[15px] leading-tight">Arben Krasniqi</h4>
-            <p className="text-xs text-[#D4AF37]/75 font-medium mt-0.5 mb-1.5">
+            <p className="text-xs text-[#b08d57]/75 font-medium mt-0.5 mb-1.5">
               Founder – Atlantic Logistics
             </p>
             <div className="flex flex-wrap gap-2 text-[10px] text-white/40">
@@ -50,7 +50,7 @@ export default function WacSpotlightWidget() {
         </div>
 
         {/* Quote */}
-        <div className="rounded-xl p-4 mb-5 border border-[#D4AF37]/[0.08] bg-[#D4AF37]/[0.02]">
+        <div className="rounded-xl p-4 mb-5 border border-[#b08d57]/[0.08] bg-[#b08d57]/[0.02]">
           <p className="text-[12.5px] leading-relaxed italic text-white/70 mb-3">
             "The biggest mistake I made early on was thinking I had to do it all alone. The moment I
             started hiring people smarter than me and leaning into our community network, Atlantic
@@ -58,7 +58,7 @@ export default function WacSpotlightWidget() {
           </p>
           <Link
             href="/spotlight/arben-krasniqi"
-            className="text-[#D4AF37]/70 text-[11px] font-bold hover:text-[#D4AF37] transition-colors flex items-center gap-1 w-max"
+            className="text-[#b08d57]/70 text-[11px] font-bold hover:text-[#b08d57] transition-colors flex items-center gap-1 w-max"
           >
             Read Full Interview <ChevronRight className="w-3 h-3" />
           </Link>
@@ -87,18 +87,10 @@ export default function WacSpotlightWidget() {
               </Link>
             )}
 
-            {/* Message — Tier 3 ghost; routes to messages compose in V2 */}
-            <Link
-              href="/messages?to=arben-krasniqi"
-              className="w-full py-2.5 border border-white/[0.12] rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-white/55 hover:text-white/80 hover:border-white/[0.18]"
-            >
-              <MessageCircle className="w-3.5 h-3.5" /> Message
-            </Link>
-
             {/* Directory deep-link — Tier 2 outlined gold (higher signal, navigates away) */}
             <Link
               href="/directory?q=logistics"
-              className="w-full py-2.5 border border-[#D4AF37]/30 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-[#D4AF37]/70 hover:bg-[#D4AF37]/10"
+              className="w-full py-2.5 border border-[#b08d57]/30 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-colors text-[#b08d57]/70 hover:bg-[#b08d57]/10"
             >
               <Users className="w-3.5 h-3.5" /> See Albanian founders in Logistics
             </Link>

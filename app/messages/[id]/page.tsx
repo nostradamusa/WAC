@@ -147,7 +147,7 @@ export default function ActiveChatPage({
                   <div 
                      className={`p-3 md:p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-sm relative ${
                        msg.sender === "me" 
-                         ? "bg-[rgba(212,175,55,0.1)] border border-[#D4AF37]/30 text-white rounded-tr-sm" 
+                         ? "bg-[rgba(176,141,87,0.1)] border border-[#b08d57]/30 text-white rounded-tr-sm" 
                          : "bg-white/5 border border-white/10 text-white/90 rounded-tl-sm"
                      }`}
                   >
@@ -241,14 +241,14 @@ export default function ActiveChatPage({
             <div className="absolute -top-14 left-0 w-full px-4 flex gap-2 overflow-x-auto wac-scrollbar pb-2">
                <button 
                   onClick={() => setInputText("I'd love to organize a carpool. Let's coordinate!")}
-                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(212,175,55,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(212,175,55,0.15)]"
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(176,141,87,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(176,141,87,0.15)]"
                >
                   <Sparkles size={12} />
                   Sure, let's coordinate.
                </button>
                <button 
                   onClick={() => setInputText("I won't be able to carpool this time, but I'll see you there!")}
-                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(212,175,55,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(212,175,55,0.15)]"
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(176,141,87,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(176,141,87,0.15)]"
                >
                   <Sparkles size={12} />
                   I can't carpool, sorry.
@@ -307,7 +307,7 @@ export default function ActiveChatPage({
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="Type a message or use AI to draft..."
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 pr-12 text-sm outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(212,175,55,0.1)] transition-all resize-none max-h-32 min-h-[46px] wac-scrollbar break-words placeholder:opacity-50"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 pr-12 text-sm outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(176,141,87,0.1)] transition-all resize-none max-h-32 min-h-[46px] wac-scrollbar break-words placeholder:opacity-50"
                         style={{ fieldSizing: "content" } as any}
                         onKeyDown={(e) => {
                            if (e.key === 'Enter' && !e.shiftKey) {
@@ -323,7 +323,7 @@ export default function ActiveChatPage({
                   <button 
                      type="submit" 
                      disabled={!inputText.trim()}
-                     className={`p-3 rounded-xl mb-1 flex items-center justify-center transition ${inputText.trim() ? "bg-[var(--accent)] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]" : "bg-white/5 text-white/30 cursor-not-allowed"}`}
+                     className={`p-3 rounded-xl mb-1 flex items-center justify-center transition ${inputText.trim() ? "bg-[var(--accent)] text-black shadow-[0_0_15px_rgba(176,141,87,0.4)]" : "bg-white/5 text-white/30 cursor-not-allowed"}`}
                   >
                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
@@ -352,7 +352,7 @@ export default function ActiveChatPage({
                     ></textarea>
                     <button 
                        onClick={() => setConnectionStatus("pending")} 
-                       className="bg-[var(--accent)] text-black font-bold py-2.5 px-6 text-sm rounded-full hover:bg-[var(--accent)]/90 hover:shadow-[0_0_15px_rgba(212,175,55,0.4)] transition-all mx-auto w-max inline-block mt-2"
+                       className="bg-[var(--accent)] text-black font-bold py-2.5 px-6 text-sm rounded-full hover:bg-[var(--accent)]/90 hover:shadow-[0_0_15px_rgba(176,141,87,0.4)] transition-all mx-auto w-max inline-block mt-2"
                     >
                        Send Connection Request
                     </button>

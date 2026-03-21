@@ -18,13 +18,13 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <Link
               href="/"
-              className="mb-6 flex items-center gap-3 transition-opacity md:w-max hover:opacity-90"
+              className="mb-6 flex items-center gap-3 md:w-max group"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] shadow-md">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#b08d57]/60 bg-[var(--accent)] transition-shadow duration-300 group-hover:shadow-[0_0_16px_rgba(176,141,87,0.45)]">
                 <img
                   src="/images/wac-logo.jpg"
                   alt="World Albanian Congress Logo"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
                 />
               </div>
               <div className="flex flex-col">

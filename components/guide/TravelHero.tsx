@@ -27,7 +27,7 @@ export default function TravelHero() {
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-7xl font-serif tracking-tight mb-4 leading-tight text-white">
-            <span className="text-[#D4AF37] italic font-light opacity-90">
+            <span className="text-[#b08d57] italic font-light opacity-90">
               Return
             </span>{" "}
             to the Land.

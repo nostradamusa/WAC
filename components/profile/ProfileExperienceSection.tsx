@@ -307,7 +307,7 @@ export default function ProfileExperienceSection({
                     <h4 className="m-0 text-[15px] font-bold text-white tracking-tight flex items-center gap-2">
                       {displayTitle}
                       {experience.isCurrent && (
-                        <span className="text-[10px] uppercase tracking-wider bg-[#bd9a3f]/20 text-[#D4AF37] px-2 py-0.5 rounded-full font-bold">
+                        <span className="text-[10px] uppercase tracking-wider bg-[#bd9a3f]/20 text-[#b08d57] px-2 py-0.5 rounded-full font-bold">
                           Current
                         </span>
                       )}

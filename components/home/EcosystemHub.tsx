@@ -5,18 +5,18 @@ import SectionLabel from "@/components/ui/SectionLabel";
 const SECTIONS = [
   {
     icon: Compass,
-    name: "The Directory",
+    name: "Directory",
     description:
       "Find any Albanian professional, business, or organization. Search by name, profession, or location.",
     href: "/directory",
-    iconBg: "bg-[#D4AF37]/10",
-    iconColor: "text-[#D4AF37]/80",
-    nameColor: "text-[#D4AF37]",
-    linkColor: "text-[#D4AF37]/55 group-hover:text-[#D4AF37]",
+    iconBg: "bg-[#b08d57]/10",
+    iconColor: "text-[#b08d57]/80",
+    nameColor: "text-[#b08d57]",
+    linkColor: "text-[#b08d57]/55 group-hover:text-[#b08d57]",
   },
   {
     icon: Activity,
-    name: "The Pulse",
+    name: "Pulse",
     description:
       "The real-time community feed. News, discussions, and updates from across the diaspora.",
     href: "/community",
@@ -66,8 +66,8 @@ export default function EcosystemHub() {
               >
                 <Icon size={18} className={iconColor} />
               </div>
-              {/* Serif name carries section-identity color — matches destination page H1 */}
-              <h3 className={`font-serif text-base font-normal mb-1.5 ${nameColor}`}>
+              {/* Serif italic name carries section-identity color — matches destination page H1 */}
+              <h3 className={`font-serif text-base font-normal italic mb-1.5 ${nameColor}`}>
                 {name}
               </h3>
               <p className="text-xs text-white/45 leading-relaxed flex-1">{description}</p>

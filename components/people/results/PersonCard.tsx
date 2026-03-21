@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   Bookmark,
@@ -11,6 +12,7 @@ import {
   HandCoins,
   Users,
   MapPin,
+  X,
 } from "lucide-react";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
@@ -75,8 +77,9 @@ const BADGE_CONFIG = [
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function PersonCard({ person }: { person: DirectoryPerson }) {
-  const [isSaved, setIsSaved]     = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [isSaved,          setIsSaved]          = useState(false);
+  const [showToast,        setShowToast]        = useState(false);
+  const [showAvatarModal,  setShowAvatarModal]  = useState(false);
 
   const displayName  = person.full_name || person.username || "Member";
   const profileHref  = person.username ? `/people/${person.username}` : "#";
@@ -124,7 +127,7 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
             onClick={handleSave}
             className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
           >
-            <Bookmark size={10} className={isSaved ? "fill-[#D4AF37] text-[#D4AF37]" : "text-white"} />
+            <Bookmark size={10} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : "text-white"} />
           </button>
           <button
             onClick={handleShare}
@@ -133,25 +136,34 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
             <Share2 size={10} className="text-white" />
           </button>
         </div>
+      </div>
 
-        {/* Avatar — overlaps banner edge */}
-        <div className="absolute bottom-0 left-4 translate-y-1/2 z-10">
-          {person.avatar_url ? (
+      {/*
+        Avatar — anchored to the article (not inside the banner overflow-hidden),
+        bridging the banner/body boundary. z-20 ensures it paints above body content.
+      */}
+      <div className="absolute left-4 top-10 z-20">
+        {person.avatar_url ? (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAvatarModal(true); }}
+            className="block rounded-full hover:opacity-90 transition-opacity cursor-zoom-in"
+            aria-label="View profile photo"
+          >
             <img
               src={person.avatar_url}
               alt={displayName}
-              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md"
+              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md ring-1 ring-white/[0.12]"
             />
-          ) : (
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-white/[0.08] flex items-center justify-center text-sm font-semibold uppercase text-white/65 shadow-md">
-              {initials}
-            </div>
-          )}
-        </div>
+          </button>
+        ) : (
+          <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-white/[0.08] flex items-center justify-center text-sm font-semibold uppercase text-white/65 shadow-md ring-1 ring-white/[0.08]">
+            {initials}
+          </div>
+        )}
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col px-4 pt-9 pb-4">
+      <div className="flex flex-1 flex-col px-4 pt-14 pb-4">
 
         {/* Name + verified */}
         <div className="flex items-center gap-1 min-w-0 mb-0.5">
@@ -232,13 +244,13 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
             <FollowButton followingType="person" followingId={person.id} size="sm" className="flex-1" />
             <Link
               href={profileHref}
-              className="flex-1 flex items-center justify-center py-1.5 rounded-xl border border-[#D4AF37]/50 text-[#D4AF37] text-xs font-semibold hover:bg-[#D4AF37]/[0.06] transition-colors"
+              className="flex-1 flex items-center justify-center py-1.5 px-3 rounded-full bg-[#b08d57] text-black text-xs font-bold hover:bg-[#9a7545] transition-colors"
             >
               View
             </Link>
           </div>
         ) : (
-          <div className="mt-3 h-8 rounded-xl border border-white/[0.07] flex items-center justify-center text-[11px] text-white/25">
+          <div className="mt-3 h-8 rounded-full border border-white/[0.07] flex items-center justify-center text-[11px] text-white/25">
             Profile pending
           </div>
         )}
@@ -246,12 +258,36 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
 
       {/* Toast */}
       <div
-        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#D4AF37] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
+        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
           showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
         }`}
       >
         Link copied!
       </div>
+
+      {/* Avatar lightbox — rendered in body portal to avoid transform clipping */}
+      {showAvatarModal && person.avatar_url && createPortal(
+        <div
+          className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer animate-in fade-in duration-150"
+          onClick={() => setShowAvatarModal(false)}
+        >
+          <div className="relative max-w-[280px] w-full space-y-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={person.avatar_url}
+              alt={displayName}
+              className="w-full aspect-square rounded-3xl object-cover shadow-2xl"
+            />
+            <p className="text-center text-sm text-white/55 font-medium">{displayName}</p>
+            <button
+              onClick={() => setShowAvatarModal(false)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white/10 border border-white/15 flex items-center justify-center hover:bg-white/20 transition-colors"
+            >
+              <X size={13} className="text-white/70" />
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </article>
   );
 }

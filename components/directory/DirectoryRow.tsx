@@ -21,7 +21,7 @@ const KIND_CONFIG: Record<
     avatarBg: "bg-white/[0.08]",
     avatarText: "text-white/65",
     actionLabel: "Connect",
-    actionClass: "border-[#D4AF37]/35 text-[#D4AF37] hover:bg-[#D4AF37]/[0.06]",
+    actionClass: "border-[#b08d57]/35 text-[#b08d57] hover:bg-[#b08d57]/[0.06]",
   },
   business: {
     Icon: Briefcase,
@@ -39,10 +39,10 @@ const KIND_CONFIG: Record<
   },
   event: {
     Icon: Calendar,
-    avatarBg: "bg-[#D4AF37]/15",
-    avatarText: "text-[#D4AF37]/70",
+    avatarBg: "bg-[#b08d57]/15",
+    avatarText: "text-[#b08d57]/70",
     actionLabel: "RSVP",
-    actionClass: "border-[#D4AF37]/35 text-[#D4AF37] hover:bg-[#D4AF37]/[0.06]",
+    actionClass: "border-[#b08d57]/35 text-[#b08d57] hover:bg-[#b08d57]/[0.06]",
   },
 };
 

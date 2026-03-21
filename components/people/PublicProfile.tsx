@@ -126,13 +126,13 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm opacity-70 mb-4">
             {locationString && (
               <div className="flex items-center gap-1.5">
-                <MapPin size={14} className="text-[#D4AF37]" />
+                <MapPin size={14} className="text-[#b08d57]" />
                 <span>{locationString}</span>
               </div>
             )}
             {rootsString && (
               <div className="flex items-center gap-1.5 border-l border-[var(--border)] pl-4">
-                <Globe size={14} className="text-[#D4AF37]" />
+                <Globe size={14} className="text-[#b08d57]" />
                 <span>Roots: {rootsString}</span>
               </div>
             )}

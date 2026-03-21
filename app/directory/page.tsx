@@ -31,10 +31,11 @@ export default async function DirectoryPage({
 }) {
   const params = await searchParams;
   const scopeRaw = params.scope?.toLowerCase() || "all";
-  const mappedScope = scopeRaw === "organizations" ? "groups" : scopeRaw;
-  
-  const validScopes: string[] = ["all", "people", "groups", "businesses", "events"];
-  const scope = validScopes.includes(mappedScope) ? (mappedScope as "all" | "people" | "groups" | "businesses" | "events") : "all";
+
+  const validScopes: string[] = ["all", "people", "businesses", "organizations", "events"];
+  const scope = validScopes.includes(scopeRaw)
+    ? (scopeRaw as "all" | "people" | "businesses" | "organizations" | "events")
+    : "all";
 
   const filters: SearchFilters = {
     q: params.q?.trim() ?? "",
@@ -53,19 +54,23 @@ export default async function DirectoryPage({
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const fetchPeople = scope === "all" || scope === "people";
-  const fetchEntities = scope === "all" || scope === "groups" || scope === "businesses";
-  const fetchEvents = scope === "all" || scope === "events";
+  const fetchPeople    = scope === "all" || scope === "people";
+  const fetchEntities  = scope === "all" || scope === "organizations" || scope === "businesses";
+  const fetchEvents    = scope === "all" || scope === "events";
 
   const [peopleRes, entitiesRes] = await Promise.all([
-    fetchPeople ? getPeopleDirectory(filters, user?.id) : Promise.resolve({ data: [], error: null, count: 0 }),
-    fetchEntities ? getEntitiesDirectory(filters) : Promise.resolve({ businesses: [], organizations: [], error: null })
+    fetchPeople
+      ? getPeopleDirectory(filters, user?.id)
+      : Promise.resolve({ data: [], error: null, count: 0 }),
+    fetchEntities
+      ? getEntitiesDirectory(filters)
+      : Promise.resolve({ businesses: [], organizations: [], error: null }),
   ]);
 
-  const people = peopleRes.data;
-  const businesses = scope === "all" || scope === "businesses" ? entitiesRes.businesses : [];
-  const groups = scope === "all" || scope === "groups" ? entitiesRes.organizations : [];
-  
+  const people        = peopleRes.data;
+  const businesses    = scope === "all" || scope === "businesses"    ? entitiesRes.businesses    : [];
+  const organizations = scope === "all" || scope === "organizations" ? entitiesRes.organizations : [];
+
   const mockEvents: EventDirectoryEntry[] = [
     {
       id: "ev-1",
@@ -91,14 +96,14 @@ export default async function DirectoryPage({
       country: "Albania",
       description: "An exclusive weekend retreat for Albanian founders and venture capitalists discussing the future of the Balkan tech ecosystem.",
       attendees_count: 45,
-    }
+    },
   ];
 
   // TODO: Implement actual getEventsDirectory backend service once DB schema expands
   // Mock events are placeholder data — only show when browsing without a query
   const events: EventDirectoryEntry[] = fetchEvents && !filters.q ? mockEvents : [];
 
-  const totalResults = people.length + businesses.length + groups.length + events.length;
+  const totalResults = people.length + businesses.length + organizations.length + events.length;
 
   return (
     <UnifiedDiscoveryLayout
@@ -109,7 +114,7 @@ export default async function DirectoryPage({
       totalResults={totalResults}
       peopleCount={people.length}
       businessCount={businesses.length}
-      groupsCount={groups.length}
+      organizationsCount={organizations.length}
       eventsCount={events.length}
       results={
         <Suspense fallback={
@@ -124,7 +129,7 @@ export default async function DirectoryPage({
             scope={scope}
             people={people as EnrichedDirectoryPerson[]}
             businesses={businesses}
-            groups={groups}
+            organizations={organizations}
             events={events}
           />
         </Suspense>

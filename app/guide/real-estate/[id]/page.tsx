@@ -157,7 +157,7 @@ export default function PropertyDetails({ params }: { params: Promise<{ id: stri
 
         {/* Right Column: Contact Agent Sticky Box */}
         <div className="relative">
-           <div className="sticky top-28 bg-[#1b1714] border border-[var(--accent)]/30 p-8 rounded-3xl shadow-[0_0_40px_rgba(212,175,55,0.05)]">
+           <div className="sticky top-28 bg-[#1b1714] border border-[var(--accent)]/30 p-8 rounded-3xl shadow-[0_0_40px_rgba(176,141,87,0.05)]">
               <h3 className="text-xl font-serif mb-6 border-b border-white/10 pb-4">Contact Agent</h3>
               
               <div className="flex items-center gap-4 mb-6">
@@ -204,16 +204,16 @@ export default function PropertyDetails({ params }: { params: Promise<{ id: stri
                  </div>
 
                  <div className="grid grid-cols-2 gap-4">
-                    <input type="text" defaultValue="Sokol B." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] opacity-50 cursor-not-allowed" readOnly title="Name pulled from platform profile" />
-                    <input type="email" defaultValue="sokol@example.al" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] opacity-50 cursor-not-allowed" readOnly title="Email pulled from platform profile" />
+                    <input id="agent-sender-name" name="agent-sender-name" type="text" defaultValue="Sokol B." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] opacity-50 cursor-not-allowed" readOnly title="Name pulled from platform profile" />
+                    <input id="agent-sender-email" name="agent-sender-email" type="email" defaultValue="sokol@example.al" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] opacity-50 cursor-not-allowed" readOnly title="Email pulled from platform profile" />
                  </div>
 
                  <div>
-                    <textarea placeholder="Hi, I am interested in this property..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] resize-none"></textarea>
+                    <textarea id="agent-message" name="agent-message" placeholder="Hi, I am interested in this property..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--accent)] resize-none"></textarea>
                  </div>
 
                  <label className="flex items-start gap-3 text-sm text-white/70 cursor-pointer group">
-                    <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 rounded border-white/20 accent-[var(--accent)] bg-white/5" />
+                    <input id="attach-wac-profile" name="attach-wac-profile" type="checkbox" defaultChecked className="mt-1 w-4 h-4 rounded border-white/20 accent-[var(--accent)] bg-white/5" />
                     <span className="group-hover:text-white transition-colors leading-relaxed">
                        Attach a link to my <span className="text-[var(--accent)] font-bold">WAC Public Profile</span> so the agent can quickly verify my identity and professional background.
                     </span>

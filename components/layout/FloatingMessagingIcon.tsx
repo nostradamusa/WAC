@@ -464,7 +464,7 @@ export default function FloatingMessagingIcon() {
                 <div className={`
                     relative p-3 rounded-2xl text-sm max-w-[85%] 
                     ${isMe 
-                      ? "bg-[rgba(212,175,55,0.1)] border border-[#D4AF37]/30 text-white rounded-tr-sm" 
+                      ? "bg-[rgba(176,141,87,0.1)] border border-[#b08d57]/30 text-white rounded-tr-sm" 
                       : "bg-white/5 border border-white/10 text-white/90 rounded-tl-sm"
                     }
                 `}>
@@ -703,6 +703,8 @@ export default function FloatingMessagingIcon() {
                     <div className="relative flex-1 group">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[var(--accent)] transition" />
                       <input 
+                        id="floating-messages-search"
+                        name="floating-messages-search"
                         type="text" 
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
@@ -776,7 +778,7 @@ export default function FloatingMessagingIcon() {
                             )}
                           </span>
                           {isUnread && (
-                            <div className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_5px_rgba(212,175,55,1)]"></div>
+                            <div className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_5px_rgba(176,141,87,1)]"></div>
                           )}
                         </div>
                       </div>

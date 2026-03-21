@@ -68,14 +68,14 @@ export default function TalentBenchPage() {
             <div className="wac-card p-5">
                <h3 className="font-bold uppercase tracking-wider text-sm mb-4">Industries</h3>
                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Technology & Software</label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Finance & Real Estate</label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Healthcare</label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="accent-[var(--accent)]" /> Legal</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="industry-tech" name="industry-tech" type="checkbox" className="accent-[var(--accent)]" /> Technology & Software</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="industry-finance" name="industry-finance" type="checkbox" className="accent-[var(--accent)]" /> Finance & Real Estate</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="industry-health" name="industry-health" type="checkbox" className="accent-[var(--accent)]" /> Healthcare</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input id="industry-legal" name="industry-legal" type="checkbox" className="accent-[var(--accent)]" /> Legal</label>
                </div>
             </div>
 
-            <div className="wac-card p-5 bg-gradient-to-br from-[#111] to-[rgba(212,175,55,0.05)] border-[var(--accent)]/20">
+            <div className="wac-card p-5 bg-gradient-to-br from-[#111] to-[rgba(176,141,87,0.05)] border-[var(--accent)]/20">
                <h3 className="font-serif font-bold text-[var(--accent)] mb-2 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Hiring Partner</h3>
                <p className="text-xs opacity-70 leading-relaxed mb-4">
                   Verified organizations can access complete resumes and export candidate lists.

@@ -272,7 +272,7 @@ export default function ProfileCompletionCard({
                 marginTop: 8,
                 fontSize: 13,
                 fontWeight: 600,
-                color: "#d4af37",
+                color: "#b08d57",
               }}
             >
               {progressNudge}
@@ -310,7 +310,7 @@ export default function ProfileCompletionCard({
           style={{
             width: `${completionPercentage}%`,
             height: "100%",
-            background: "linear-gradient(90deg, #b8860b 0%, #d4af37 100%)",
+            background: "linear-gradient(90deg, #b8860b 0%, #b08d57 100%)",
             borderRadius: 999,
           }}
         />

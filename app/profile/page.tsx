@@ -273,7 +273,7 @@ export default function ProfilePage() {
     return {
       scrollMarginTop: 100, borderRadius: 12, padding: isHighlighted ? 10 : 0, margin: isHighlighted ? "-10px" : "0",
       transition: "box-shadow 0.25s ease, background-color 0.25s ease, padding 0.25s ease, margin 0.25s ease",
-      boxShadow: isHighlighted ? "0 0 0 2px rgba(212, 175, 55, 0.9)" : "none", background: isHighlighted ? "rgba(212, 175, 55, 0.08)" : "transparent",
+      boxShadow: isHighlighted ? "0 0 0 2px rgba(176, 141, 87, 0.9)" : "none", background: isHighlighted ? "rgba(176, 141, 87, 0.08)" : "transparent",
     } as const;
   };
 
@@ -347,7 +347,7 @@ export default function ProfilePage() {
       <div className="flex items-start justify-between mb-6 md:mb-8 px-4 md:px-0">
          <div>
             <h1 className="text-3xl md:text-4xl font-serif tracking-tight mb-1 md:mb-2 text-white">
-               <span className="text-[#D4AF37] italic font-light opacity-90">Personal</span> Identity
+               <span className="text-[#b08d57] italic font-light opacity-90">Personal</span> Identity
             </h1>
             <p className="opacity-70 text-sm md:text-base">
                Manage your professional identity, local discovery presence, and network visibility.
@@ -418,7 +418,7 @@ export default function ProfilePage() {
                      <div className="flex flex-col gap-1">
                         <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">{fullName || "Your Name"}</h2>
                         <div className="flex flex-col text-sm opacity-80">
-                           <span className="font-medium text-[#D4AF37]">{headline || "Add a professional headline"}</span>
+                           <span className="font-medium text-[#b08d57]">{headline || "Add a professional headline"}</span>
                            {currentTitle && currentCompany && (
                               <span className="flex items-center gap-1.5 opacity-70 mt-1">
                                  <Briefcase size={13} /> {currentTitle} — {currentCompany}
@@ -446,18 +446,18 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div id="profile-field-fullName">
                            <label className="block text-sm font-bold text-white/90 mb-2.5">Full Name</label>
-                           <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                           <input id="full-name" name="full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                         </div>
 
                         <div id="profile-field-tagline">
                            <label className="block text-sm font-bold text-white/90 mb-2.5">Tagline <span className="opacity-50 font-normal">(Optional)</span></label>
-                           <input value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A short, catchy phrase about what drives you" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                           <input id="tagline" name="tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A short, catchy phrase about what drives you" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                         </div>
                      </div>
 
                      <div id="profile-field-bio">
                         <label className="block text-sm font-bold text-white/90 mb-2.5">Biography</label>
-                        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={5} placeholder="Share your story, your professional journey, and your ties to the community..." className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] resize-vertical" />
+                        <textarea id="bio-textarea" name="bio-textarea" value={bio} onChange={(e) => setBio(e.target.value)} rows={5} placeholder="Share your story, your professional journey, and your ties to the community..." className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] resize-vertical" />
                      </div>
                </ProfileCard>
 
@@ -517,22 +517,22 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div id="profile-field-country">
                               <label className="block text-sm font-bold text-white/90 mb-2.5">Country</label>
-                              <input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. USA" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                              <input id="country" name="country" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. USA" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                            </div>
                            <div id="profile-field-stateRegion">
                               <label className="block text-sm font-bold text-white/90 mb-2.5">State / Region</label>
-                              <input value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} placeholder="e.g. New York" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] focus:ring-2 focus:ring-[#D4AF37]/50" />
+                              <input id="state-region" name="state-region" value={stateRegion} onChange={(e) => setStateRegion(e.target.value)} placeholder="e.g. New York" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] focus:ring-2 focus:ring-[#b08d57]/50" />
                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div id="profile-field-city">
                               <label className="block text-sm font-bold text-white/90 mb-2.5">Current City</label>
-                              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Manhattan" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] focus:ring-2 focus:ring-[#D4AF37]/50" />
+                              <input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Manhattan" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] focus:ring-2 focus:ring-[#b08d57]/50" />
                            </div>
                            <div id="profile-field-ancestryCity">
                               <label className="block text-sm font-bold text-white/90 mb-2.5">Ancestry City / Village</label>
-                              <input value={ancestryCity} onChange={(e) => setAncestryCity(e.target.value)} placeholder="e.g. Struga, Prishtina" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                              <input id="ancestry-city" name="ancestry-city" value={ancestryCity} onChange={(e) => setAncestryCity(e.target.value)} placeholder="e.g. Struga, Prishtina" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                            </div>
                         </div>
                </ProfileCard>
@@ -546,16 +546,16 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                      <div id="profile-field-streetAddress" className="md:col-span-2">
                         <label className="block text-sm font-bold text-white/90 mb-2.5">Street Address <span className="opacity-50 font-normal">(Optional)</span></label>
-                        <input value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="e.g. 123 Main St, Apt 4B" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                        <input id="street-address" name="street-address" value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} placeholder="e.g. 123 Main St, Apt 4B" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                      </div>
                      <div id="profile-field-zipCode">
-                        <label className="block text-sm font-bold text-white/90 mb-2.5">ZIP / Postal Code <span className="text-[#D4AF37]">*</span></label>
-                        <input value={zipCode} onChange={(e) => setZipCode(e.target.value)} required placeholder="e.g. 10001" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
+                        <label className="block text-sm font-bold text-white/90 mb-2.5">ZIP / Postal Code <span className="text-[#b08d57]">*</span></label>
+                        <input id="zip-code" name="zip-code" value={zipCode} onChange={(e) => setZipCode(e.target.value)} required placeholder="e.g. 10001" className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)]" />
                      </div>
                   </div>
 
-                  <div id="profile-field-mapVisibility" className="mt-6 bg-[#D4AF37]/5 border border-[#D4AF37]/20 p-5 rounded-xl">
-                     <label className="block text-sm font-bold text-[#D4AF37] mb-2 flex items-center gap-2">Diaspora Map Visibility</label>
+                  <div id="profile-field-mapVisibility" className="mt-6 bg-[#b08d57]/5 border border-[#b08d57]/20 p-5 rounded-xl">
+                     <label className="block text-sm font-bold text-[#b08d57] mb-2 flex items-center gap-2">Diaspora Map Visibility</label>
                      <WacSelect
                         value={mapVisibility}
                         onChange={setMapVisibility}
@@ -579,7 +579,7 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div id="profile-field-dateOfBirth">
                            <label className="block text-sm font-bold text-white/90 mb-2.5">Date of Birth</label>
-                           <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] [color-scheme:dark]" />
+                           <input id="date-of-birth" name="date-of-birth" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] [color-scheme:dark]" />
                            
                            <div id="profile-field-birthdayVisibility" className="mt-6">
                               <label className="block text-xs font-bold text-white/60 mb-2 uppercase tracking-wide">Birthday Privacy</label>
@@ -631,7 +631,7 @@ export default function ProfilePage() {
                               <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${intent.state ? 'translate-x-5' : 'translate-x-0'}`}></div>
                            </div>
                            <span className="font-bold text-sm select-none">{intent.label}</span>
-                           <input type="checkbox" checked={intent.state} onChange={(e) => intent.set(e.target.checked)} className="hidden" />
+                           <input id={`intent-${intent.id}`} name={`intent-${intent.id}`} type="checkbox" checked={intent.state} onChange={(e) => intent.set(e.target.checked)} className="hidden" />
                         </label>
                      ))}
                   </div>
@@ -642,7 +642,7 @@ export default function ProfilePage() {
 
            {/* RIGHT COLUMN: COMPLETION & ACTION */}
           <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-[180px] hidden lg:block">
-             <div className="bg-gradient-to-b from-[var(--accent)] to-[rgba(212,175,55,0.3)] p-[1px] rounded-2xl">
+             <div className="bg-gradient-to-b from-[var(--accent)] to-[rgba(176,141,87,0.3)] p-[1px] rounded-2xl">
                 <div className="bg-[#0f0f0f] rounded-2xl p-6 h-full flex flex-col pt-10 relative">
                    <div className="mt-2">
                       <ProfileCompletionCard

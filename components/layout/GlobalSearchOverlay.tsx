@@ -60,11 +60,11 @@ function TypeBadge({ type }: { type: string }) {
   const isProfile = type === "profile";
   const isBusiness = type === "business";
   const styles = isProfile
-    ? "text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/20"
+    ? "text-[#b08d57] bg-[#b08d57]/10 border-[#b08d57]/20"
     : isBusiness
     ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
     : "text-green-400 bg-green-500/10 border-green-500/20";
-  const label = isProfile ? "Profile" : isBusiness ? "Business" : "Association";
+  const label = isProfile ? "Profile" : isBusiness ? "Business" : "Organization";
   return (
     <span className={`text-[9px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full border ${styles}`}>
       {label}
@@ -75,16 +75,15 @@ function TypeBadge({ type }: { type: string }) {
 function RecentAvatar({ item }: { item: RecentlyViewedItem }) {
   const isProfile = item.entity_type === "profile";
   const isBusiness = item.entity_type === "business";
-  // "association" is the display name; entity_type may still be "organization" from older records
-  const ringColor = isProfile ? "border-[#D4AF37]" : isBusiness ? "border-blue-500" : "border-green-500";
-  const textColor = isProfile ? "text-[#D4AF37]" : isBusiness ? "text-blue-400" : "text-green-400";
-  const bgColor   = isProfile ? "bg-[#D4AF37]/10"  : isBusiness ? "bg-blue-500/10"  : "bg-green-500/10";
+  const ringColor = isProfile ? "border-[#b08d57]" : isBusiness ? "border-blue-500" : "border-green-500";
+  const textColor = isProfile ? "text-[#b08d57]" : isBusiness ? "text-blue-400" : "text-green-400";
+  const bgColor   = isProfile ? "bg-[#b08d57]/10"  : isBusiness ? "bg-blue-500/10"  : "bg-green-500/10";
 
   return (
     <button className="flex flex-col items-center gap-1.5 group w-full">
       <div className={`relative w-11 h-11 rounded-full overflow-hidden border-2 ${ringColor} shrink-0 group-hover:scale-105 transition-transform`}>
         {item.avatar_url ? (
-          <Image src={item.avatar_url} alt={item.name} fill className="object-cover" />
+          <Image src={item.avatar_url} alt={item.name} fill sizes="44px" className="object-cover" />
         ) : (
           <div className={`w-full h-full ${bgColor} flex items-center justify-center ${textColor}`}>
             {isProfile && <User size={16} />}
@@ -113,10 +112,13 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isEventsPage = pathname === "/events" || pathname.startsWith("/events/");
+  const isEventsPage    = pathname === "/events"     || pathname.startsWith("/events/");
+  const isDirectoryPage = pathname === "/directory"  || pathname.startsWith("/directory");
   const searchPlaceholder = isEventsPage
     ? "Search events, hosts, cities…"
-    : "Search with Alban Intelligence...";
+    : isDirectoryPage
+      ? "Search people, businesses, organizations…"
+      : "Search with Alban Intelligence...";
 
   // Focus input, lock body scroll, and load data when opened
   useEffect(() => {
@@ -168,7 +170,7 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
     // Save to recently viewed
     saveRecentlyViewed({
       entity_id: result.id,
-      entity_type: (result.type === "organization" ? "association" : result.type) as "profile" | "business" | "association",
+      entity_type: result.type as "profile" | "business" | "organization",
       name: result.name,
       avatar_url: result.avatar_url ?? null,
       username_or_slug: result.username_or_slug ?? null,
@@ -221,8 +223,8 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
               {liveResults.length > 0 ? liveResults.map(result => (
                 <button key={result.id} onClick={() => handleResultClick(result)} className="flex items-center gap-3 p-4 border-b border-white/5 hover:bg-white/5 transition">
                   <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 border border-white/10">
-                    {result.avatar_url ? <Image src={result.avatar_url} alt={result.name} fill className="object-cover" /> : (
-                      <div className="w-full h-full bg-black/40 flex items-center justify-center font-bold text-[#D4AF37] text-sm">{result.name.charAt(0)}</div>
+                    {result.avatar_url ? <Image src={result.avatar_url} alt={result.name} fill sizes="40px" className="object-cover" /> : (
+                      <div className="w-full h-full bg-black/40 flex items-center justify-center font-bold text-[#b08d57] text-sm">{result.name.charAt(0)}</div>
                     )}
                   </div>
                   <div className="flex flex-col items-start gap-1 min-w-0">
@@ -285,11 +287,11 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
               {/* Alban Suggests */}
               <div className="border-t border-white/5 pt-4 mt-2">
                 <div className="px-4 mb-2">
-                  <h3 className="text-xs font-semibold text-[#D4AF37]/80 uppercase tracking-widest">Alban Suggests</h3>
+                  <h3 className="text-xs font-semibold text-[#b08d57]/80 uppercase tracking-widest">Alban Suggests</h3>
                 </div>
                 {SUGGESTED_SEARCHES.map((term, i) => (
                   <button key={i} onClick={() => submitSearch(term)} className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition group">
-                    <Search size={14} className="text-[#D4AF37]/50 shrink-0 mt-0.5 group-hover:text-[#D4AF37] transition" />
+                    <Search size={14} className="text-[#b08d57]/50 shrink-0 mt-0.5 group-hover:text-[#b08d57] transition" />
                     <span className="text-sm text-white/65 text-left line-clamp-2">{term}</span>
                   </button>
                 ))}
@@ -298,7 +300,7 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
               {/* The Brief */}
               <div className="border-t border-white/5 pt-4 mt-2">
                 <div className="px-4 mb-2">
-                  <h3 className="text-xs font-semibold text-[#D4AF37]/80 uppercase tracking-widest">The Brief</h3>
+                  <h3 className="text-xs font-semibold text-[#b08d57]/80 uppercase tracking-widest">The Brief</h3>
                 </div>
                 {THE_BRIEF.map((item) => {
                   const Icon = item.icon;
@@ -329,10 +331,12 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
               <div className="absolute inset-0 flex items-center pointer-events-none select-none">
                 {isEventsPage ? (
                   <span className="text-white/30 text-base">Search events, hosts, cities…</span>
+                ) : isDirectoryPage ? (
+                  <span className="text-white/30 text-base">Search people, businesses, organizations…</span>
                 ) : (
                   <>
                     <span className="text-white/30 text-base">Search with&nbsp;</span>
-                    <span className="text-[#D4AF37]/60 italic font-light text-base">Alban Intelligence</span>
+                    <span className="text-[#b08d57]/60 italic font-light text-base">Alban Intelligence</span>
                     <span className="text-white/20 text-base">...</span>
                   </>
                 )}
@@ -371,9 +375,9 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                 >
                   <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 border border-white/10">
                     {result.avatar_url ? (
-                      <Image src={result.avatar_url} alt={result.name} fill className="object-cover" />
+                      <Image src={result.avatar_url} alt={result.name} fill sizes="40px" className="object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-white/5 flex items-center justify-center font-bold text-[#D4AF37] text-sm">
+                      <div className="w-full h-full bg-white/5 flex items-center justify-center font-bold text-[#b08d57] text-sm">
                         {result.name.charAt(0)}
                       </div>
                     )}
@@ -387,7 +391,7 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                 <div className="py-12 text-center text-white/40 text-sm">No results for &quot;{query}&quot;</div>
               )}
               <div className="px-5 py-3 border-t border-white/[0.06] mt-1">
-                <button onClick={() => submitSearch()} className="text-[#D4AF37] text-sm font-medium hover:underline">
+                <button onClick={() => submitSearch()} className="text-[#b08d57] text-sm font-medium hover:underline">
                   See all results for &quot;{query}&quot; →
                 </button>
               </div>
@@ -449,14 +453,14 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
 
                 {/* Right — Alban Suggests */}
                 <div className="p-4 flex flex-col gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#D4AF37]/55 px-1 mb-1">Alban Suggests</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#b08d57]/55 px-1 mb-1">Alban Suggests</span>
                   {SUGGESTED_SEARCHES.map((term, i) => (
                     <button
                       key={i}
                       onClick={() => submitSearch(term)}
-                      className="flex items-start gap-3 w-full px-3 py-3 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-[#D4AF37]/[0.04] hover:border-[#D4AF37]/[0.12] transition group text-left"
+                      className="flex items-start gap-3 w-full px-3 py-3 rounded-xl bg-white/[0.03] border border-white/[0.05] hover:bg-[#b08d57]/[0.04] hover:border-[#b08d57]/[0.12] transition group text-left"
                     >
-                      <Search size={12} className="text-[#D4AF37]/35 shrink-0 mt-0.5 group-hover:text-[#D4AF37]/70 transition" />
+                      <Search size={12} className="text-[#b08d57]/35 shrink-0 mt-0.5 group-hover:text-[#b08d57]/70 transition" />
                       <span className="text-[13px] text-white/55 line-clamp-2 group-hover:text-white/85 transition leading-snug">{term}</span>
                     </button>
                   ))}

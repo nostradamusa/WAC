@@ -68,6 +68,8 @@ export default function MessagesInboxPage() {
           <div className="relative mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <input 
+              id="messages-search"
+              name="messages-search"
               type="text" 
               placeholder="Search messages..." 
               className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-9 pr-4 text-sm outline-none focus:border-[var(--accent)] transition"
@@ -140,7 +142,7 @@ export default function MessagesInboxPage() {
       {/* RIGHT MAIN AREA: Empty State / Chat Frame */}
       <div className="hidden md:flex flex-1 flex-col bg-[var(--background)] relative pt-24 md:pt-32 mt-16 md:mt-20">
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center pb-20">
-           <div className="w-24 h-24 rounded-full bg-[rgba(212,175,55,0.05)] flex items-center justify-center border border-[var(--accent)]/30 mb-6 drop-shadow-2xl">
+           <div className="w-24 h-24 rounded-full bg-[rgba(176,141,87,0.05)] flex items-center justify-center border border-[var(--accent)]/30 mb-6 drop-shadow-2xl">
              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>
            </div>
            <h2 className="text-3xl font-serif tracking-tight mb-3">Your Conversations</h2>

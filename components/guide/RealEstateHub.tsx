@@ -59,7 +59,7 @@ export default function RealEstateHub() {
                  <h4 className="font-bold text-sm">Modern City Center Apt</h4>
                  <div className="text-[var(--accent)] font-serif text-lg">€145,000</div>
              </div>
-             <div className="bg-white/5 border border-[var(--accent)]/30 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm rotate-3 shadow-[0_0_30px_rgba(212,175,55,0.1)]">
+             <div className="bg-white/5 border border-[var(--accent)]/30 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm rotate-3 shadow-[0_0_30px_rgba(176,141,87,0.1)]">
                  <div className="h-32 bg-white/10 rounded-xl overflow-hidden relative">
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 text-[10px] font-bold tracking-wider rounded">PRISHTINA, KS</div>
                  </div>

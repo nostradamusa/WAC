@@ -18,7 +18,7 @@ export function useUnreadMessageCount(actorId: string | null | undefined, userId
       const { data: participations } = await supabase
         .from("conversation_participants")
         .select("conversation_id")
-        .eq("participant_id", actorId);
+        .eq("actor_id", actorId);
 
       if (!participations || participations.length === 0) { setCount(0); return; }
 
@@ -29,7 +29,7 @@ export function useUnreadMessageCount(actorId: string | null | undefined, userId
         .select("id", { count: "exact", head: true })
         .in("conversation_id", convIds)
         .eq("is_read", false)
-        .neq("sent_by_user_id", userId);
+        .neq("sender_id", userId);
 
       setCount(unread ?? 0);
     }
