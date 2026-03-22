@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 
 type GlobalDirectoryFiltersProps = {
   totalResults: number;
-  scope: "all" | "people" | "businesses" | "organizations" | "events";
+  scope: "all" | "people" | "businesses" | "organizations";
 };
 
 export default function GlobalDirectoryFilters({
@@ -118,14 +118,6 @@ export default function GlobalDirectoryFilters({
                 {label}
               </label>
             ))}
-            <label className={`flex items-center justify-center gap-2 rounded-xl col-span-2 border px-3 py-3 text-xs font-bold cursor-pointer transition ${
-              scope === "events"
-                ? "bg-[var(--accent)]/10 border-[var(--accent)] text-[var(--accent)]"
-                : "bg-white/5 border-transparent text-white/70 hover:text-white"
-            }`}>
-              <input type="radio" name="scope" value="events" defaultChecked={scope === "events"} className="sr-only" />
-              Events
-            </label>
           </div>
         </div>
 

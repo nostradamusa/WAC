@@ -30,6 +30,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { togglePostReaction, ReactionType, deletePost, editPost } from "@/lib/services/feedService";
 import PostComments from "./PostComments";
+import PulsePostViewer from "./PulsePostViewer";
 import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import { useActor } from "@/components/providers/ActorProvider";
 import { supabase } from "@/lib/supabase";
@@ -355,6 +356,8 @@ export default function PostCard({ post }: { post: NetworkPost }) {
   const [showReactionsModal, setShowReactionsModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
+  const [showViewer, setShowViewer] = useState(false);
+
   const { currentActor } = useActor();
   const pressTimer = useRef<NodeJS.Timeout | null>(null);
   const isLongPress = useRef(false);
@@ -443,6 +446,24 @@ export default function PostCard({ post }: { post: NetworkPost }) {
       currentActor.id === post.author_organization_id);
 
   const isOwner = actorOwnsPost || (!currentActor && currentUserId === post.author_profile_id);
+
+  // ─── Desktop expanded viewer ────────────────────────────────────────────────
+
+  const hasMedia = (post.media_items && post.media_items.length > 0) || !!post.image_url;
+  const isExpandable =
+    hasMedia ||
+    isDiscussion ||
+    post.comments_count > 0 ||
+    post.content.length > 120;
+
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    // Don't open if clicking an interactive element
+    if (target.closest("button, a, textarea, input")) return;
+    // Desktop only
+    if (typeof window !== "undefined" && window.innerWidth < 768) return;
+    if (isExpandable) setShowViewer(true);
+  };
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -695,7 +716,10 @@ export default function PostCard({ post }: { post: NetworkPost }) {
   );
 
   return (
-    <div className={`wac-card p-5 mb-4 transition-colors relative ${cardBorder}`}>
+    <div
+      className={`wac-card p-5 mb-4 transition-colors relative ${cardBorder} ${isExpandable ? "md:cursor-pointer" : ""}`}
+      onClick={handleCardClick}
+    >
       {post.original_post_id && (
         <div className="flex items-center gap-2 text-[11px] font-semibold text-white/40 mb-3 pb-3 border-b border-white/5">
           <Repeat size={13} strokeWidth={2} className="text-[#b08d57]/60" />
@@ -1131,6 +1155,10 @@ export default function PostCard({ post }: { post: NetworkPost }) {
       </div>
 
       {showComments && <PostComments postId={post.id} />}
+
+      {showViewer && (
+        <PulsePostViewer post={post} onClose={() => setShowViewer(false)} />
+      )}
 
       {toastMessage &&
         typeof document !== "undefined" &&

@@ -369,7 +369,6 @@ export default function GroupsHub() {
 
         {/* ── Zone 2: H1 ───────────────────────────────────────────────────── */}
         <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
-          The{" "}
           <span className="italic font-light opacity-90 text-amber-400">Groups</span>
         </h1>
 

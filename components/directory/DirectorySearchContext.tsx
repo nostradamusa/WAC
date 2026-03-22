@@ -10,10 +10,9 @@ const SCOPES = [
   { value: "people",        label: "People" },
   { value: "businesses",    label: "Businesses" },
   { value: "organizations", label: "Organizations" },
-  { value: "events",        label: "Events" },
 ] as const;
 
-type Scope = "all" | "people" | "businesses" | "organizations" | "events";
+type Scope = "all" | "people" | "businesses" | "organizations";
 
 // ── Result summary helper ─────────────────────────────────────────────────────
 
@@ -23,7 +22,6 @@ function buildResultSummary(
   people: number,
   businesses: number,
   organizations: number,
-  events: number,
 ): string {
   if (scope !== "all") {
     const labels: Record<Scope, [string, string]> = {
@@ -31,17 +29,15 @@ function buildResultSummary(
       people:        ["person",       "people"],
       businesses:    ["business",     "businesses"],
       organizations: ["organization", "organizations"],
-      events:        ["event",        "events"],
     };
     const [singular, plural] = labels[scope];
     return `${total} ${total === 1 ? singular : plural}`;
   }
 
   const parts: string[] = [];
-  if (people        > 0) parts.push(`${people}        ${people        === 1 ? "person"       : "people"}`);
-  if (businesses    > 0) parts.push(`${businesses}    ${businesses    === 1 ? "business"     : "businesses"}`);
+  if (people        > 0) parts.push(`${people} ${people === 1 ? "person" : "people"}`);
+  if (businesses    > 0) parts.push(`${businesses} ${businesses === 1 ? "business" : "businesses"}`);
   if (organizations > 0) parts.push(`${organizations} ${organizations === 1 ? "organization" : "organizations"}`);
-  if (events        > 0) parts.push(`${events}        ${events        === 1 ? "event"        : "events"}`);
 
   if (parts.length === 0) return `${total} ${total === 1 ? "result" : "results"}`;
   return `${total} ${total === 1 ? "result" : "results"} · ${parts.join(" · ")}`;
@@ -58,7 +54,6 @@ type DirectorySearchContextProps = {
   peopleCount: number;
   businessCount: number;
   organizationsCount: number;
-  eventsCount: number;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -72,7 +67,6 @@ export default function DirectorySearchContext({
   peopleCount,
   businessCount,
   organizationsCount,
-  eventsCount,
 }: DirectorySearchContextProps) {
   const searchParams = useSearchParams();
   const router       = useRouter();
@@ -133,7 +127,7 @@ export default function DirectorySearchContext({
   };
 
   const resultSummary = buildResultSummary(
-    scope, totalResults, peopleCount, businessCount, organizationsCount, eventsCount,
+    scope, totalResults, peopleCount, businessCount, organizationsCount,
   );
 
   return (

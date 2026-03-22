@@ -7,7 +7,7 @@ import DirectorySearchContext from "./DirectorySearchContext";
 
 type UnifiedDiscoveryLayoutProps = {
   initialQuery: string;
-  scope: "all" | "people" | "businesses" | "organizations" | "events";
+  scope: "all" | "people" | "businesses" | "organizations";
   results: ReactNode;
   filtersConfig: ReactNode;
   defaultFiltersOpen?: boolean;
@@ -15,7 +15,6 @@ type UnifiedDiscoveryLayoutProps = {
   peopleCount: number;
   businessCount: number;
   organizationsCount: number;
-  eventsCount: number;
 };
 
 export default function UnifiedDiscoveryLayout({
@@ -28,7 +27,6 @@ export default function UnifiedDiscoveryLayout({
   peopleCount,
   businessCount,
   organizationsCount,
-  eventsCount,
 }: UnifiedDiscoveryLayoutProps) {
   const [isFiltersOpen, setIsFiltersOpen] = useState(defaultFiltersOpen);
   const searchParams = useSearchParams();
@@ -63,7 +61,6 @@ export default function UnifiedDiscoveryLayout({
           peopleCount={peopleCount}
           businessCount={businessCount}
           organizationsCount={organizationsCount}
-          eventsCount={eventsCount}
         />
 
         {/* ── Results ───────────────────────────────────────────────── */}

@@ -8,7 +8,6 @@ import {
 } from "@/lib/services/searchService";
 import { supabase } from "@/lib/supabase";
 import type { SearchFilters, EnrichedDirectoryPerson } from "@/lib/services/searchService";
-import type { EventDirectoryEntry } from "@/lib/types/event-directory";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +31,9 @@ export default async function DirectoryPage({
   const params = await searchParams;
   const scopeRaw = params.scope?.toLowerCase() || "all";
 
-  const validScopes: string[] = ["all", "people", "businesses", "organizations", "events"];
+  const validScopes: string[] = ["all", "people", "businesses", "organizations"];
   const scope = validScopes.includes(scopeRaw)
-    ? (scopeRaw as "all" | "people" | "businesses" | "organizations" | "events")
+    ? (scopeRaw as "all" | "people" | "businesses" | "organizations")
     : "all";
 
   const filters: SearchFilters = {
@@ -56,7 +55,6 @@ export default async function DirectoryPage({
 
   const fetchPeople    = scope === "all" || scope === "people";
   const fetchEntities  = scope === "all" || scope === "organizations" || scope === "businesses";
-  const fetchEvents    = scope === "all" || scope === "events";
 
   const [peopleRes, entitiesRes] = await Promise.all([
     fetchPeople
@@ -71,39 +69,7 @@ export default async function DirectoryPage({
   const businesses    = scope === "all" || scope === "businesses"    ? entitiesRes.businesses    : [];
   const organizations = scope === "all" || scope === "organizations" ? entitiesRes.organizations : [];
 
-  const mockEvents: EventDirectoryEntry[] = [
-    {
-      id: "ev-1",
-      name: "Global Albanian Tech Summit 2026",
-      slug: "tech-summit-2026",
-      date: "2026-10-15",
-      time: "9:00 AM EST",
-      location: "Javits Center",
-      city: "New York",
-      state: "NY",
-      country: "USA",
-      description: "Join thousands of Albanian professionals for the largest tech and innovation summit of the year. Featuring keynote speakers from top tier firms.",
-      attendees_count: 1250,
-    },
-    {
-      id: "ev-2",
-      name: "Illyrian Founders Retreat",
-      slug: "founders-retreat",
-      date: "2026-11-05",
-      time: "10:00 AM CET",
-      location: "Marriot Hotel",
-      city: "Tirana",
-      country: "Albania",
-      description: "An exclusive weekend retreat for Albanian founders and venture capitalists discussing the future of the Balkan tech ecosystem.",
-      attendees_count: 45,
-    },
-  ];
-
-  // TODO: Implement actual getEventsDirectory backend service once DB schema expands
-  // Mock events are placeholder data — only show when browsing without a query
-  const events: EventDirectoryEntry[] = fetchEvents && !filters.q ? mockEvents : [];
-
-  const totalResults = people.length + businesses.length + organizations.length + events.length;
+  const totalResults = people.length + businesses.length + organizations.length;
 
   return (
     <UnifiedDiscoveryLayout
@@ -115,7 +81,6 @@ export default async function DirectoryPage({
       peopleCount={people.length}
       businessCount={businesses.length}
       organizationsCount={organizations.length}
-      eventsCount={events.length}
       results={
         <Suspense fallback={
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -130,7 +95,6 @@ export default async function DirectoryPage({
             people={people as EnrichedDirectoryPerson[]}
             businesses={businesses}
             organizations={organizations}
-            events={events}
           />
         </Suspense>
       }

@@ -2,7 +2,9 @@
 
 import { Suspense, useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import EventsResults from "@/components/events/EventsResults";
+import { supabase } from "@/lib/supabase";
 import SectionLabel from "@/components/ui/SectionLabel";
 import {
   CalendarDays,
@@ -15,6 +17,8 @@ import {
   ChevronRight,
   Plus,
   Download,
+  Link2,
+  Trash2,
   AlignJustify,
   LayoutGrid,
   CalendarRange,
@@ -24,6 +28,9 @@ import {
   UserPlus,
   AlignLeft,
   Eye,
+  Loader2,
+  CheckCircle2,
+  SlidersHorizontal,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -55,13 +62,133 @@ interface QuestionItem {
   required: boolean;
 }
 
-function makeDraft(date: Date, startTime = "09:00", endTime = "10:00"): EventDraft {
+// Relationship priority: personal > rsvp > group > org > business > people > browse
+// "browse"  = public/network-visible event the user does not own and hasn't RSVP'd
+// "personal" must only be set when created_by === current user's id
+type CalRelationship = "personal" | "rsvp" | "group" | "org" | "business" | "people" | "browse";
+
+const REL_COLORS: Record<CalRelationship, {
+  bg: string; text: string; border: string; dot: string; rule: string; hover: string;
+}> = {
+  personal: { bg: "bg-rose-500/[0.16]",    text: "text-rose-300",    border: "border-rose-400/[0.22]",    dot: "bg-rose-400",    rule: "bg-rose-500/30",    hover: "hover:bg-rose-500/[0.26]"    },
+  rsvp:     { bg: "bg-teal-500/[0.16]",    text: "text-teal-300",    border: "border-teal-400/[0.22]",    dot: "bg-teal-400",    rule: "bg-teal-500/30",    hover: "hover:bg-teal-500/[0.26]"    },
+  group:    { bg: "bg-amber-500/[0.16]",   text: "text-amber-300",   border: "border-amber-400/[0.22]",   dot: "bg-amber-400",   rule: "bg-amber-500/30",   hover: "hover:bg-amber-500/[0.26]"   },
+  org:      { bg: "bg-emerald-500/[0.16]", text: "text-emerald-300", border: "border-emerald-400/[0.22]", dot: "bg-emerald-400", rule: "bg-emerald-500/30", hover: "hover:bg-emerald-500/[0.26]" },
+  business: { bg: "bg-blue-500/[0.16]",    text: "text-blue-300",    border: "border-blue-400/[0.22]",    dot: "bg-blue-400",    rule: "bg-blue-500/30",    hover: "hover:bg-blue-500/[0.26]"    },
+  people:   { bg: "bg-[#b08d57]/[0.16]",   text: "text-[#b08d57]",   border: "border-[#b08d57]/[0.22]",   dot: "bg-[#b08d57]",   rule: "bg-[#b08d57]/30",   hover: "hover:bg-[#b08d57]/[0.26]"   },
+  browse:   { bg: "bg-white/[0.05]",        text: "text-white/45",    border: "border-white/[0.10]",        dot: "bg-white/30",    rule: "bg-white/[0.12]",   hover: "hover:bg-white/[0.09]"        },
+};
+
+const REL_LABELS: Record<CalRelationship, string> = {
+  personal: "Private Items",
+  rsvp:     "My RSVP",
+  group:    "My Group",
+  org:      "Followed Org",
+  business: "Followed Business",
+  people:   "Followed Person",
+  browse:   "Public Event",
+};
+
+// Default to "browse" (neutral) — never assume personal without explicit classification
+function eventColors(source?: CalRelationship) {
+  return REL_COLORS[source ?? "browse"];
+}
+
+interface CalEvent {
+  id:          string;
+  title:       string;
+  start_time:  string;   // ISO timestamp stored in UTC
+  end_time:    string | null;
+  location:    string | null;
+  description: string | null;
+  created_by:  string | null;
+  source?:     CalRelationship; // classified after fetch — never defaults to personal
+}
+
+// ── Time helpers ──────────────────────────────────────────────────────────────
+
+function addMinutesToTime(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total  = h * 60 + m + minutes;
+  const nh     = Math.floor(total / 60) % 24;
+  const nm     = total % 60;
+  return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+}
+
+function getDurationMinutes(
+  startDate: string, startTime: string,
+  endDate: string,   endTime: string,
+): number {
+  const s = new Date(`${startDate}T${startTime}`);
+  const e = new Date(`${endDate}T${endTime}`);
+  return Math.round((e.getTime() - s.getTime()) / 60000);
+}
+
+function getDurationLabel(
+  startDate: string, startTime: string,
+  endDate: string,   endTime: string,
+): string {
+  const mins = getDurationMinutes(startDate, startTime, endDate, endTime);
+  if (mins <= 0) return "";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+const DURATION_CHIPS = [
+  { label: "30m",  minutes: 30  },
+  { label: "1h",   minutes: 60  },
+  { label: "2h",   minutes: 120 },
+  { label: "3h",   minutes: 180 },
+];
+
+// ── Draft factory ──────────────────────────────────────────────────────────────
+// endTime defaults to startTime + 1h; pass explicitEndTime to override (e.g. from week-grid drag)
+
+function makeDraft(date: Date, startTime = "09:00", explicitEndTime?: string): EventDraft {
   const p  = (n: number) => String(n).padStart(2, "0");
   const ds = `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
   return {
     type: "event", title: "", startDate: ds, startTime,
-    endDate: ds, endTime, allDay: false, repeat: "none",
+    endDate: ds, endTime: explicitEndTime ?? addMinutesToTime(startTime, 60),
+    allDay: false, repeat: "none",
     guests: "", location: "", description: "", calendar: "personal", visibility: "public",
+  };
+}
+
+// ── Timezone helpers ──────────────────────────────────────────────────────────
+// Events are saved in UTC (via .toISOString()). These convert back to local
+// date/time strings so the form and display always show the user's local time.
+
+function isoToLocalDateParts(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
+}
+
+function localDateKey(iso: string): string {
+  // Returns "YYYY-MM-DD" in the user's local timezone for calendar mapping
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function calEventToDraft(ev: CalEvent): EventDraft {
+  const start = isoToLocalDateParts(ev.start_time);
+  const end   = ev.end_time
+    ? isoToLocalDateParts(ev.end_time)
+    : { date: start.date, time: addMinutesToTime(start.time, 60) };
+  return {
+    type: "event", title: ev.title,
+    startDate: start.date, startTime: start.time,
+    endDate:   end.date,   endTime:   end.time,
+    allDay: false, repeat: "none",
+    guests: "", location: ev.location ?? "",
+    description: ev.description ?? "",
+    calendar: "personal", visibility: "public",
   };
 }
 
@@ -123,11 +250,13 @@ function formatHour(h: number): string {
 }
 
 const CAL_SOURCES = [
-  { id: "rsvps",      label: "My RSVPs",            dot: "bg-teal-400"    },
-  { id: "groups",     label: "My Groups",            dot: "bg-amber-400"  },
-  { id: "orgs",       label: "Followed Orgs",        dot: "bg-emerald-400" },
-  { id: "businesses", label: "Followed Businesses",  dot: "bg-blue-400"   },
-  { id: "people",     label: "Followed People",      dot: "bg-[#b08d57]"  },
+  { id: "personal",   label: "Private Items",          dot: "bg-rose-400",    disabled: false },
+  { id: "rsvps",      label: "My RSVPs",               dot: "bg-teal-400",    disabled: false },
+  { id: "groups",     label: "My Groups",              dot: "bg-amber-400",   disabled: false },
+  { id: "orgs",       label: "Followed Orgs",          dot: "bg-emerald-400", disabled: false },
+  { id: "businesses", label: "Followed Businesses",    dot: "bg-blue-400",    disabled: false },
+  { id: "people",     label: "Followed People",        dot: "bg-[#b08d57]",   disabled: false },
+  { id: "imported",   label: "Imported Calendars",     dot: "bg-white/25",    disabled: true  },
 ];
 
 const CAL_VIEW_TABS: { id: CalViewMode; label: string; icon: React.ElementType }[] = [
@@ -148,7 +277,7 @@ const REPEAT_OPTIONS = [
 ];
 
 const CALENDAR_OPTIONS = [
-  { value: "personal", label: "My Calendar"     },
+  { value: "personal", label: "Private Items" },
   { value: "group",    label: "Group Calendar"  },
   { value: "org",      label: "Org Calendar"    },
   { value: "business", label: "Business Cal."   },
@@ -290,19 +419,66 @@ const timeInputCls =
 // ── CreateEventModal ──────────────────────────────────────────────────────────
 
 function CreateEventModal({
-  draft: initialDraft, onClose, onMoreOptions,
+  draft: initialDraft, onClose, onSave, onMoreOptions,
 }: {
   draft: EventDraft;
   onClose: () => void;
+  onSave: (d: EventDraft) => Promise<void>;
   onMoreOptions: (d: EventDraft) => void;
 }) {
-  const [draft, setDraft] = useState<EventDraft>(initialDraft);
+  const [draft, setDraft]       = useState<EventDraft>(initialDraft);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saved, setSaved]       = useState(false);
+
   const set = (partial: Partial<EventDraft>) => setDraft((d) => ({ ...d, ...partial }));
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  // When start time changes, preserve the current duration
+  const handleStartTimeChange = (newTime: string) => {
+    const durMins = Math.max(
+      getDurationMinutes(draft.startDate, draft.startTime, draft.endDate, draft.endTime),
+      60,
+    );
+    set({ startTime: newTime, endTime: addMinutesToTime(newTime, durMins) });
+  };
+
+  const handleStartDateChange = (newDate: string) => {
+    // Keep end date in sync if they were the same day
+    if (draft.startDate === draft.endDate) {
+      set({ startDate: newDate, endDate: newDate });
+    } else {
+      set({ startDate: newDate });
+    }
+  };
+
+  const setDuration = (minutes: number) => {
+    set({ endTime: addMinutesToTime(draft.startTime, minutes), endDate: draft.startDate });
+  };
+
+  const durationLabel = !draft.allDay
+    ? getDurationLabel(draft.startDate, draft.startTime, draft.endDate, draft.endTime)
+    : "";
+
+  const handleCreate = async () => {
+    if (!draft.title.trim() || isSaving) return;
+    setIsSaving(true);
+    setSaveError("");
+    try {
+      await onSave(draft);
+      setSaved(true);
+      setTimeout(onClose, 900);
+    } catch (err: any) {
+      setSaveError(err.message || "Failed to save. Please try again.");
+      setIsSaving(false);
+    }
+  };
+
+  const isTask = draft.type === "task";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -330,75 +506,146 @@ function CreateEventModal({
         <div className="px-5 pb-4 shrink-0">
           <input
             type="text" value={draft.title} onChange={(e) => set({ title: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && draft.title.trim() && onClose()}
-            placeholder="Add title" autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+            placeholder={isTask ? "What needs to be done?" : "Add title"} autoFocus
             className="w-full text-base font-semibold bg-transparent border-b border-white/[0.1] pb-2 text-white placeholder:text-white/22 outline-none focus:border-teal-400/30 transition-colors"
           />
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {/* Date & Time */}
-          <div className="space-y-2.5">
-            <div>
-              <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">Start</label>
-              <div className="flex gap-1.5">
-                <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
-                {!draft.allDay && <input type="time" value={draft.startTime} onChange={(e) => set({ startTime: e.target.value })} className={timeInputCls} />}
-              </div>
-            </div>
-            <div>
-              <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">End</label>
-              <div className="flex gap-1.5">
-                <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
-                {!draft.allDay && <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />}
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-4 pt-0.5">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <Toggle checked={draft.allDay} onChange={() => set({ allDay: !draft.allDay })} />
-                <span className="text-xs text-white/48">All day</span>
-              </label>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <RotateCcw size={10} className="text-white/25 shrink-0" />
-                <div className="relative">
-                  <select value={draft.repeat} onChange={(e) => set({ repeat: e.target.value })}
-                    className="appearance-none bg-transparent text-xs text-white/48 outline-none cursor-pointer pr-3.5">
-                    {REPEAT_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
-                  </select>
-                  <ChevronDown size={9} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+
+          {/* ── TASK mode — lightweight ── */}
+          {isTask && (
+            <>
+              <div>
+                <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1.5">Due date</label>
+                <div className="flex gap-1.5">
+                  <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
+                  <input type="time" value={draft.startTime} onChange={(e) => set({ startTime: e.target.value })} className={timeInputCls} />
                 </div>
               </div>
-            </div>
-          </div>
+              <div className="border-t border-white/[0.06]" />
+              <InlineField icon={AlignLeft} placeholder="Notes (optional)…" value={draft.description} onChange={(v) => set({ description: v })} multiline />
+            </>
+          )}
 
-          <div className="border-t border-white/[0.06]" />
+          {/* ── EVENT mode — full composer ── */}
+          {!isTask && (
+            <>
+              {/* Start */}
+              <div className="space-y-2.5">
+                <div>
+                  <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">Start</label>
+                  <div className="flex gap-1.5">
+                    <input type="date" value={draft.startDate} onChange={(e) => handleStartDateChange(e.target.value)} className={dateInputCls} />
+                    {!draft.allDay && (
+                      <input type="time" value={draft.startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={timeInputCls} />
+                    )}
+                  </div>
+                </div>
 
-          <div>
-            <InlineField icon={UserPlus}  placeholder="Add guests"      value={draft.guests}      onChange={(v) => set({ guests: v })} />
-            <InlineField icon={MapPin}    placeholder="Add location"    value={draft.location}    onChange={(v) => set({ location: v })} />
-            <InlineField icon={AlignLeft} placeholder="Add description" value={draft.description} onChange={(v) => set({ description: v })} multiline />
-          </div>
+                {/* Duration chips */}
+                {!draft.allDay && (
+                  <div>
+                    <div className="flex gap-1 items-center">
+                      {DURATION_CHIPS.map(({ label, minutes }) => {
+                        const expectedEnd = addMinutesToTime(draft.startTime, minutes);
+                        const isActive    = draft.endTime === expectedEnd && draft.startDate === draft.endDate;
+                        return (
+                          <button key={label} onClick={() => setDuration(minutes)}
+                            type="button"
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                              isActive
+                                ? "bg-teal-500/[0.15] text-teal-400 border border-teal-400/25"
+                                : "border border-white/[0.10] text-white/38 hover:text-white/65 hover:border-white/18"
+                            }`}>
+                            {label}
+                          </button>
+                        );
+                      })}
+                      {/* Custom duration badge — only when no preset chip matches */}
+                      {durationLabel && !DURATION_CHIPS.some(({ minutes }) =>
+                        addMinutesToTime(draft.startTime, minutes) === draft.endTime && draft.startDate === draft.endDate
+                      ) && (
+                        <span className="text-[9px] font-semibold text-teal-400/70 bg-teal-500/[0.10] px-1.5 py-0.5 rounded-full leading-none ml-1">
+                          {durationLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-          <div className="border-t border-white/[0.06]" />
+                {/* End */}
+                <div>
+                  <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">End</label>
+                  <div className="flex gap-1.5">
+                    <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
+                    {!draft.allDay && (
+                      <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />
+                    )}
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-2 gap-2 pb-1">
-            <SelectField icon={CalendarDays} value={draft.calendar}   onChange={(v) => set({ calendar: v })}   options={CALENDAR_OPTIONS}   />
-            <SelectField icon={Eye}          value={draft.visibility} onChange={(v) => set({ visibility: v })} options={DISCOVERY_OPTIONS} />
-          </div>
+                <div className="flex items-center justify-between gap-4 pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <Toggle checked={draft.allDay} onChange={() => set({ allDay: !draft.allDay })} />
+                    <span className="text-xs text-white/48">All day</span>
+                  </label>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <RotateCcw size={10} className="text-white/25 shrink-0" />
+                    <div className="relative">
+                      <select value={draft.repeat} onChange={(e) => set({ repeat: e.target.value })}
+                        className="appearance-none bg-transparent text-xs text-white/48 outline-none cursor-pointer pr-3.5">
+                        {REPEAT_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
+                      </select>
+                      <ChevronDown size={9} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-white/[0.06]" />
+
+              <div>
+                <InlineField icon={UserPlus}  placeholder="Add guests"      value={draft.guests}      onChange={(v) => set({ guests: v })} />
+                <InlineField icon={MapPin}    placeholder="Add location"    value={draft.location}    onChange={(v) => set({ location: v })} />
+                <InlineField icon={AlignLeft} placeholder="Add description" value={draft.description} onChange={(v) => set({ description: v })} multiline />
+              </div>
+
+              <div className="border-t border-white/[0.06]" />
+
+              <div className="grid grid-cols-2 gap-2 pb-1">
+                <SelectField icon={CalendarDays} value={draft.calendar}   onChange={(v) => set({ calendar: v })}   options={CALENDAR_OPTIONS}   />
+                <SelectField icon={Eye}          value={draft.visibility} onChange={(v) => set({ visibility: v })} options={DISCOVERY_OPTIONS} />
+              </div>
+            </>
+          )}
+
+          {saveError && <p className="text-xs text-red-400 pb-1">{saveError}</p>}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-3.5 border-t border-white/[0.07] flex items-center justify-between shrink-0">
           <button onClick={onClose} className="text-xs font-medium text-white/38 hover:text-white/60 transition-colors">Cancel</button>
           <div className="flex items-center gap-2">
-            <button onClick={() => onMoreOptions(draft)}
-              className="px-3 py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/45 hover:text-white/70 hover:border-white/18 transition-colors">
-              More options
-            </button>
-            <button disabled={!draft.title.trim()} onClick={onClose}
-              className="wac-btn-primary wac-btn-sm disabled:opacity-30 disabled:cursor-not-allowed">
-              Create
+            {!isTask && (
+              <button onClick={() => onMoreOptions(draft)}
+                className="px-3 py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/38 hover:text-white/65 hover:border-white/18 transition-colors">
+                Full Event Builder →
+              </button>
+            )}
+            <button
+              disabled={!draft.title.trim() || isSaving || saved}
+              onClick={handleCreate}
+              className="wac-btn-primary wac-btn-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              {saved
+                ? <><CheckCircle2 size={11} />Saved!</>
+                : isSaving
+                  ? <><Loader2 size={11} className="animate-spin" />{isTask ? "Saving…" : "Creating…"}</>
+                  : isTask ? "Save Task" : "Create"
+              }
             </button>
           </div>
         </div>
@@ -413,13 +660,18 @@ function CreateEventModal({
 // discovery/access split, RSVP depth, questionnaire, and reminders.
 
 function FullEventEditorModal({
-  draft: initialDraft, onClose,
+  draft: initialDraft, onClose, onSave,
 }: {
   draft: EventDraft;
   onClose: () => void;
+  onSave: (d: EventDraft) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<EventDraft>(initialDraft);
   const set = (partial: Partial<EventDraft>) => setDraft((d) => ({ ...d, ...partial }));
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saved, setSaved]       = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabId>("basics");
 
@@ -471,6 +723,37 @@ function FullEventEditorModal({
       { id: Math.random().toString(36).slice(2), text, type: "text", required: false },
     ]);
   }
+
+  async function handleSaveEvent() {
+    if (!draft.title.trim() || isSaving) return;
+    setIsSaving(true);
+    setSaveError("");
+    try {
+      await onSave(draft);
+      setSaved(true);
+      setTimeout(onClose, 900);
+    } catch (err: any) {
+      setSaveError(err.message || "Failed to save. Please try again.");
+      setIsSaving(false);
+    }
+  }
+
+  // Preserve current duration when start time changes
+  const handleEditorStartTimeChange = (newTime: string) => {
+    const durMins = Math.max(
+      getDurationMinutes(draft.startDate, draft.startTime, draft.endDate, draft.endTime),
+      60,
+    );
+    set({ startTime: newTime, endTime: addMinutesToTime(newTime, durMins) });
+  };
+
+  const setEditorDuration = (minutes: number) => {
+    set({ endTime: addMinutesToTime(draft.startTime, minutes), endDate: draft.startDate });
+  };
+
+  const editorDurationLabel = !draft.allDay
+    ? getDurationLabel(draft.startDate, draft.startTime, draft.endDate, draft.endTime)
+    : "";
 
   function goNextTab() {
     const idx = EDITOR_TABS.findIndex((t) => t.id === activeTab);
@@ -550,9 +833,39 @@ function FullEventEditorModal({
                     <span className="text-[10px] text-white/30 w-8 shrink-0">Start</span>
                     <div className="flex gap-1.5 flex-1">
                       <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
-                      {!draft.allDay && <input type="time" value={draft.startTime} onChange={(e) => set({ startTime: e.target.value })} className={timeInputCls} />}
+                      {!draft.allDay && <input type="time" value={draft.startTime} onChange={(e) => handleEditorStartTimeChange(e.target.value)} className={timeInputCls} />}
                     </div>
                   </div>
+
+                  {/* Duration chips */}
+                  {!draft.allDay && (
+                    <div className="flex items-center gap-2 pl-10">
+                      <div className="flex gap-1 flex-wrap">
+                        {DURATION_CHIPS.map(({ label, minutes }) => {
+                          const expectedEnd = addMinutesToTime(draft.startTime, minutes);
+                          const isActive    = draft.endTime === expectedEnd && draft.startDate === draft.endDate;
+                          return (
+                            <button key={label} onClick={() => setEditorDuration(minutes)} type="button"
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                                isActive
+                                  ? "bg-teal-500/[0.15] text-teal-400 border border-teal-400/25"
+                                  : "border border-white/[0.10] text-white/38 hover:text-white/65 hover:border-white/18"
+                              }`}>
+                              {label}
+                            </button>
+                          );
+                        })}
+                        {editorDurationLabel && !DURATION_CHIPS.some(({ minutes }) =>
+                          addMinutesToTime(draft.startTime, minutes) === draft.endTime && draft.startDate === draft.endDate
+                        ) && (
+                          <span className="self-center text-[10px] font-semibold text-teal-400/60 bg-teal-500/[0.08] px-1.5 py-0.5 rounded-full leading-none">
+                            {editorDurationLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-white/30 w-8 shrink-0">End</span>
                     <div className="flex gap-1.5 flex-1">
@@ -677,6 +990,11 @@ function FullEventEditorModal({
               <div>
                 <div className={sectionHead}>Calendar destination</div>
                 <SelectField icon={CalendarDays} value={draft.calendar} onChange={(v) => set({ calendar: v })} options={CALENDAR_OPTIONS} />
+                {draft.calendar === "personal" && (
+                  <p className="text-[10px] text-white/28 mt-1.5 leading-relaxed">
+                    Private by default. Lightweight personal scheduling — you can share or publish it later if needed.
+                  </p>
+                )}
               </div>
 
               {/* Discovery — who can find it */}
@@ -868,10 +1186,13 @@ function FullEventEditorModal({
 
         {/* ── Footer ── */}
         <div className="px-5 py-3.5 border-t border-white/[0.07] flex items-center justify-between shrink-0">
-          <button onClick={onClose}
-            className="text-xs font-medium text-white/38 hover:text-white/60 transition-colors">
-            Cancel
-          </button>
+          <div className="flex flex-col items-start gap-1">
+            <button onClick={onClose}
+              className="text-xs font-medium text-white/38 hover:text-white/60 transition-colors">
+              Cancel
+            </button>
+            {saveError && <p className="text-[10px] text-red-400">{saveError}</p>}
+          </div>
           <div className="flex items-center gap-2">
             {!isLastTab && (
               <button onClick={goNextTab}
@@ -879,9 +1200,16 @@ function FullEventEditorModal({
                 Next →
               </button>
             )}
-            <button disabled={!draft.title.trim()} onClick={onClose}
-              className="wac-btn-primary wac-btn-md disabled:opacity-30 disabled:cursor-not-allowed">
-              Save Event
+            <button
+              disabled={!draft.title.trim() || isSaving || saved}
+              onClick={handleSaveEvent}
+              className="wac-btn-primary wac-btn-md disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5">
+              {saved
+                ? <><CheckCircle2 size={12} />Saved!</>
+                : isSaving
+                  ? <><Loader2 size={12} className="animate-spin" />Saving…</>
+                  : "Save Event"
+              }
             </button>
           </div>
         </div>
@@ -924,6 +1252,322 @@ function FeaturedCard({ event }: { event: typeof FEATURED[0] }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+// ── CalEventDetailModal ───────────────────────────────────────────────────────
+
+function CalEventDetailModal({
+  event, onClose, onEdit, onDelete,
+}: {
+  event:    CalEvent;
+  onClose:  () => void;
+  onEdit:   () => void;
+  onDelete: () => Promise<void>;
+}) {
+  const [isDeleting,  setIsDeleting]  = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const c          = eventColors(event.source);
+  const relLabel   = REL_LABELS[event.source ?? "browse"];
+
+  const start      = new Date(event.start_time);
+  const end        = event.end_time ? new Date(event.end_time) : null;
+  const dateLabel  = start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const timeLabel  = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const endLabel   = end?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", esc);
+    return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", esc); };
+  }, [onClose]);
+
+  const handleDelete = async () => {
+    setIsDeleting(true); setDeleteError("");
+    try { await onDelete(); onClose(); }
+    catch (e: any) { setDeleteError(e.message || "Delete failed"); setIsDeleting(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full sm:max-w-md bg-[#0e0e0e] border border-white/[0.09] rounded-t-[28px] sm:rounded-2xl shadow-2xl overflow-hidden">
+
+        {/* Mobile drag handle */}
+        <div className="flex justify-center pt-3 sm:hidden">
+          <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
+        </div>
+
+        {/* Relationship color accent bar */}
+        <div className={`h-[2px] w-full mt-3 sm:mt-0 ${c.rule}`} />
+
+        {/* Header — title + source badge + close */}
+        <div className="flex items-start gap-3 px-5 pt-4 pb-3">
+          <div className="flex-1 min-w-0">
+            {/* Source badge */}
+            <div className={`inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full mb-2.5 ${c.bg} border ${c.border}`}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+              <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] ${c.text}`}>{relLabel}</span>
+            </div>
+            <h2 className="text-[16px] font-semibold text-white leading-snug">{event.title}</h2>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-white/28 hover:text-white/60 hover:bg-white/[0.06] shrink-0 transition-colors mt-0.5">
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Metadata section */}
+        <div className="px-5 pb-4 space-y-2.5 border-b border-white/[0.07]">
+
+          {/* Date + time row */}
+          <div className="flex items-center gap-3">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${c.bg} border ${c.border}`}>
+              <CalendarDays size={12} className={c.text} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[12.5px] font-medium text-white/72 leading-snug">{dateLabel}</div>
+              <div className={`text-[11px] font-medium mt-0.5 ${c.text} opacity-80`}>
+                {timeLabel}{endLabel ? ` – ${endLabel}` : ""}
+              </div>
+            </div>
+          </div>
+
+          {/* Location row */}
+          {event.location && (
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-white/[0.04] border border-white/[0.08] flex items-center justify-center shrink-0">
+                <MapPin size={12} className="text-white/35" />
+              </div>
+              <span className="text-[12.5px] text-white/58 leading-snug truncate">{event.location}</span>
+            </div>
+          )}
+
+        </div>
+
+        {/* Description section */}
+        {event.description && (
+          <div className="px-5 py-4 border-b border-white/[0.07]">
+            <div className="flex items-start gap-2.5">
+              <AlignLeft size={12} className="text-white/25 mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-white/50 leading-relaxed whitespace-pre-line">{event.description}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="px-5 py-4 flex items-center gap-3">
+          {/* Destructive — left aligned, text-only */}
+          <div className="flex-1 min-w-0">
+            <button onClick={handleDelete} disabled={isDeleting}
+              className="text-[11px] font-medium text-red-400/45 hover:text-red-400 transition-colors disabled:opacity-40 flex items-center gap-1.5">
+              {isDeleting && <Loader2 size={10} className="animate-spin" />}
+              {isDeleting ? "Deleting…" : "Delete event"}
+            </button>
+            {deleteError && <p className="text-[10px] text-red-400 mt-0.5">{deleteError}</p>}
+          </div>
+          {/* Confirm/edit — right aligned */}
+          <button onClick={onClose}
+            className="px-4 py-1.5 rounded-full text-xs font-medium text-white/35 border border-white/[0.09] hover:text-white/58 hover:border-white/[0.16] transition-colors shrink-0">
+            Close
+          </button>
+          <button onClick={onEdit}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors shrink-0 ${c.bg} ${c.text} border ${c.border} ${c.hover}`}>
+            Edit Event
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── MobileEventStrip ─────────────────────────────────────────────────────────
+// Compact below-calendar event list shown on mobile only (lg:hidden).
+// Replaces the sidebar "This Week/Month" panel when sidebar is collapsed.
+
+function MobileEventStrip({
+  label, events, loading, onOpen,
+}: {
+  label: string;
+  events: CalEvent[];
+  loading: boolean;
+  onOpen: (ev: CalEvent) => void;
+}) {
+  if (loading) return null; // toolbar spinner already covers this
+  if (events.length === 0) return (
+    <div className="lg:hidden mt-3 px-1">
+      <p className="text-[10px] text-white/20">No events — tap + to add one.</p>
+    </div>
+  );
+  const visible = events.slice(0, 4);
+  const extra   = events.length - visible.length;
+  return (
+    <div className="lg:hidden mt-4 space-y-1">
+      <div className="flex items-center justify-between mb-2 px-0.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">{label}</span>
+        <span className="text-[10px] text-white/18">{events.length} event{events.length !== 1 ? "s" : ""}</span>
+      </div>
+      {visible.map((ev) => {
+        const c = eventColors(ev.source);
+        const d = new Date(ev.start_time);
+        return (
+          <button key={ev.id} onClick={() => onOpen(ev)}
+            className="w-full text-left flex items-center gap-2.5 px-0.5 py-1.5 group">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot} opacity-50`} />
+            <span className="text-[10px] text-white/28 shrink-0 tabular-nums">
+              {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </span>
+            <span className={`text-[11px] font-medium truncate ${c.text} group-hover:opacity-100 opacity-75 transition-opacity`}>{ev.title}</span>
+          </button>
+        );
+      })}
+      {extra > 0 && (
+        <p className="text-[10px] text-white/20 pl-4">+{extra} more</p>
+      )}
+    </div>
+  );
+}
+
+// ── ImportedCal type ──────────────────────────────────────────────────────────
+
+type ImportedCal = {
+  id: string;
+  name: string;
+  icsUrl: string;
+  colorDot: string;
+};
+
+const IMPORT_COLORS = [
+  { dot: "bg-violet-400",  label: "Violet"  },
+  { dot: "bg-sky-400",     label: "Sky"     },
+  { dot: "bg-pink-400",    label: "Pink"    },
+  { dot: "bg-lime-400",    label: "Lime"    },
+  { dot: "bg-orange-400",  label: "Orange"  },
+  { dot: "bg-cyan-400",    label: "Cyan"    },
+];
+
+const LS_KEY = "wac_imported_cals";
+
+function loadImportedCals(): ImportedCal[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
+}
+
+function saveImportedCals(cals: ImportedCal[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(cals));
+}
+
+// ── ImportCalendarModal ───────────────────────────────────────────────────────
+
+function ImportCalendarModal({
+  onClose,
+  onSave,
+}: {
+  onClose: () => void;
+  onSave: (cal: ImportedCal) => void;
+}) {
+  const [name,     setName]     = useState("");
+  const [icsUrl,   setIcsUrl]   = useState("");
+  const [colorDot, setColorDot] = useState(IMPORT_COLORS[0].dot);
+  const [error,    setError]    = useState("");
+
+  function handleSave() {
+    if (!name.trim())   { setError("Give this calendar a name."); return; }
+    if (!icsUrl.trim()) { setError("Paste the ICS feed URL."); return; }
+    const url = icsUrl.trim();
+    if (!url.startsWith("http") && !url.startsWith("webcal")) {
+      setError("URL should start with https:// or webcal://");
+      return;
+    }
+    onSave({ id: `imp_${Date.now()}`, name: name.trim(), icsUrl: url, colorDot });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.10] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.06] shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-white/85">Import Calendar</h2>
+            <p className="text-[11px] text-white/35 mt-0.5">Add a Google Calendar or ICS feed</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.05] text-white/35 hover:text-white/65 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+
+          {/* Name */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2">Calendar Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => { setName(e.target.value); setError(""); }}
+              placeholder="e.g. My Google Calendar, Work, Family"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/22 outline-none focus:border-teal-400/30 transition-colors"
+            />
+          </div>
+
+          {/* ICS URL */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2">ICS Feed URL</label>
+            <div className="relative">
+              <Link2 size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+              <input
+                type="url"
+                value={icsUrl}
+                onChange={(e) => { setIcsUrl(e.target.value); setError(""); }}
+                placeholder="https://calendar.google.com/…/basic.ics"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-white/22 outline-none focus:border-teal-400/30 transition-colors"
+              />
+            </div>
+            <div className="mt-2.5 p-3 rounded-xl bg-white/[0.025] border border-white/[0.05]">
+              <p className="text-[10px] text-white/35 leading-relaxed">
+                <span className="text-white/50 font-medium">How to get your Google Calendar ICS URL:</span><br />
+                In Google Calendar → Settings → your calendar → "Secret address in iCal format"
+              </p>
+            </div>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2.5">Calendar Color</label>
+            <div className="flex gap-2.5">
+              {IMPORT_COLORS.map(({ dot, label }) => (
+                <button
+                  key={dot}
+                  onClick={() => setColorDot(dot)}
+                  title={label}
+                  className={`w-7 h-7 rounded-full transition-all ${dot} ${colorDot === dot ? "ring-2 ring-white/50 ring-offset-2 ring-offset-[#0f0f0f] scale-110" : "opacity-55 hover:opacity-80"}`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Note: read-only */}
+          <p className="text-[10px] text-white/28 leading-relaxed">
+            Imported calendars are <span className="text-white/42">read-only</span> — events will appear in your WAC calendar but are managed in the original app.
+          </p>
+
+          {error && <p className="text-[11px] text-red-400/80">{error}</p>}
+        </div>
+
+        <div className="px-5 pb-6 pt-3 shrink-0 border-t border-white/[0.05]">
+          <button
+            onClick={handleSave}
+            className="w-full py-3 rounded-full bg-teal-500/[0.14] border border-teal-400/20 text-teal-400/90 text-sm font-semibold hover:bg-teal-500/[0.22] transition-colors">
+            Import Calendar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -972,6 +1616,32 @@ function CalendarModeView() {
     });
   }
 
+  const [showSourceSheet,  setShowSourceSheet]  = useState(false);
+  const [showImportModal,  setShowImportModal]  = useState(false);
+  const [importedCals,     setImportedCals]     = useState<ImportedCal[]>(() => loadImportedCals());
+
+  function addImportedCal(cal: ImportedCal) {
+    const next = [...importedCals, cal];
+    setImportedCals(next);
+    saveImportedCals(next);
+    setActiveSources((prev) => { const s = new Set(prev); s.add(cal.id); return s; });
+    setShowImportModal(false);
+  }
+
+  function removeImportedCal(id: string) {
+    const next = importedCals.filter((c) => c.id !== id);
+    setImportedCals(next);
+    saveImportedCals(next);
+    setActiveSources((prev) => { const s = new Set(prev); s.delete(id); return s; });
+  }
+
+  // Navbar `+` in Calendar mode → open Quick Create
+  useEffect(() => {
+    const handler = () => setModalDraft(makeDraft(new Date()));
+    window.addEventListener("events-compose", handler);
+    return () => window.removeEventListener("events-compose", handler);
+  }, []);
+
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selDayIdx,   setSelDayIdx]   = useState<number | null>(null);
   const [selStartH,   setSelStartH]   = useState<number | null>(null);
@@ -984,14 +1654,112 @@ function CalendarModeView() {
     return () => window.removeEventListener("mouseup", stop);
   }, []);
 
-  const [modalDraft,     setModalDraft]     = useState<EventDraft | null>(null);
-  const [showFullEditor, setShowFullEditor] = useState(false);
+  // ── Event data ─────────────────────────────────────────────────────────────
+  const [calEvents,    setCalEvents]    = useState<CalEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [calRefreshKey, setCalRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchVisibleEvents() {
+      let start: Date, end: Date;
+      if (calView === "week") {
+        const dow = navDate.getDay();
+        start = new Date(navDate.getFullYear(), navDate.getMonth(), navDate.getDate() - dow, 0, 0, 0);
+        end   = new Date(navDate.getFullYear(), navDate.getMonth(), navDate.getDate() - dow + 6, 23, 59, 59);
+      } else if (calView === "agenda") {
+        // Agenda follows the same month context as the nav header — not a fixed rolling window
+        start = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
+        end   = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 0, 23, 59, 59);
+      } else {
+        start = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
+        end   = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 0, 23, 59, 59);
+      }
+      console.log("[CalFetch] view:", calView, "range:", start.toISOString(), "→", end.toISOString());
+      setEventsLoading(true);
+      const [{ data, error }, { data: { user: authUser } }] = await Promise.all([
+        supabase
+          .from("events")
+          .select("id, title, start_time, end_time, location, description, created_by")
+          .gte("start_time", start.toISOString())
+          .lte("start_time", end.toISOString())
+          .order("start_time", { ascending: true }),
+        supabase.auth.getUser(),
+      ]);
+      if (cancelled) return;
+      if (error) {
+        console.error("[CalFetch] error:", error.message);
+        setCalEvents([]);
+      } else {
+        const uid = authUser?.id ?? null;
+        const classified = (data ?? []).map((ev: any): CalEvent => ({
+          ...ev,
+          // Only mark personal if the current user created it — never assume
+          source: (uid && ev.created_by === uid) ? "personal" : "browse",
+        }));
+        console.log("[CalFetch] fetched", classified.length, "events:", classified);
+        setCalEvents(classified);
+      }
+      setEventsLoading(false);
+    }
+    fetchVisibleEvents();
+    return () => { cancelled = true; };
+  }, [navDate, calView, calRefreshKey]);
+
+  const [modalDraft,       setModalDraft]       = useState<EventDraft | null>(null);
+  const [showFullEditor,   setShowFullEditor]   = useState(false);
+  const [editingEventId,   setEditingEventId]   = useState<string | null>(null);
+  const [selectedCalEvent, setSelectedCalEvent] = useState<CalEvent | null>(null);
 
   function closeModal() {
-    setModalDraft(null); setShowFullEditor(false);
+    setModalDraft(null); setShowFullEditor(false); setEditingEventId(null);
     setSelectedDay(null); setSelDayIdx(null); setSelStartH(null); setSelEndH(null);
   }
   function handleMoreOptions(draft: EventDraft) { setModalDraft(draft); setShowFullEditor(true); }
+
+  function openEventDetail(ev: CalEvent) { setSelectedCalEvent(ev); }
+  function openEventEdit(ev: CalEvent) {
+    setEditingEventId(ev.id);
+    setModalDraft(calEventToDraft(ev));
+    setShowFullEditor(false);
+    setSelectedCalEvent(null);
+  }
+  async function handleEventDelete(id: string): Promise<void> {
+    const { error } = await supabase.from("events").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    setCalRefreshKey((k) => k + 1);
+  }
+
+  async function handleEventSave(draft: EventDraft): Promise<void> {
+    const visMap: Record<string, string> = {
+      public: "public", private: "private",
+      network: "members", group: "members", org: "members",
+    };
+    const { data: { user } } = await supabase.auth.getUser();
+    // Save in UTC — new Date("YYYY-MM-DDTHH:MM:SS") is local time, .toISOString() converts to UTC
+    const payload: Record<string, unknown> = {
+      title:       draft.title.trim(),
+      description: draft.description || null,
+      location:    draft.location    || null,
+      start_time:  new Date(`${draft.startDate}T${draft.startTime}:00`).toISOString(),
+      end_time:    new Date(`${draft.endDate}T${draft.endTime}:00`).toISOString(),
+      visibility:  visMap[draft.visibility] ?? "public",
+      created_by:  user?.id ?? null,
+    };
+    console.log("[EventSave] payload:", payload);
+    let dbError;
+    if (editingEventId) {
+      const res = await supabase.from("events").update(payload).eq("id", editingEventId);
+      dbError = res.error;
+    } else {
+      const res = await supabase.from("events").insert(payload);
+      dbError = res.error;
+    }
+    if (dbError) throw new Error(dbError.message);
+    console.log("[EventSave] success");
+    setEditingEventId(null);
+    setCalRefreshKey((k) => k + 1);
+  }
 
   function handleDayClick(day: number) {
     const date = new Date(navDate.getFullYear(), navDate.getMonth(), day);
@@ -1052,6 +1820,18 @@ function CalendarModeView() {
     [weekStart]
   );
 
+  // Map "YYYY-MM-DD" (local) → CalEvent[] for O(1) lookup in month + week cells
+  // Uses localDateKey() so events at e.g. 11 PM in UTC-5 still land on the correct local date
+  const eventsMap = useMemo(() => {
+    const map = new Map<string, CalEvent[]>();
+    for (const ev of calEvents) {
+      const dk = localDateKey(ev.start_time);
+      if (!map.has(dk)) map.set(dk, []);
+      map.get(dk)!.push(ev);
+    }
+    return map;
+  }, [calEvents]);
+
   const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 
   const periodLabel =
@@ -1070,33 +1850,46 @@ function CalendarModeView() {
   }
 
   return (
-    <div className="mt-6 flex flex-col lg:flex-row gap-5">
+    <div className="mt-2 md:mt-4 flex flex-col lg:flex-row gap-5 min-h-[calc(100vh-240px)]">
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* Toolbar */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <button onClick={prevPeriod} className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/15 transition-colors">
-              <ChevronLeft size={14} />
+            <button onClick={prevPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors">
+              <ChevronLeft size={15} />
             </button>
-            <span className="text-sm font-semibold text-white/80 min-w-[160px] text-center">{periodLabel}</span>
-            <button onClick={nextPeriod} className="w-7 h-7 flex items-center justify-center rounded-lg border border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/15 transition-colors">
-              <ChevronRight size={14} />
+            <span className="text-[15px] font-semibold text-white/85 min-w-[170px] text-center tracking-tight">{periodLabel}</span>
+            <button onClick={nextPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors">
+              <ChevronRight size={15} />
             </button>
           </div>
-          <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] border border-white/[0.07] rounded-lg">
-            {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
-              const active = calView === id;
-              return (
-                <button key={id} onClick={() => switchCalView(id)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                    active ? "bg-teal-500/[0.12] text-teal-400" : "text-white/35 hover:text-white/60"
-                  }`}>
-                  <Icon size={11} />
-                  <span className="hidden sm:inline">{label}</span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2">
+            {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0" />}
+            {/* Mobile source filter — sidebar is hidden on mobile */}
+            <button
+              onClick={() => setShowSourceSheet(true)}
+              className={`lg:hidden w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
+                activeSources.size < (CAL_SOURCES.filter(s => s.id !== "imported").length + importedCals.length)
+                  ? "bg-teal-500/[0.12] border-teal-400/20 text-teal-400/80"
+                  : "border-white/[0.09] text-white/35 hover:text-white/65 hover:border-white/18"
+              }`}>
+              <SlidersHorizontal size={13} />
+            </button>
+            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] border border-white/[0.07] rounded-lg">
+              {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
+                const active = calView === id;
+                return (
+                  <button key={id} onClick={() => switchCalView(id)}
+                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      active ? "bg-white/[0.08] text-white/80" : "text-white/30 hover:text-white/55"
+                    }`}>
+                    <Icon size={11} />
+                    <span className="hidden sm:inline">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -1115,31 +1908,65 @@ function CalendarModeView() {
                   const isSelected = day !== null && day === selectedDay && !isToday;
                   const isWeekend  = i % 7 === 0 || i % 7 === 6;
                   const lastInRow  = i % 7 === 6;
+                  const dateKey    = day !== null
+                    ? `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                    : null;
+                  const dayEvs = dateKey ? (eventsMap.get(dateKey) ?? []) : [];
                   return (
                     <div key={i} onClick={() => day !== null && handleDayClick(day)}
-                      className={`relative min-h-[56px] p-1.5 border-b border-r border-white/[0.04] transition-colors ${lastInRow ? "border-r-0" : ""} ${
+                      className={`relative min-h-[90px] sm:min-h-[104px] p-1 sm:p-1.5 border-b border-r border-white/[0.04] transition-colors ${lastInRow ? "border-r-0" : ""} ${
                         day === null ? "bg-white/[0.01]"
-                        : isSelected ? "bg-teal-500/[0.07] cursor-pointer"
+                        : isSelected ? "bg-white/[0.04] cursor-pointer"
                         : isWeekend  ? "bg-white/[0.012] cursor-pointer hover:bg-white/[0.03]"
                         : "cursor-pointer hover:bg-white/[0.025]"
                       }`}>
                       {day !== null && (
-                        <span className={`inline-flex items-center justify-center w-5 h-5 text-[11px] rounded-full ${
-                          isToday    ? "bg-teal-500/20 text-teal-400 font-semibold ring-1 ring-teal-400/40"
-                          : isSelected ? "bg-teal-400/15 text-teal-400 font-semibold"
-                          : "text-white/35 font-medium"
-                        }`}>
-                          {day}
-                        </span>
+                        <>
+                          <span className={`inline-flex items-center justify-center w-6 h-6 text-[11px] rounded-full ${
+                            isToday    ? "bg-teal-500/20 text-teal-400 font-semibold ring-1 ring-teal-400/40"
+                            : isSelected ? "bg-white/10 text-white/80 font-semibold"
+                            : "text-white/35 font-medium"
+                          }`}>
+                            {day}
+                          </span>
+                          {/* Event chips — up to 3 visible, then "+N more" overflow */}
+                          <div className="mt-1 space-y-[2px]">
+                            {dayEvs.slice(0, 3).map((ev) => {
+                              const c = eventColors(ev.source);
+                              return (
+                                <button key={ev.id}
+                                  onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
+                                  className={`w-full text-left px-1.5 py-[2px] text-[9px] font-semibold rounded truncate leading-tight transition-colors ${c.bg} ${c.text} ${c.border} border ${c.hover}`}>
+                                  {ev.title}
+                                </button>
+                              );
+                            })}
+                            {dayEvs.length > 3 && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDayClick(day); }}
+                                className="w-full text-left px-1 py-[1px] text-[8px] text-white/35 hover:text-white/60 leading-none transition-colors font-medium">
+                                +{dayEvs.length - 3} more
+                              </button>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   );
                 })}
               </div>
             </div>
-            <div className="mt-3 py-3 px-4 rounded-xl border border-dashed border-white/[0.06]">
+            <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
               <p className="text-xs text-white/28">Click any day to create an event. RSVP to events or follow groups to populate your calendar.</p>
             </div>
+
+            {/* Mobile: compact event summary strip */}
+            <MobileEventStrip
+              label={MONTH_NAMES[navDate.getMonth()]}
+              events={calEvents}
+              loading={eventsLoading}
+              onOpen={openEventDetail}
+            />
           </>
         )}
 
@@ -1165,78 +1992,331 @@ function CalendarModeView() {
                 {WEEK_HOURS.map((hour) => (
                   <div key={hour} className="grid border-b border-white/[0.03] last:border-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
                     <div className="px-2 pt-1.5 text-right text-[10px] text-white/20 leading-none shrink-0">{formatHour(hour)}</div>
-                    {weekDays.map((_, dayIdx) => (
-                      <div key={dayIdx}
-                        onMouseDown={(e) => handleSlotMouseDown(dayIdx, hour, e)}
-                        onMouseEnter={() => handleSlotMouseEnter(dayIdx, hour)}
-                        className={`h-10 border-l border-white/[0.03] cursor-pointer transition-colors ${
-                          isSlotSelected(dayIdx, hour) ? "bg-teal-500/[0.14]" : "hover:bg-white/[0.04]"
-                        }`}
-                      />
-                    ))}
+                    {weekDays.map((d, dayIdx) => {
+                      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                      const slotEvs = (eventsMap.get(dk) ?? []).filter(
+                        (ev) => new Date(ev.start_time).getHours() === hour
+                      );
+                      return (
+                        <div key={dayIdx}
+                          onMouseDown={(e) => handleSlotMouseDown(dayIdx, hour, e)}
+                          onMouseEnter={() => handleSlotMouseEnter(dayIdx, hour)}
+                          className={`relative h-10 border-l border-white/[0.03] cursor-pointer transition-colors overflow-hidden ${
+                            isSlotSelected(dayIdx, hour) ? "bg-teal-500/[0.14]" : "hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          {slotEvs.map((ev) => {
+                            const c = eventColors(ev.source);
+                            return (
+                              <button key={ev.id}
+                                onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className={`absolute inset-x-[2px] top-[2px] bottom-[2px] ${c.bg} border ${c.border} rounded px-1 flex items-center ${c.hover} transition-colors z-10`}>
+                                <span className={`text-[8px] font-semibold ${c.text} truncate leading-none`}>{ev.title}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mt-3 py-3 px-4 rounded-xl border border-dashed border-white/[0.06]">
+            <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
               <p className="text-xs text-white/28">Click and drag on any column to select a time range and create an event.</p>
             </div>
+
+            {/* Mobile: compact event summary strip */}
+            <MobileEventStrip
+              label="This Week"
+              events={calEvents}
+              loading={eventsLoading}
+              onOpen={openEventDetail}
+            />
           </>
         )}
 
-        {/* Agenda */}
-        {calView === "agenda" && (
-          <div className="wac-card p-14 text-center space-y-2">
-            <AlignJustify size={22} className="text-teal-400/35 mx-auto mb-3" />
-            <p className="text-white/40 text-sm">Agenda view coming soon.</p>
-            <p className="text-white/25 text-xs">Your RSVPs and subscribed calendars will appear here.</p>
-          </div>
-        )}
+        {/* Agenda — grouped by date, follows navDate month range */}
+        {calView === "agenda" && (() => {
+          if (eventsLoading) return (
+            <div className="wac-card p-14 flex items-center justify-center">
+              <Loader2 size={20} className="animate-spin text-white/20" />
+            </div>
+          );
+
+          // Group events by local date key, preserving chronological order
+          const dayGroups = new Map<string, CalEvent[]>();
+          for (const ev of calEvents) {
+            const dk = localDateKey(ev.start_time);
+            if (!dayGroups.has(dk)) dayGroups.set(dk, []);
+            dayGroups.get(dk)!.push(ev);
+          }
+
+          if (dayGroups.size === 0) return (
+            <div className="wac-card p-14 text-center">
+              <AlignJustify size={20} className="text-white/15 mx-auto mb-3" />
+              <p className="text-white/35 text-sm font-medium">
+                No events in {MONTH_NAMES[navDate.getMonth()]} {navDate.getFullYear()}
+              </p>
+              <p className="text-white/20 text-xs mt-1">
+                Create an event or navigate to another month.
+              </p>
+            </div>
+          );
+
+          const _today = new Date();
+          const p2 = (n: number) => String(n).padStart(2, "0");
+          const todayKey = `${_today.getFullYear()}-${p2(_today.getMonth() + 1)}-${p2(_today.getDate())}`;
+
+          return (
+            <div>
+              {[...dayGroups.entries()].map(([dk, dayEvs]) => {
+                const dayDate   = new Date(dayEvs[0].start_time);
+                const isToday   = dk === todayKey;
+                const isPast    = dk < todayKey;
+                const dayLabel  = dayDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+                return (
+                  <div key={dk} className="mb-3">
+
+                    {/* Date divider header */}
+                    <div className="flex items-center gap-3 mb-2">
+                      {isToday ? (
+                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal-400 px-2 py-0.5 bg-teal-500/10 border border-teal-400/20 rounded-full">
+                          Today · {dayLabel}
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${isPast ? "text-white/22" : "text-white/35"}`}>
+                          {dayLabel}
+                        </span>
+                      )}
+                      <div className={`flex-1 h-px ${isPast ? "bg-white/[0.04]" : "bg-white/[0.07]"}`} />
+                    </div>
+
+                    {/* Events for this day */}
+                    <div className="space-y-1 pl-0">
+                      {dayEvs.map((ev) => {
+                        const c         = eventColors(ev.source);
+                        const evStart   = new Date(ev.start_time);
+                        const evEnd     = ev.end_time ? new Date(ev.end_time) : null;
+                        const timeLabel = evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        const endLabel  = evEnd?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        return (
+                          <button key={ev.id} onClick={() => openEventDetail(ev)}
+                            className={`w-full text-left flex items-stretch gap-0 rounded-lg border border-white/[0.07] overflow-hidden transition-colors hover:border-white/[0.14] ${isPast ? "opacity-55 hover:opacity-80" : ""}`}>
+                            {/* Relationship color bar */}
+                            <div className={`w-[3px] shrink-0 ${c.rule}`} />
+                            {/* Time column */}
+                            <div className="w-[64px] shrink-0 flex flex-col justify-center px-2 py-2 border-r border-white/[0.05]">
+                              <span className="text-[10px] font-semibold text-white/50 leading-none">{timeLabel}</span>
+                              {endLabel && <span className="text-[9px] text-white/28 mt-0.5 leading-none">{endLabel}</span>}
+                            </div>
+                            {/* Content */}
+                            <div className="flex-1 min-w-0 px-3 py-2 flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className={`text-[13px] font-semibold leading-snug truncate ${c.text}`}>{ev.title}</div>
+                                {ev.location && (
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <MapPin size={9} className="text-white/25 shrink-0" />
+                                    <span className="text-[10px] text-white/30 truncate">{ev.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Source dot */}
+                              <div className={`w-2 h-2 rounded-full shrink-0 ${c.dot} opacity-40`} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Sidebar */}
-      <div className="lg:w-52 shrink-0 space-y-3">
-        <div className="flex lg:flex-col gap-2">
-          <button className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-teal-400/20 text-xs font-semibold text-teal-400/70 hover:bg-teal-500/10 hover:text-teal-400 transition-colors">
-            <Plus size={12} />Add Event
-          </button>
-          <button className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-white/[0.08] text-xs font-semibold text-white/35 hover:text-white/60 hover:border-white/15 transition-colors">
-            <Download size={12} />Import Calendar
-          </button>
-        </div>
+      {/* Sidebar — desktop only; mobile uses toolbar + button for actions */}
+      <div className="hidden lg:block lg:w-52 shrink-0 space-y-3">
+
+        {/* Source legend */}
         <div className="wac-card p-4">
-          <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/30 mb-3">Sources</div>
+          <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25 mb-3">Sources</div>
           <div className="space-y-2.5">
-            {CAL_SOURCES.map(({ id, label, dot }) => {
-              const active = activeSources.has(id);
+            {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {
+              const active = !disabled && activeSources.has(id);
               return (
-                <button key={id} onClick={() => toggleSource(id)} className="w-full flex items-center gap-2.5 text-left">
-                  <span className={`w-2 h-2 rounded-full shrink-0 transition-opacity ${dot} ${active ? "opacity-80" : "opacity-20"}`} />
-                  <span className={`text-xs transition-colors ${active ? "text-white/60" : "text-white/25"}`}>{label}</span>
+                <button key={id} onClick={() => !disabled && toggleSource(id)}
+                  disabled={disabled}
+                  className={`w-full flex items-center gap-2.5 text-left ${disabled ? "cursor-default" : "group"}`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 transition-opacity ${dot} ${active ? "opacity-75" : "opacity-18"}`} />
+                  <span className={`text-[11px] transition-colors ${active ? "text-white/55" : "text-white/22"}`}>{label}</span>
                 </button>
               );
             })}
+
+            {/* Imported calendars section */}
+            {importedCals.length > 0 && (
+              <>
+                <div className="border-t border-white/[0.06] pt-2.5 mt-1">
+                  <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20 mb-2">Imported</div>
+                  {importedCals.map((cal) => {
+                    const active = activeSources.has(cal.id);
+                    return (
+                      <div key={cal.id} className="flex items-center gap-2.5 group mb-2">
+                        <button onClick={() => toggleSource(cal.id)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+                          <span className={`w-2 h-2 rounded-full shrink-0 transition-opacity ${cal.colorDot} ${active ? "opacity-75" : "opacity-18"}`} />
+                          <span className={`text-[11px] truncate transition-colors ${active ? "text-white/55" : "text-white/22"}`}>{cal.name}</span>
+                        </button>
+                        <button onClick={() => removeImportedCal(cal.id)} className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400/70 transition-all shrink-0">
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Add Calendar */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="mt-4 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.07] text-[10px] font-semibold text-white/28 hover:text-white/55 hover:border-white/14 transition-colors">
+            <Plus size={10} />Add Calendar
+          </button>
         </div>
+
+        {/* This period's events — real data from calendar fetch */}
         <div className="wac-card p-4">
-          <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/30 mb-3">Upcoming</div>
-          <div className="space-y-3">
-            {FEATURED.slice(0, 2).map((ev) => (
-              <Link key={ev.id} href={ev.href} className="block group">
-                <div className="text-[10px] text-teal-400/60 mb-0.5">{ev.date}</div>
-                <div className="text-xs text-white/55 leading-snug group-hover:text-white/80 transition-colors line-clamp-2">{ev.title}</div>
-              </Link>
-            ))}
+          <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25 mb-3">
+            {calView === "week" ? "This Week" : `${MONTH_NAMES[navDate.getMonth()]}`}
+          </div>
+          {calEvents.length === 0 ? (
+            <p className="text-[11px] text-white/22 leading-relaxed">
+              No events this period.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {calEvents.slice(0, 5).map((ev) => {
+                const c = eventColors(ev.source);
+                const d = new Date(ev.start_time);
+                return (
+                  <button key={ev.id} onClick={() => openEventDetail(ev)} className="w-full text-left flex items-start gap-2 group">
+                    <span className={`w-1.5 h-1.5 rounded-full mt-[3px] shrink-0 ${c.dot} opacity-55`} />
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] text-white/28 leading-none mb-0.5">
+                        {d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        {" · "}
+                        {d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </div>
+                      <div className="text-[11px] text-white/52 group-hover:text-white/78 leading-snug transition-colors truncate">{ev.title}</div>
+                    </div>
+                  </button>
+                );
+              })}
+              {calEvents.length > 5 && (
+                <p className="text-[9.5px] text-white/22 pl-3.5">+{calEvents.length - 5} more</p>
+              )}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Mobile: Sources filter bottom sheet */}
+      {showSourceSheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSourceSheet(false)} />
+          <div className="relative z-10 w-full bg-[#0e0e0e] border-t border-white/[0.09] rounded-t-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom,0px),20px)]">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
+            </div>
+            <div className="px-5 pt-3 pb-5">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">Calendar Sources</span>
+                <button onClick={() => setShowSourceSheet(false)} className="text-white/25 hover:text-white/55 transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {
+                  const active = !disabled && activeSources.has(id);
+                  return (
+                    <button key={id} onClick={() => !disabled && toggleSource(id)}
+                      disabled={disabled}
+                      className={`w-full flex items-center gap-3 text-left ${disabled ? "opacity-40 cursor-default" : ""}`}>
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-opacity ${dot} ${active ? "opacity-75" : "opacity-18"}`} />
+                      <span className={`text-[13px] flex-1 transition-colors ${active ? "text-white/65" : "text-white/28"}`}>{label}</span>
+                      <div className={`relative w-9 h-[18px] rounded-full transition-colors shrink-0 ${active ? "bg-teal-500/40" : "bg-white/[0.10]"}`}>
+                        <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white/75 shadow-sm transition-transform ${active ? "translate-x-[21px]" : "translate-x-[3px]"}`} />
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Imported calendars */}
+                {importedCals.length > 0 && (
+                  <div className="border-t border-white/[0.07] pt-4 space-y-4">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/25">Imported Calendars</div>
+                    {importedCals.map((cal) => {
+                      const active = activeSources.has(cal.id);
+                      return (
+                        <div key={cal.id} className="flex items-center gap-3">
+                          <button onClick={() => toggleSource(cal.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-opacity ${cal.colorDot} ${active ? "opacity-75" : "opacity-20"}`} />
+                            <span className={`text-[13px] flex-1 truncate transition-colors ${active ? "text-white/65" : "text-white/28"}`}>{cal.name}</span>
+                          </button>
+                          <button onClick={() => removeImportedCal(cal.id)} className="text-white/18 hover:text-red-400/65 transition-colors shrink-0 mr-2">
+                            <Trash2 size={13} />
+                          </button>
+                          <div onClick={() => toggleSource(cal.id)} className={`relative w-9 h-[18px] rounded-full transition-colors shrink-0 cursor-pointer ${active ? "bg-teal-500/40" : "bg-white/[0.10]"}`}>
+                            <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white/75 shadow-sm transition-transform ${active ? "translate-x-[21px]" : "translate-x-[3px]"}`} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add Calendar CTA */}
+                <div className="border-t border-white/[0.07] pt-4">
+                  <button
+                    onClick={() => { setShowSourceSheet(false); setShowImportModal(true); }}
+                    className="w-full flex items-center gap-3 py-2.5 px-4 rounded-xl border border-teal-400/15 bg-teal-500/[0.05] text-teal-400/70 hover:bg-teal-500/[0.10] hover:text-teal-400/90 transition-colors">
+                    <Plus size={14} />
+                    <span className="text-[13px] font-medium">Add Calendar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Import Calendar modal */}
+      {showImportModal && (
+        <ImportCalendarModal onClose={() => setShowImportModal(false)} onSave={addImportedCal} />
+      )}
 
       {/* Modals */}
       {modalDraft && !showFullEditor && (
-        <CreateEventModal draft={modalDraft} onClose={closeModal} onMoreOptions={handleMoreOptions} />
+        <CreateEventModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} onMoreOptions={handleMoreOptions} />
       )}
       {modalDraft && showFullEditor && (
-        <FullEventEditorModal draft={modalDraft} onClose={closeModal} />
+        <FullEventEditorModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} />
+      )}
+      {selectedCalEvent && (
+        <CalEventDetailModal
+          event={selectedCalEvent}
+          onClose={() => setSelectedCalEvent(null)}
+          onEdit={() => openEventEdit(selectedCalEvent)}
+          onDelete={() => handleEventDelete(selectedCalEvent.id)}
+        />
       )}
     </div>
   );
@@ -1245,6 +2325,7 @@ function CalendarModeView() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function EventsPage() {
+  const router = useRouter();
   const [activeLens, setActiveLens] = useState<Lens>("my-network");
   const [activeType, setActiveType] = useState("All");
 
@@ -1253,43 +2334,55 @@ export default function EventsPage() {
   const showCategories = activeLens !== "calendar";
   const browseLabel    = activeLens === "browse" ? "Browse Events" : "All Events";
 
+  const isCalendar = activeLens === "calendar";
+
+  // When NOT in calendar mode, the "events-compose" dispatch from the navbar
+  // should fall through to the full event builder at /events/new.
+  // (When in calendar mode, CalendarModeView handles the same event to open Quick Create.)
+  const isCalendarRef = useRef(isCalendar);
+  useEffect(() => { isCalendarRef.current = isCalendar; }, [isCalendar]);
+  useEffect(() => {
+    const handler = () => { if (!isCalendarRef.current) router.push("/events/new"); };
+    window.addEventListener("events-compose", handler);
+    return () => window.removeEventListener("events-compose", handler);
+  }, [router]);
+
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
+      <div className={`max-w-screen-xl mx-auto px-4 sm:px-6 pb-24 ${isCalendar ? "pt-14 md:pt-20" : "pt-20 md:pt-24"}`}>
 
-        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
-          <span className="italic font-light opacity-90 text-teal-400">Events</span>
-        </h1>
-        <p className="mt-2 text-sm text-white/45 max-w-lg">
-          Community gatherings, network calendars, and shared moments across the diaspora.
-        </p>
+        {/* Page header — hidden in calendar workspace mode */}
+        {!isCalendar && (
+          <>
+            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
+              <span className="italic font-light opacity-90 text-teal-400">Events</span>
+            </h1>
+            <p className="mt-2 text-sm text-white/45 max-w-lg">
+              Community gatherings, network calendars, and shared moments across the diaspora.
+            </p>
+          </>
+        )}
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Lens tabs — mode switching only */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-fit">
-            {LENSES.map(({ id, label, icon: Icon }) => {
-              const active = activeLens === id;
-              return (
-                <button key={id} onClick={() => setActiveLens(id)}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
-                    active ? "bg-teal-500/[0.12] text-teal-400" : "text-white/45 hover:text-white/70"
-                  }`}>
-                  <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
-                  {/* Shorten "My Network" on small screens to avoid crowding */}
-                  <span className="sm:hidden">{id === "my-network" ? "Network" : label}</span>
-                  <span className="hidden sm:inline">{label}</span>
-                </button>
-              );
-            })}
+        {/* Mode selector + optional calendar workspace label */}
+        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${isCalendar ? "mt-5" : "mt-5"}`}>
+          <div className="flex items-center gap-3">
+            {/* Lens tabs */}
+            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-fit">
+              {LENSES.map(({ id, label, icon: Icon }) => {
+                const active = activeLens === id;
+                return (
+                  <button key={id} onClick={() => setActiveLens(id)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
+                      active ? "bg-white/[0.08] text-white/80" : "text-white/40 hover:text-white/65"
+                    }`}>
+                    <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
+                    <span className="sm:hidden">{id === "my-network" ? "Network" : label}</span>
+                    <span className="hidden sm:inline">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {/* Create Event — desktop only; mobile uses navbar + button */}
-          <Link
-            href="/events/new"
-            className="hidden sm:flex wac-btn-primary wac-btn-sm items-center gap-1.5 w-fit shrink-0"
-          >
-            <Plus size={11} strokeWidth={2.5} />
-            Create Event
-          </Link>
         </div>
 
         {showCategories && (
@@ -1311,7 +2404,7 @@ export default function EventsPage() {
           </div>
         )}
 
-        {activeLens === "calendar" && <CalendarModeView />}
+        {isCalendar && <CalendarModeView />}
 
         {showFeatured && (
           <section className="mt-8">

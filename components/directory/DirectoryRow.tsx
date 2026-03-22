@@ -57,7 +57,6 @@ export type DirectoryRowProps = {
   /** Tertiary: location or short descriptor */
   line3?: string;
   isVerified?: boolean;
-  verifiedType?: "person" | "business" | "organization";
 };
 
 export default function DirectoryRow({
@@ -69,7 +68,6 @@ export default function DirectoryRow({
   line2,
   line3,
   isVerified,
-  verifiedType = "person",
 }: DirectoryRowProps) {
   const { Icon, avatarBg, avatarText, actionLabel, actionClass } = KIND_CONFIG[entityKind];
 
@@ -99,7 +97,6 @@ export default function DirectoryRow({
           </span>
           {isVerified && (
             <VerifiedBadge
-              type={verifiedType}
               className="shrink-0 [&_svg]:w-3 [&_svg]:h-3"
             />
           )}

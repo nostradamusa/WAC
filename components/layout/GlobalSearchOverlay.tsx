@@ -20,12 +20,65 @@ interface GlobalSearchOverlayProps {
   onClose: () => void;
 }
 
-const SUGGESTED_SEARCHES = [
-  "Certified Financial Planner who lives near Dallas from Struga and is open to collaborate",
-  "Women-owned tech startups hiring software engineers in Prishtina",
-  "Personal Injury Lawyer who lives in Jersey and is open to investing",
-  "Medical professionals organizing health missions to rural Albania",
-];
+// ── Page-specific search context ─────────────────────────────────────────────
+
+const PAGE_CONTEXT = {
+  directory: {
+    placeholder: "Search people, businesses, organizations…",
+    label: "Try searching for",
+    suggestions: [
+      "Find Albanian dentists in New Jersey",
+      "Construction businesses in Detroit",
+      "Albanian cultural organizations",
+      "Financial advisors open to mentoring",
+    ],
+    route: (q: string) => `/directory?q=${encodeURIComponent(q)}`,
+  },
+  events: {
+    placeholder: "Search events, hosts, cities…",
+    label: "Try searching for",
+    suggestions: [
+      "Networking events in NYC",
+      "Events hosted by Albanian Roots",
+      "Tech meetups this month",
+      "Cultural events in Prishtina",
+    ],
+    route: (q: string) => `/events?q=${encodeURIComponent(q)}`,
+  },
+  groups: {
+    placeholder: "Search groups, interests, communities…",
+    label: "Try searching for",
+    suggestions: [
+      "Parenting groups",
+      "Finance communities",
+      "Travel groups in Europe",
+      "Career & professional circles",
+    ],
+    route: (q: string) => `/groups?q=${encodeURIComponent(q)}`,
+  },
+  pulse: {
+    placeholder: "Search posts, people, topics…",
+    label: "Try searching for",
+    suggestions: [
+      "Posts about tech summit",
+      "People talking about investing",
+      "Discussions on Albanian business",
+      "News about diaspora communities",
+    ],
+    route: (q: string) => `/pulse?q=${encodeURIComponent(q)}`,
+  },
+  default: {
+    placeholder: "Search with Alban Intelligence...",
+    label: "Alban Suggests",
+    suggestions: [
+      "Certified Financial Planner who lives near Dallas from Struga and is open to collaborate",
+      "Women-owned tech startups hiring software engineers in Prishtina",
+      "Personal Injury Lawyer who lives in Jersey and is open to investing",
+      "Medical professionals organizing health missions to rural Albania",
+    ],
+    route: (q: string) => `/directory?q=${encodeURIComponent(q)}`,
+  },
+} as const;
 
 const THE_BRIEF = [
   {
@@ -112,13 +165,18 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isEventsPage    = pathname === "/events"     || pathname.startsWith("/events/");
   const isDirectoryPage = pathname === "/directory"  || pathname.startsWith("/directory");
-  const searchPlaceholder = isEventsPage
-    ? "Search events, hosts, cities…"
-    : isDirectoryPage
-      ? "Search people, businesses, organizations…"
-      : "Search with Alban Intelligence...";
+  const isEventsPage    = pathname === "/events"     || pathname.startsWith("/events/");
+  const isGroupsPage    = pathname === "/groups"     || pathname.startsWith("/groups/");
+  const isPulsePage     = pathname === "/pulse"      || pathname.startsWith("/pulse/");
+
+  const pageCtx = isDirectoryPage ? PAGE_CONTEXT.directory
+    : isEventsPage    ? PAGE_CONTEXT.events
+    : isGroupsPage    ? PAGE_CONTEXT.groups
+    : isPulsePage     ? PAGE_CONTEXT.pulse
+    : PAGE_CONTEXT.default;
+
+  const searchPlaceholder = pageCtx.placeholder;
 
   // Focus input, lock body scroll, and load data when opened
   useEffect(() => {
@@ -159,10 +217,7 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
       const filtered = prev.filter(h => h.term.toLowerCase() !== trimmed.toLowerCase());
       return [{ id: Date.now().toString(), term: trimmed, searched_at: new Date().toISOString() }, ...filtered];
     });
-    router.push(isEventsPage
-      ? `/events?q=${encodeURIComponent(trimmed)}`
-      : `/directory?q=${encodeURIComponent(trimmed)}`,
-    );
+    router.push(pageCtx.route(trimmed));
     onClose();
   };
 
@@ -284,12 +339,12 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                 )}
               </div>
 
-              {/* Alban Suggests */}
+              {/* Page-specific suggestions */}
               <div className="border-t border-white/5 pt-4 mt-2">
                 <div className="px-4 mb-2">
-                  <h3 className="text-xs font-semibold text-[#b08d57]/80 uppercase tracking-widest">Alban Suggests</h3>
+                  <h3 className="text-xs font-semibold text-[#b08d57]/80 uppercase tracking-widest">{pageCtx.label}</h3>
                 </div>
-                {SUGGESTED_SEARCHES.map((term, i) => (
+                {pageCtx.suggestions.map((term, i) => (
                   <button key={i} onClick={() => submitSearch(term)} className="flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition group">
                     <Search size={14} className="text-[#b08d57]/50 shrink-0 mt-0.5 group-hover:text-[#b08d57] transition" />
                     <span className="text-sm text-white/65 text-left line-clamp-2">{term}</span>
@@ -329,16 +384,14 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
           <form onSubmit={(e) => { e.preventDefault(); submitSearch(); }} className="flex-1 relative">
             {!query && (
               <div className="absolute inset-0 flex items-center pointer-events-none select-none">
-                {isEventsPage ? (
-                  <span className="text-white/30 text-base">Search events, hosts, cities…</span>
-                ) : isDirectoryPage ? (
-                  <span className="text-white/30 text-base">Search people, businesses, organizations…</span>
-                ) : (
+                {pageCtx === PAGE_CONTEXT.default ? (
                   <>
                     <span className="text-white/30 text-base">Search with&nbsp;</span>
                     <span className="text-[#b08d57]/60 italic font-light text-base">Alban Intelligence</span>
                     <span className="text-white/20 text-base">...</span>
                   </>
+                ) : (
+                  <span className="text-white/30 text-base">{pageCtx.placeholder}</span>
                 )}
               </div>
             )}
@@ -451,10 +504,10 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                   ))}
                 </div>
 
-                {/* Right — Alban Suggests */}
+                {/* Right — Page-specific suggestions */}
                 <div className="p-4 flex flex-col gap-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#b08d57]/55 px-1 mb-1">Alban Suggests</span>
-                  {SUGGESTED_SEARCHES.map((term, i) => (
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[#b08d57]/55 px-1 mb-1">{pageCtx.label}</span>
+                  {pageCtx.suggestions.map((term, i) => (
                     <button
                       key={i}
                       onClick={() => submitSearch(term)}

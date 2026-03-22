@@ -205,7 +205,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
         className="sticky top-0 z-10 bg-[var(--background)]/95 backdrop-blur-md"
         style={{
           maxHeight: tabBarHidden ? 0 : 80,
-          overflow: "hidden",
+          overflow: tabBarHidden ? "hidden" : "visible",
           opacity: tabBarHidden ? 0 : 1,
           pointerEvents: tabBarHidden ? "none" : undefined,
           transition: "max-height 0.3s ease, opacity 0.25s ease",

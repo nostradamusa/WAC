@@ -22,6 +22,8 @@ export function middleware(request: NextRequest) {
     "'unsafe-inline'",
     "'unsafe-eval'",
     "translate.google.com",
+    "http://www.google.com",
+    "https://www.google.com",
     "https://translate.googleapis.com",
     "https://translate-pa.googleapis.com",
     "https://*.gstatic.com",
@@ -32,7 +34,7 @@ export function middleware(request: NextRequest) {
   const csp = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
-    "script-src-elem 'self' 'unsafe-inline' translate.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com",
+    "script-src-elem 'self' 'unsafe-inline' translate.google.com http://www.google.com https://www.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "font-src 'self' https://fonts.gstatic.com",

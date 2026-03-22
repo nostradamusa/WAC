@@ -114,7 +114,7 @@ export default function BusinessCard({ business }: { business: BusinessProfile }
         {/* Name + verified */}
         <div className="flex items-center gap-1 min-w-0 mb-0.5">
           <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
-          {business.is_verified && <VerifiedBadge type="business" className="shrink-0 mt-px" />}
+          {business.is_verified && <VerifiedBadge className="shrink-0 mt-px" />}
         </div>
 
         {/* Subtitle */}

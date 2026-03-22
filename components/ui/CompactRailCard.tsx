@@ -30,7 +30,6 @@ export type CompactRailCardProps = {
   /** Entity kind — used to pick the fallback icon when initials is empty */
   entityKind?: EntityKind;
   isVerified?: boolean;
-  verifiedType?: "person" | "business" | "organization";
 };
 
 export default function CompactRailCard({
@@ -44,7 +43,6 @@ export default function CompactRailCard({
   avatarTextClass,
   entityKind,
   isVerified,
-  verifiedType = "person",
 }: CompactRailCardProps) {
   const FallbackIcon = entityKind ? KIND_ICON[entityKind] : null;
   return (
@@ -85,7 +83,6 @@ export default function CompactRailCard({
           <span className="text-[11px] font-semibold text-white leading-tight truncate">{name}</span>
           {isVerified && (
             <VerifiedBadge
-              type={verifiedType}
               className="shrink-0 opacity-80 [&_svg]:w-2.5 [&_svg]:h-2.5"
             />
           )}

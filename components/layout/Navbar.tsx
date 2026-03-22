@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, Plus, MessageCircle, Compass, CalendarDays, Activity, Network, Telescope,
-  ChevronDown, User, Settings, Building2, LogOut, Briefcase, Landmark,
+  ChevronDown, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check,
 } from "lucide-react";
 import LanguageToggle from "./LanguageToggle";
 import { useActor } from "@/components/providers/ActorProvider";
@@ -53,6 +53,8 @@ export default function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showCreateTip,  setShowCreateTip]  = useState(false);
   const [showNetworkMenu, setShowNetworkMenu] = useState(false);
+  const [lang,           setLang]           = useState<"en" | "sq">("en");
+  const [showLangPicker, setShowLangPicker] = useState(false);
   const longPressRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const networkMenuRef  = useRef<HTMLDivElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
@@ -66,7 +68,8 @@ export default function Navbar() {
       return;
     }
     if (pathname.startsWith("/events")) {
-      router.push("/events/new");
+      // Dispatch a context-aware compose event; EventsPage/CalendarModeView handle it
+      window.dispatchEvent(new CustomEvent("events-compose"));
       return;
     }
     if (pathname.startsWith("/groups")) {
@@ -84,6 +87,17 @@ export default function Navbar() {
 
   const managedEntities = ownedEntities.filter((e) => e.type !== "person");
 
+
+  useEffect(() => {
+    setLang(document.cookie.includes("googtrans=/en/sq") ? "sq" : "en");
+  }, []);
+
+  function switchLang(target: "en" | "sq") {
+    if (target === lang) return;
+    document.cookie = `googtrans=/en/${target}; path=/`;
+    document.cookie = `googtrans=/en/${target}; path=/; domain=${window.location.hostname}`;
+    window.location.reload();
+  }
 
   useEffect(() => {
     async function loadUser() {
@@ -400,6 +414,48 @@ export default function Navbar() {
           </Link>
         ))}
 
+        {/* Language */}
+        <button
+          onClick={() => setShowLangPicker((v) => !v)}
+          className="w-full text-left flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06] group"
+        >
+          <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
+            <Globe size={15} strokeWidth={1.8} className="text-white/50" />
+          </div>
+          <span className="text-sm font-medium text-white/70 group-hover:text-white transition flex-1">Language</span>
+          <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mr-1">
+            {lang === "sq" ? "SQ" : "EN"}
+          </span>
+          <ChevronDown
+            size={12} strokeWidth={2}
+            className="text-white/20 transition-transform shrink-0"
+            style={{ transform: showLangPicker ? "rotate(180deg)" : "rotate(0deg)" }}
+          />
+        </button>
+
+        {showLangPicker && (
+          <div className="mx-5 mb-1 rounded-xl border border-white/[0.07] overflow-hidden">
+            {(["en", "sq"] as const).map((code) => {
+              const label = code === "en" ? "English" : "Shqip";
+              const active = lang === code;
+              return (
+                <button
+                  key={code}
+                  onClick={() => switchLang(code)}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
+                    active
+                      ? "text-[#b08d57] bg-[#b08d57]/[0.06]"
+                      : "text-white/55 hover:bg-white/[0.04] hover:text-white"
+                  }`}
+                >
+                  {label}
+                  {active && <Check size={13} strokeWidth={2.5} className="text-[#b08d57] shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Settings */}
         <Link
           href="/settings"
@@ -554,8 +610,14 @@ export default function Navbar() {
             >
               <Search size={13} className="shrink-0 group-hover:text-[#b08d57] transition-colors" />
               <span className="text-xs whitespace-nowrap hidden lg:block">
-                {pathname === "/events" || pathname.startsWith("/events/")
+                {pathname === "/directory" || pathname.startsWith("/directory/")
+                  ? "Search people, businesses, organizations…"
+                  : pathname === "/events" || pathname.startsWith("/events/")
                   ? "Search events, hosts, cities…"
+                  : pathname === "/groups" || pathname.startsWith("/groups/")
+                  ? "Search groups, interests, communities…"
+                  : pathname === "/pulse" || pathname.startsWith("/pulse/")
+                  ? "Search posts, people, topics…"
                   : <>Search with <span className="font-serif italic font-light opacity-90 text-[#b08d57]">Alban Intelligence</span></>
                 }
               </span>
@@ -605,8 +667,14 @@ export default function Navbar() {
               name="mobile-ai-search"
               type="text"
               placeholder={
-                pathname === "/events" || pathname.startsWith("/events/")
+                pathname === "/directory" || pathname.startsWith("/directory/")
+                  ? "Search people, businesses, organizations…"
+                  : pathname === "/events" || pathname.startsWith("/events/")
                   ? "Search events, hosts, cities…"
+                  : pathname === "/groups" || pathname.startsWith("/groups/")
+                  ? "Search groups, interests, communities…"
+                  : pathname === "/pulse" || pathname.startsWith("/pulse/")
+                  ? "Search posts, people, topics…"
                   : "Search with A.I."
               }
               onFocus={(e) => { e.preventDefault(); setIsSearchOpen(true); e.target.blur(); }}

@@ -8,6 +8,7 @@ import { uploadPostMedia } from "@/lib/services/feedService";
 import {
   X, Plus, Loader2, Image as ImageIcon, FileText, CalendarDays, Camera, Type,
 } from "lucide-react";
+import MyStoryViewer, { MyStory } from "./MyStoryViewer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,33 @@ const MOCK_STORIES = [
   { id: "s5", name: "Gent Berisha" },
 ];
 
+// Mock stories for the current user — replace with real DB data when stories table is live
+const MY_MOCK_STORIES: MyStory[] = [
+  {
+    id: "my-s1",
+    bgGradient: "linear-gradient(145deg, #1a1207 0%, #100d06 60%, #1a1712 100%)",
+    content: "Great conversations at the WAC summit today 🇦🇱",
+    timeAgo: "2h",
+    viewedBy: [
+      { name: "Ardit Hoxha",  avatarUrl: null },
+      { name: "Elira Koci",   avatarUrl: null },
+      { name: "Bleron Deva",  avatarUrl: null },
+      { name: "Vjosa Molla",  avatarUrl: null },
+      { name: "Gent Berisha", avatarUrl: null },
+    ],
+  },
+  {
+    id: "my-s2",
+    bgGradient: "linear-gradient(160deg, #0a1218 0%, #060e14 50%, #0a0d14 100%)",
+    content: "Connecting the diaspora, one conversation at a time.",
+    timeAgo: "5h",
+    viewedBy: [
+      { name: "Ardit Hoxha", avatarUrl: null },
+      { name: "Elira Koci",  avatarUrl: null },
+    ],
+  },
+];
+
 // ─── Story circle sub-component ───────────────────────────────────────────────
 // Uses border+padding (not ring/box-shadow) so it renders inside the element's
 // layout box and is never clipped by ancestor overflow:hidden / overflow:auto.
@@ -111,9 +139,10 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
   const { currentActor, isLoading } = useActor();
 
   // ── Sheet / mode state
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [composeMode, setComposeMode] = useState<ComposeMode>("post");
-  const [postType,    setPostType]    = useState<PostType>("update");
+  const [isSheetOpen,       setIsSheetOpen]       = useState(false);
+  const [composeMode,       setComposeMode]       = useState<ComposeMode>("post");
+  const [postType,          setPostType]          = useState<PostType>("update");
+  const [showMyStoryViewer, setShowMyStoryViewer] = useState(false);
 
   // ── Story seen state (persisted to localStorage)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => {
@@ -271,7 +300,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
   const onLayerPointerDown = (e: React.PointerEvent, layer: TextLayer) => {
     e.stopPropagation();
     setActiveLayerId(layer.id);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     dragRef.current = { layerId: layer.id, startX: e.clientX, startY: e.clientY, initX: layer.x, initY: layer.y };
   };
 
@@ -453,20 +482,26 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
           className="flex gap-4 overflow-x-auto pt-1 pb-3 px-0.5"
           style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
         >
-          {/* Your story */}
-          <button
-            onClick={() => router.push("/stories/new")}
-            className="flex flex-col items-center gap-2 shrink-0 group"
-            aria-label="Add your story"
-          >
+          {/* Your story — avatar opens viewer, + badge opens creator */}
+          <div className="flex flex-col items-center gap-2 shrink-0">
             <div className="relative">
-              <StoryCircle name={currentActor.name} avatarUrl={currentActor.avatar_url} unseen size={62} />
-              <div className="absolute bottom-0 right-0 w-[20px] h-[20px] rounded-full bg-[#b08d57] border-2 border-[#151311] flex items-center justify-center pointer-events-none">
+              <button
+                onClick={() => setShowMyStoryViewer(true)}
+                aria-label="View your story"
+                className="block active:scale-95 transition-transform duration-100"
+              >
+                <StoryCircle name={currentActor.name} avatarUrl={currentActor.avatar_url} unseen size={62} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push("/stories/new"); }}
+                aria-label="Add to story"
+                className="absolute bottom-0 right-0 w-[20px] h-[20px] rounded-full bg-[#b08d57] border-2 border-[#151311] flex items-center justify-center hover:bg-[#9a7545] transition-colors z-10"
+              >
                 <Plus size={9} strokeWidth={3.2} className="text-black" />
-              </div>
+              </button>
             </div>
             <span className="text-[10.5px] font-medium text-white/45 leading-none whitespace-nowrap">Your story</span>
-          </button>
+          </div>
 
           {/* Other stories */}
           {sortedStories.map((story) => {
@@ -486,6 +521,16 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
         </div>
         <div className="border-b border-white/[0.06]" />
       </div>
+
+      {/* ── My story viewer ──────────────────────────────────────────────────── */}
+      {showMyStoryViewer && (
+        <MyStoryViewer
+          authorName={currentActor.name}
+          authorAvatar={currentActor.avatar_url ?? null}
+          stories={MY_MOCK_STORIES}
+          onClose={() => setShowMyStoryViewer(false)}
+        />
+      )}
 
       {/* ── Compose sheet ─────────────────────────────────────────────────────── */}
       {isSheetOpen && (
@@ -658,6 +703,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                           style={{ aspectRatio: "4/5", maxHeight: "52vh" }}
                           onPointerMove={onCanvasPointerMove}
                           onPointerUp={onCanvasPointerUp}
+                          onPointerCancel={onCanvasPointerUp}
                           onClick={() => setActiveLayerId(null)}
                         >
                           {storyIsVideo
