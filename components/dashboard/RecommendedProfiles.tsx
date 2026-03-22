@@ -127,7 +127,7 @@ export default function RecommendedProfiles({
                 <h3 className="font-semibold group-hover:text-[var(--accent)]">
                   {profile.full_name}
                 </h3>
-                {profile.is_verified && <VerifiedBadge />}
+                {profile.is_verified && <VerifiedBadge size="sm" />}
               </div>
 
               {profile.headline ? (

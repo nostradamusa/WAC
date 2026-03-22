@@ -115,7 +115,7 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
             <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight text-[var(--accent)] drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
               {displayName}
             </h1>
-            {profile.is_verified && <VerifiedBadge className="w-6 h-6" />}
+            {profile.is_verified && <VerifiedBadge size="lg" />}
           </div>
 
           <p className="text-lg md:text-xl font-medium opacity-90 max-w-2xl text-[var(--foreground)]/90 mb-3">

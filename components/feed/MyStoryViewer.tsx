@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { X, Eye } from "lucide-react";
 
 const STORY_DURATION_MS = 6000;
@@ -18,6 +19,8 @@ export type MyStory = {
   content?: string;
   timeAgo: string;
   viewedBy: StoryViewer[];
+  mentions?: { name: string; slug?: string; kind?: string }[];
+  location?: string;
 };
 
 type Props = {
@@ -25,21 +28,25 @@ type Props = {
   authorAvatar: string | null;
   stories: MyStory[];
   onClose: () => void;
+  isAuthor?: boolean;
+  onSendReply?: (storyId: string, messageOrEmoji: string) => void;
 };
 
 // ─── Inner component ──────────────────────────────────────────────────────────
 
-function ViewerInner({ authorName, authorAvatar, stories, onClose }: Props) {
+function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = true, onSendReply }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [progress, setProgress]         = useState(0);
   const [isPaused, setIsPaused]         = useState(false);
   const [showViewers, setShowViewers]   = useState(false);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const router = useRouter();
+  const intervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const goNextRef   = useRef<() => void>(() => {});
 
   const current    = stories[currentIndex];
-  const totalViews = current.viewedBy.length;
+  if (!current) return null;
+  const totalViews = current.viewedBy?.length ?? 0;
 
   const goNext = useCallback(() => {
     setShowViewers(false);
@@ -233,13 +240,42 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose }: Props) {
               </p>
             )}
           </div>
+
+          {/* Mentions & Location overlay */}
+          {(current.mentions?.length || current.location) && (
+            <div className="absolute inset-x-0 bottom-28 z-20 flex flex-col items-center gap-2 pointer-events-none">
+              {current.mentions?.map((m, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!m.slug && !m.name) return;
+                    const path = (m.kind === "organization" || m.kind === "business") 
+                      ? `/profile/entities/${m.slug || m.name}`
+                      : `/${m.slug || m.name}`;
+                    onClose();
+                    router.push(path);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold shadow-lg shrink-0 pointer-events-auto hover:bg-white/30 hover:scale-105 active:scale-95 transition-all"
+                >
+                  @{m.name}
+                </button>
+              ))}
+              {current.location && (
+                <div className="px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white text-xs font-medium shadow-lg shrink-0 pointer-events-auto cursor-pointer hover:bg-black/60 transition flex items-center gap-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  {current.location}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* ── Seen-by panel — z above stage ───────────────────────────────── */}
+        {/* ── Seen-by panel / Reply panel — z above stage ─────────────────── */}
         <div className="absolute bottom-0 left-0 right-0 z-30">
 
-          {/* Expanded viewer list */}
-          {showViewers && (
+          {/* Expanded viewer list (Author only) */}
+          {isAuthor && showViewers && (
             <div
               className="bg-[#111]/96 backdrop-blur-md border-t border-white/[0.08] px-5 pt-4 pb-6 max-h-[52%] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200"
               onClick={(e) => e.stopPropagation()}
@@ -286,8 +322,8 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose }: Props) {
             </div>
           )}
 
-          {/* Collapsed seen-by pill — always anchored bottom-left */}
-          {!showViewers && (
+          {/* Collapsed seen-by pill — always anchored bottom-left (Author only) */}
+          {isAuthor && !showViewers && (
             <div className="px-4 pb-[max(env(safe-area-inset-bottom,0px),20px)] pb-5">
               <button
                 onClick={(e) => {
@@ -323,6 +359,47 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose }: Props) {
                     : `${totalViews} ${totalViews === 1 ? "view" : "views"}`}
                 </span>
               </button>
+            </div>
+          )}
+
+          {/* Bottom Reply Bar (Non-Author) */}
+          {!isAuthor && (
+            <div
+              className="px-4 pb-6 pt-12 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-center gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Send message..."
+                  className="w-full bg-black/40 border-[1.5px] border-white/30 rounded-full py-3 px-5 text-white placeholder:text-white/80 text-[15px] focus:outline-none focus:border-white/60 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                      onSendReply?.(current.id, e.currentTarget.value.trim());
+                      e.currentTarget.value = "";
+                      onClose();
+                    }
+                  }}
+                  onFocus={() => setIsPaused(true)}
+                  onBlur={() => setIsPaused(false)}
+                />
+              </div>
+              
+              <div className="flex items-center gap-1.5 shrink-0 overflow-visible">
+                {["👍", "❤️", "😂", "😲", "😢", "😡"].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => {
+                      onSendReply?.(current.id, emoji);
+                      onClose();
+                    }}
+                    className="text-[26px] hover:scale-125 transition-transform duration-200 active:scale-95 leading-none"
+                    style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

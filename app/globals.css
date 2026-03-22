@@ -283,6 +283,15 @@ button:disabled {
   border-color: rgba(176, 141, 87, 0.6);
 }
 
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0);   }
+}
+
+.animate-page-enter {
+  animation: page-enter 0.25s ease-out both;
+}
+
 @keyframes pop-bounce {
   0% { transform: scale(1); }
   40% { transform: scale(1.4) translateY(-10%); }

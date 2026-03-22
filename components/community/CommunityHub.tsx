@@ -23,6 +23,15 @@ export default function CommunityHub() {
 
   const lastScrollY  = useRef(0);
   const rafPending   = useRef<number | null>(null);
+  const feedScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("wac-refresh-feed", handleRefresh);
+    return () => window.removeEventListener("wac-refresh-feed", handleRefresh);
+  }, []);
 
   function handleLeftScroll(e: React.UIEvent<HTMLDivElement>) {
     if (window.innerWidth >= 768) return;
@@ -73,6 +82,7 @@ export default function CommunityHub() {
 
         {/* ── LEFT COLUMN — independent scroll ─────────────────────────────── */}
         <div
+          ref={feedScrollRef}
           className="col-span-1 lg:col-span-8 h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
           onScroll={handleLeftScroll}
         >

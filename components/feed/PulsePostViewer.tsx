@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import PostComments from "./PostComments";
 import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import { togglePostReaction, ReactionType } from "@/lib/services/feedService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ function MediaStage({ items, fallbackUrl }: { items?: PostMediaItem[]; fallbackU
           src={current.url}
           controls
           playsInline
-          className="max-w-full max-h-full object-contain"
+          className="w-full h-full object-contain"
         />
       ) : (
         <div className="relative w-full h-full">
@@ -236,12 +237,12 @@ function ViewerInner({ post, onClose }: Props) {
 
       {/* Shell */}
       <div
-        className="relative z-10 flex w-full max-w-[1080px] rounded-2xl overflow-hidden border border-white/[0.07] shadow-[0_40px_120px_rgba(0,0,0,0.85)] animate-in zoom-in-95 duration-200"
-        style={{ height: "min(90dvh, 760px)" }}
+        className="relative z-10 flex flex-col md:flex-row w-full max-w-[1080px] rounded-t-2xl md:rounded-2xl overflow-hidden md:border border-white/[0.07] shadow-[0_40px_120px_rgba(0,0,0,0.85)] animate-in zoom-in-95 duration-200"
+        style={{ height: "min(92dvh, 760px)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── Left: primary content / media stage ─────────────────────── */}
-        <div className="flex-1 min-w-0 relative bg-[#050505]">
+        {/* ── Top/Left: primary content / media stage ─────────────────────── */}
+        <div className="md:flex-1 shrink-0 h-[40dvh] md:h-auto min-w-0 flex flex-col relative bg-[#050505]">
 
           {/* Close button — always on top-left */}
           <button
@@ -252,18 +253,18 @@ function ViewerInner({ post, onClose }: Props) {
           </button>
 
           {hasMedia ? (
-            <div className="absolute inset-0">
+            <div className="flex-1 relative min-h-0">
               <MediaStage items={post.media_items} fallbackUrl={post.image_url} />
             </div>
           ) : (
-            <div className="absolute inset-0">
+            <div className="flex-1 relative min-h-0">
               <ContentStage content={post.content} authorName={authorName} />
             </div>
           )}
         </div>
 
-        {/* ── Right: social context panel ─────────────────────────────── */}
-        <div className="w-[360px] shrink-0 bg-[#0d0d0d] border-l border-white/[0.06] flex flex-col">
+        {/* ── Bottom/Right: social context panel ─────────────────────────────── */}
+        <div className="flex-1 min-h-0 md:w-[360px] md:shrink-0 bg-[#0d0d0d] border-t md:border-t-0 md:border-l border-white/[0.06] flex flex-col">
 
           {/* Author header — fixed at top of panel */}
           <div className="px-5 pt-5 pb-4 border-b border-white/[0.06] shrink-0">
@@ -282,11 +283,7 @@ function ViewerInner({ post, onClose }: Props) {
                   <span className="font-semibold text-sm text-white group-hover:text-[#b08d57] transition-colors truncate">
                     {authorName}
                   </span>
-                  {isVerified && (
-                    <svg className="w-3.5 h-3.5 shrink-0 text-[#b08d57]" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M10.081.9C11.239.199 12.761.199 13.919.9l1.455.882c.49.297 1.05.438 1.611.408l1.7-.091c1.353-.072 2.553.844 2.89 2.158l.423 1.64c.143.553.438 1.05.85 1.45L24 8.527c.974.945.974 2.505 0 3.45l-1.152 1.118c-.412.4-.707.897-.85 1.45l-.423 1.64c-.337 1.314-1.537 2.23-2.89 2.158l-1.7-.091c-.56-.03-1.121.111-1.611.408l-1.455.882c-1.158.701-2.68.701-3.838 0l-1.455-.882c-.49-.297-1.05-.438-1.611-.408l-1.7.091c-1.353.072-2.553-.844-2.89-2.158l-.423-1.64c-.143-.553-.438-1.05-.85-1.45L0 11.977c-.974-.945-.974-2.505 0-3.45l1.152-1.118c.412-.4.707-.897.85-1.45l.423-1.64c.337-1.314 1.537-2.23 2.89-2.158l1.7.091c.56.03 1.121-.111 1.611-.408L10.081.9z" />
-                    </svg>
-                  )}
+                  {isVerified && <VerifiedBadge size="sm" className="shrink-0" />}
                 </div>
                 <p className="text-[11px] text-white/40 truncate mt-0.5">
                   {authorHeadline} · {timeAgo(post.created_at)}

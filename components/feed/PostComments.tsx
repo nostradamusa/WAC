@@ -8,7 +8,11 @@ import { addPostComment, searchMentionSuggestions, MentionSuggestion, deleteComm
 import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import Image from "next/image";
 import Link from "next/link";
-import { Send, Loader2, MoreHorizontal, X } from "lucide-react";
+import { Send, Loader2, MoreHorizontal, X, Plus } from "lucide-react";
+import VerifiedBadge from "@/components/ui/VerifiedBadge";
+
+// Long-press duration for showing reaction picker on touch
+const LONG_PRESS_MS = 400;
 
 export default function PostComments({ postId }: { postId: string }) {
   const [comments, setComments] = useState<NetworkComment[]>([]);
@@ -20,11 +24,14 @@ export default function PostComments({ postId }: { postId: string }) {
   const [editContent, setEditContent] = useState("");
   const [activeOptionsId, setActiveOptionsId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followedComments, setFollowedComments] = useState<Record<string, boolean>>({});
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyingToName, setReplyingToName] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [commentReactions, setCommentReactions] = useState<Record<string, ReactionType | null>>({});
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+  const reactionPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isReactionLongPress = useRef(false);
   const [commentReactionCounts, setCommentReactionCounts] = useState<Record<string, Record<string, number>>>({});
   const [reactionsModal, setReactionsModal] = useState<{ commentId: string; breakdown: any[]; loading: boolean; tab: string } | null>(null);
 
@@ -311,21 +318,37 @@ export default function PostComments({ postId }: { postId: string }) {
     const isActiveReplyTarget = replyingToId === replyTargetId;
 
     return (
-      <div key={comment.id} className={`flex gap-3 text-sm flex-col ${isReply ? 'mt-3 pl-2 sm:pl-4 border-l-2 border-white/5' : ''}`}>
+      <div key={comment.id} className={`flex gap-3 text-sm flex-col ${isReply ? 'mt-1.5 pl-3 border-l border-white/[0.12]' : ''}`}>
         <div className="flex gap-3 items-start">
-          <Link href={cAuthorLink} className="shrink-0 group">
-            <div className={`relative ${isReply ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden bg-black/20 border border-[var(--border)] group-hover:border-[var(--accent)] transition`}>
-              {cAuthorAvatar ? (
-                <Image src={cAuthorAvatar} alt={cAuthorName} fill sizes="32px" className="object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-bold text-[#b08d57] text-xs">
-                  {cAuthorName.charAt(0)}
-                </div>
-              )}
-            </div>
-          </Link>
+          <div className="relative shrink-0">
+            <Link href={cAuthorLink} className="group block">
+              <div className={`relative ${isReply ? 'w-6 h-6' : 'w-8 h-8'} rounded-full overflow-hidden bg-black/20 border border-[var(--border)] group-hover:border-[var(--accent)] transition`}>
+                {cAuthorAvatar ? (
+                  <Image src={cAuthorAvatar} alt={cAuthorName} fill sizes="32px" className="object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center font-bold text-[#b08d57] text-xs">
+                    {cAuthorName.charAt(0)}
+                  </div>
+                )}
+              </div>
+            </Link>
+            {/* Quick Follow Overlay for Unfollowed Accounts */}
+            {currentUserId !== comment.submitted_by && !followedComments[comment.submitted_by] && (
+               <button 
+                  onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     setFollowedComments(prev => ({ ...prev, [comment.submitted_by]: true }));
+                  }}
+                  title={`Follow ${cAuthorName}`}
+                  className="absolute -bottom-1 -right-0.5 bg-[#b08d57] text-[#151311] w-[14px] h-[14px] flex items-center justify-center border-2 border-[#161513] rounded-full hover:bg-white hover:text-black hover:scale-110 active:scale-95 transition-all shadow-sm z-10"
+               >
+                  <Plus size={8} strokeWidth={4} />
+               </button>
+            )}
+          </div>
           <div className="flex-1 min-w-0">
-            <div className="bg-black/20 rounded-2xl rounded-tl-[4px] p-3 border border-[var(--border)]/50 relative group">
+            <div className="relative group">
               <div className="flex justify-between items-start mb-1 gap-2">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <Link href={cAuthorLink} className="font-semibold hover:text-[var(--accent)] transition truncate">
@@ -338,7 +361,7 @@ export default function PostComments({ postId }: { postId: string }) {
                   <div className="relative">
                     <button
                       onClick={() => setActiveOptionsId(activeOptionsId === comment.id ? null : comment.id)}
-                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--accent)] transition p-1"
+                      className="opacity-40 md:opacity-0 md:group-hover:opacity-60 hover:!opacity-100 hover:text-[var(--accent)] transition p-1"
                     >
                       <MoreHorizontal size={14} />
                     </button>
@@ -389,7 +412,7 @@ export default function PostComments({ postId }: { postId: string }) {
             </div>
 
             {/* Comment action row */}
-            <div className="flex items-center justify-between mt-1.5 px-1">
+            <div className="flex items-center justify-between mt-1">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -413,7 +436,20 @@ export default function PostComments({ postId }: { postId: string }) {
                   onMouseLeave={() => setShowReactionPicker(null)}
                 >
                   <button
-                    onClick={() => handleCommentReaction(comment.id, commentReactions[comment.id] || 'like')}
+                    onTouchStart={() => {
+                      isReactionLongPress.current = false;
+                      reactionPressTimer.current = setTimeout(() => {
+                        isReactionLongPress.current = true;
+                        setShowReactionPicker(comment.id);
+                      }, LONG_PRESS_MS);
+                    }}
+                    onTouchEnd={() => { if (reactionPressTimer.current) clearTimeout(reactionPressTimer.current); }}
+                    onTouchMove={() => { if (reactionPressTimer.current) clearTimeout(reactionPressTimer.current); }}
+                    onContextMenu={(e) => { if (isReactionLongPress.current) e.preventDefault(); }}
+                    onClick={(e) => {
+                      if (isReactionLongPress.current) { e.preventDefault(); return; }
+                      handleCommentReaction(comment.id, commentReactions[comment.id] || 'like');
+                    }}
                     className={`text-[11px] font-semibold transition flex items-center gap-1 ${commentReactions[comment.id] ? 'text-[#b08d57]' : 'text-white/40 hover:text-pink-400'}`}
                   >
                     <ReactionIcon
@@ -428,19 +464,23 @@ export default function PostComments({ postId }: { postId: string }) {
                       : 'Like'}
                   </button>
                   {showReactionPicker === comment.id && (
-                    <div className="absolute bottom-full left-0 pb-1.5 z-50">
-                      <div className="bg-[#1a1a1a] border border-white/10 rounded-full px-2.5 py-1.5 flex gap-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                        {SUPPORTED_REACTIONS.map(({ type }) => (
-                          <button
-                            key={type}
-                            onClick={(e) => { e.stopPropagation(); handleCommentReaction(comment.id, type); }}
-                            className="p-0.5"
-                          >
-                            <ReactionIcon type={type} size={22} active={commentReactions[comment.id] === type} showTooltip={false} className="hover:-translate-y-1.5 hover:scale-110" />
-                          </button>
-                        ))}
+                    <>
+                      {/* Backdrop to dismiss picker on tap outside */}
+                      <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowReactionPicker(null)} />
+                      <div className="absolute bottom-full left-0 pb-1.5 z-50">
+                        <div className="bg-[#1a1a1a] border border-white/10 rounded-full px-2.5 py-1.5 flex gap-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                          {SUPPORTED_REACTIONS.map(({ type }) => (
+                            <button
+                              key={type}
+                              onClick={(e) => { e.stopPropagation(); handleCommentReaction(comment.id, type); }}
+                              className="p-0.5"
+                            >
+                              <ReactionIcon type={type} size={22} active={commentReactions[comment.id] === type} showTooltip={false} className="hover:-translate-y-1.5 hover:scale-110" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -516,8 +556,8 @@ export default function PostComments({ postId }: { postId: string }) {
                   }}
                   placeholder="Write a reply…"
                   rows={1}
-                  style={{ minHeight: "32px" }}
-                  className="flex-1 bg-transparent px-3 py-[7px] text-xs resize-none outline-none placeholder:text-white/20 leading-[1.45] overflow-hidden"
+                  style={{ minHeight: "36px", fontSize: "16px" }}
+                  className="flex-1 bg-transparent px-3 py-[7px] text-sm md:text-xs resize-none outline-none placeholder:text-white/20 leading-[1.45] overflow-hidden"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -533,7 +573,7 @@ export default function PostComments({ postId }: { postId: string }) {
                   type="submit"
                   disabled={!replyContent.trim() || isSubmitting}
                   aria-label="Send reply"
-                  className="shrink-0 w-[26px] h-[26px] m-[3px] rounded-[10px] bg-[var(--accent)] text-black flex items-center justify-center disabled:opacity-25 hover:bg-[#F2D06B] transition-colors"
+                  className="shrink-0 w-[32px] h-[32px] md:w-[26px] md:h-[26px] m-[2px] rounded-[9px] bg-[var(--accent)] text-black flex items-center justify-center disabled:opacity-25 hover:bg-[#F2D06B] transition-colors"
                 >
                   {isSubmitting
                     ? <Loader2 size={11} className="animate-spin" />
@@ -557,24 +597,24 @@ export default function PostComments({ postId }: { postId: string }) {
 
   return (
     <>
-    <div className="mt-4 pt-4 border-t border-[var(--border)] relative">
+    <div className="pt-2 pb-3 relative">
 
       {/* Comments list */}
       {isLoading ? (
         <div className="flex justify-center p-4"><Loader2 className="animate-spin opacity-50" size={20} /></div>
       ) : comments.length > 0 ? (
-        <div className="space-y-4 mb-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="space-y-3 mb-3">
           {topLevelComments.map((comment) => renderCommentThread(comment))}
         </div>
       ) : (
-        <div className="text-center text-sm opacity-50 py-2 mb-4">No comments yet. Be the first to start a discussion!</div>
+        <p className="text-[12px] text-white/25 py-1 mb-3">No comments yet.</p>
       )}
 
       {/* ── Top-level comment composer ───────────────────────────────────── */}
       <div className="flex items-end gap-2.5">
         {showMentions && mentionSuggestions.length > 0 && (
           <div className="absolute bottom-full left-0 mb-2 w-full max-w-sm bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl overflow-hidden z-[50] animate-in fade-in slide-in-from-bottom-2 pointer-events-auto">
-            <div className="max-h-96 overflow-y-auto custom-scrollbar pb-1">
+            <div className="max-h-[40vh] md:max-h-96 overflow-y-auto custom-scrollbar pb-1" style={{ overscrollBehavior: 'contain' }}>
               {mentionSuggestions.map((suggestion, idx) => {
                 const isOrg = suggestion.type === 'organization';
                 const isBiz = suggestion.type === 'business';
@@ -599,11 +639,7 @@ export default function PostComments({ postId }: { postId: string }) {
                     </div>
                     <div className="flex-1 min-w-0 pr-2 flex items-center gap-2">
                       <span className="font-semibold text-sm truncate">{suggestion.name}</span>
-                      {suggestion.is_verified && (
-                        <svg className={`w-3.5 h-3.5 flex-shrink-0 ${typeColor}`} viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M10.081.9C11.239.199 12.761.199 13.919.9l1.455.882c.49.297 1.05.438 1.611.408l1.7-.091c1.353-.072 2.553.844 2.89 2.158l.423 1.64c.143.553.438 1.05.85 1.45L24 8.527c.974.945.974 2.505 0 3.45l-1.152 1.118c-.412.4-.707.897-.85 1.45l-.423 1.64c-.337 1.314-1.537 2.23-2.89 2.158l-1.7-.091c-.56-.03-1.121.111-1.611.408l-1.455.882c-1.158.701-2.68.701-3.838 0l-1.455-.882c-.49-.297-1.05-.438-1.611-.408l-1.7.091c-1.353.072-2.553-.844-2.89-2.158l-.423-1.64c-.143-.553-.438-1.05-.85-1.45L0 11.977c-.974-.945-.974-2.505 0-3.45l1.152-1.118c.412-.4.707-.897.85-1.45l.423-1.64c.337-1.314 1.537-2.23 2.89-2.158l1.7.091c.56.03 1.121-.111 1.611-.408L10.081.9z"/>
-                        </svg>
-                      )}
+                      {suggestion.is_verified && <VerifiedBadge size="xs" className="shrink-0" />}
                       <span className={`flex-shrink-0 text-xs ml-auto capitalize px-2 py-0.5 rounded-full bg-black/40 border ${bgBorderColor} ${typeColor}`}>
                         {suggestion.type}
                       </span>
@@ -616,12 +652,12 @@ export default function PostComments({ postId }: { postId: string }) {
         )}
 
         {/* Current user avatar */}
-        <div className="w-8 h-8 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-xs font-bold shrink-0 mb-1">
+        <div className="w-8 h-8 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-xs font-bold shrink-0 mb-[5px]">
           {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
         </div>
 
-        <form onSubmit={handleSubmit} className="relative flex-1">
-          <div className="relative">
+        <form onSubmit={handleSubmit} className="flex-1">
+          <div className="flex items-end bg-black/20 border border-[var(--border)] rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]">
             <textarea
               id={`comment-textarea-${postId}`}
               name={`comment-textarea-${postId}`}
@@ -630,7 +666,8 @@ export default function PostComments({ postId }: { postId: string }) {
               onChange={handleTextChange}
               placeholder="Write a comment… (Type @ to mention)"
               rows={1}
-              className="w-full bg-black/20 border border-[var(--border)] rounded-2xl pl-4 pr-12 py-3.5 text-sm focus:outline-none focus:border-[var(--accent)] resize-none overflow-hidden"
+              style={{ fontSize: "16px" }}
+              className="flex-1 bg-transparent pl-4 pr-2 py-3 text-sm focus:outline-none resize-none overflow-hidden placeholder:text-white/30 leading-snug"
               onKeyDown={(e) => {
                 if (showMentions) {
                   if (e.key === 'ArrowDown') {
@@ -658,9 +695,9 @@ export default function PostComments({ postId }: { postId: string }) {
             <button
               type="submit"
               disabled={!newContent.trim() || isSubmitting}
-              className="absolute right-2 bottom-2 shrink-0 w-8 h-8 bg-[var(--accent)] text-black rounded-xl flex items-center justify-center hover:bg-[#F2D06B] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 w-[36px] h-[36px] md:w-[30px] md:h-[30px] m-[4px] bg-[var(--accent)] text-black rounded-[10px] flex items-center justify-center hover:bg-[#F2D06B] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} className="translate-x-[1px]" />}
+              {isSubmitting ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} className="translate-x-[1px]" />}
             </button>
           </div>
         </form>
@@ -747,11 +784,7 @@ export default function PostComments({ postId }: { postId: string }) {
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-sm text-white truncate">{r.profile?.full_name || 'Unknown'}</span>
-                      {r.profile?.is_verified && (
-                        <svg className="w-3 h-3 text-[#b08d57] shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M10.081.9C11.239.199 12.761.199 13.919.9l1.455.882c.49.297 1.05.438 1.611.408l1.7-.091c1.353-.072 2.553.844 2.89 2.158l.423 1.64c.143.553.438 1.05.85 1.45L24 8.527c.974.945.974 2.505 0 3.45l-1.152 1.118c-.412.4-.707.897-.85 1.45l-.423 1.64c-.337 1.314-1.537 2.23-2.89 2.158l-1.7-.091c-.56-.03-1.121.111-1.611.408l-1.455.882c-1.158.701-2.68.701-3.838 0l-1.455-.882c-.49-.297-1.05-.438-1.611-.408l-1.7.091c-1.353.072-2.553-.844-2.89-2.158l-.423-1.64c-.143-.553-.438-1.05-.85-1.45L0 11.977c-.974-.945-.974-2.505 0-3.45l1.152-1.118c.412-.4.707-.897.85-1.45l.423-1.64c.337-1.314 1.537-2.23 2.89-2.158l1.7.091c.56.03 1.121-.111 1.611-.408L10.081.9z"/>
-                        </svg>
-                      )}
+                      {r.profile?.is_verified && <VerifiedBadge size="xs" className="shrink-0" />}
                     </div>
                     {r.profile?.headline && (
                       <span className="text-xs text-white/30 truncate mt-0.5">{r.profile.headline}</span>

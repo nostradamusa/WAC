@@ -40,11 +40,14 @@ export default function MobileBottomNav() {
 
   if (pathname === "/post" || pathname === "/stories/new") return null;
 
+  const isMessaging = pathname.startsWith("/messages");
+  const hideNav = !isMessaging && scrollDirection === "down";
+
   return (
     <nav
       aria-label="Main navigation"
       className={`md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f0f]/96 backdrop-blur-xl border-t border-white/[0.07] safe-area-pb transition-transform duration-300 ease-in-out ${
-        scrollDirection === "down" ? "translate-y-[120%]" : "translate-y-0"
+        hideNav ? "translate-y-[120%]" : "translate-y-0"
       }`}
     >
       <div className="flex items-center justify-around max-w-md mx-auto px-1 py-1.5">
@@ -58,6 +61,12 @@ export default function MobileBottomNav() {
               href={item.href}
               aria-label={item.name}
               aria-current={isActive ? "page" : undefined}
+              onClick={(e) => {
+                if (isActive && isPulse) {
+                  e.preventDefault();
+                  window.dispatchEvent(new CustomEvent("wac-refresh-feed"));
+                }
+              }}
               className={`group relative flex items-center justify-center transition-all duration-200 ${
                 isPulse ? "w-14 h-14" : "w-12 h-12"
               } ${

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
 import { uploadPostMedia } from "@/lib/services/feedService";
 import {
-  X, Plus, Loader2, Image as ImageIcon, FileText, CalendarDays, Camera, Type,
+  X, Plus, Loader2, Image as ImageIcon, FileText, CalendarDays, Camera, Type, ChevronRight,
 } from "lucide-react";
 import MyStoryViewer, { MyStory } from "./MyStoryViewer";
 
@@ -143,6 +143,50 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
   const [composeMode,       setComposeMode]       = useState<ComposeMode>("post");
   const [postType,          setPostType]          = useState<PostType>("update");
   const [showMyStoryViewer, setShowMyStoryViewer] = useState(false);
+  const [activeStoryGroup,  setActiveStoryGroup]  = useState<{ id: string; name: string } | null>(null);
+  const [myStories,         setMyStories]         = useState<MyStory[]>(MY_MOCK_STORIES);
+
+  // Fetch real stories
+  useEffect(() => {
+    if (!currentActor) return;
+    let mounted = true;
+    async function fetchStories() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("feed_posts")
+        .select("*")
+        .eq("post_type", "story")
+        .eq("submitted_by", user.id)
+        .gte("created_at", twentyFourHoursAgo)
+        .order("created_at", { ascending: true });
+
+      if (mounted && data && data.length > 0) {
+        const realStories: MyStory[] = data.map(post => {
+          const mItems = post.media_items || [];
+          const storyMeta = mItems.find((m: any) => m.media_type === "story_meta");
+          const media = mItems.find((m: any) => m.media_type === "photo" || m.media_type === "video");
+          
+          return {
+            id: post.id,
+            bgGradient: "linear-gradient(135deg, #1a1207 0%, #0c0a08 50%, #121010 100%)",
+            content: post.content || undefined,
+            mediaUrl: media?.url || null,
+            isVideo: media?.media_type === "video" || false,
+            timeAgo: "Recently",
+            viewedBy: [],
+            mentions: storyMeta?.mentions || [],
+            location: storyMeta?.location || undefined,
+          };
+        });
+        setMyStories(realStories);
+      }
+    }
+    fetchStories();
+    return () => { mounted = false; };
+  }, [currentActor]);
 
   // ── Story seen state (persisted to localStorage)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => {
@@ -152,9 +196,6 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
       return raw ? new Set(JSON.parse(raw)) : new Set();
     } catch { return new Set(); }
   });
-
-  // ── Keyboard height (visualViewport)
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // ── Post form state
   const [content,       setContent]       = useState("");
@@ -209,16 +250,6 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
     el.style.height = `${next}px`;
     el.style.overflowY = el.scrollHeight > MAX_TEXTAREA ? "auto" : "hidden";
   }, [content]);
-
-  // Keyboard avoidance
-  useEffect(() => {
-    const vp = (window as any).visualViewport as (EventTarget & { height: number }) | undefined;
-    if (!vp) return;
-    const update = () => setKeyboardHeight(Math.max(0, window.innerHeight - (vp as any).height));
-    vp.addEventListener("resize", update);
-    vp.addEventListener("scroll", update);
-    return () => { vp.removeEventListener("resize", update); vp.removeEventListener("scroll", update); };
-  }, []);
 
   // Listen for open-compose-sheet event from navbar
   useEffect(() => {
@@ -507,7 +538,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
           {sortedStories.map((story) => {
             const isSeen = seenIds.has(story.id);
             return (
-              <button key={story.id} onClick={() => markSeen(story.id)}
+              <button key={story.id} onClick={() => { markSeen(story.id); setActiveStoryGroup(story); }}
                 className="flex flex-col items-center gap-2 shrink-0 active:scale-95 transition-transform duration-100"
                 aria-label={`${story.name}'s story`}
               >
@@ -527,8 +558,31 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
         <MyStoryViewer
           authorName={currentActor.name}
           authorAvatar={currentActor.avatar_url ?? null}
-          stories={MY_MOCK_STORIES}
+          stories={myStories}
           onClose={() => setShowMyStoryViewer(false)}
+          isAuthor={true}
+        />
+      )}
+
+      {/* ── Other user story viewer ──────────────────────────────────────────── */}
+      {activeStoryGroup && (
+        <MyStoryViewer
+          authorName={activeStoryGroup.name}
+          authorAvatar={null}
+          stories={[
+            {
+              id: activeStoryGroup.id,
+              bgGradient: "linear-gradient(135deg, #1a1207 0%, #0c0a08 50%, #121010 100%)",
+              content: "Building the future of connections on WAC \n🚀",
+              timeAgo: "1h",
+              viewedBy: [],
+            }
+          ]}
+          onClose={() => setActiveStoryGroup(null)}
+          isAuthor={false}
+          onSendReply={(storyId, reply) => {
+            console.log(`Sent reply to ${activeStoryGroup.name} for story ${storyId}: ${reply}`);
+          }}
         />
       )}
 
@@ -538,12 +592,11 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeSheet} />
 
           <div
-            className="absolute left-0 right-0 md:inset-0 md:flex md:items-center md:justify-center md:pointer-events-none"
-            style={{ bottom: keyboardHeight, transition: "bottom 0.15s ease-out" }}
+            className="absolute left-0 right-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center md:pointer-events-none"
           >
             <div
               className="w-full md:max-w-lg md:pointer-events-auto bg-[#0f0f0f] rounded-t-2xl md:rounded-2xl border-t md:border border-white/[0.09] shadow-2xl overflow-hidden flex flex-col"
-              style={{ minHeight: "72dvh", maxHeight: `calc(93dvh - ${keyboardHeight}px)` }}
+              style={{ minHeight: "72dvh", maxHeight: "93dvh" }}
             >
               {/* Drag handle */}
               <div className="md:hidden flex justify-center pt-3 pb-0 shrink-0">
@@ -674,20 +727,34 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
 
                     {/* No media selected yet */}
                     {!storyPreview && (
-                      <div className="px-5 py-6">
-                        <button
-                          onClick={() => storyInputRef.current?.click()}
-                          className="w-full rounded-2xl border border-dashed border-[#b08d57]/25 bg-[#b08d57]/[0.03]
-                            hover:border-[#b08d57]/40 hover:bg-[#b08d57]/[0.06] active:scale-[0.99]
-                            flex flex-col items-center justify-center gap-4 py-14 transition-all duration-200"
-                        >
-                          <div className="w-14 h-14 rounded-full bg-[#b08d57]/[0.10] flex items-center justify-center">
-                            <Camera size={24} strokeWidth={1.5} className="text-[#b08d57]/70" />
+                      <div className="flex-1 flex flex-col justify-center px-5 py-6 gap-3">
+                        <button onClick={() => storyInputRef.current?.click()}
+                          className="w-full rounded-[28px] border-2 border-dashed border-[#b08d57]/12 bg-[#b08d57]/[0.015] hover:border-[#b08d57]/28 hover:bg-[#b08d57]/[0.035] active:scale-[0.99] flex flex-col items-center justify-center gap-4 py-12 transition-all duration-200">
+                          <div className="w-16 h-16 rounded-full bg-[#b08d57]/[0.07] flex items-center justify-center ring-1 ring-[#b08d57]/[0.08]">
+                            <Camera size={26} strokeWidth={1.2} className="text-[#b08d57]/50" />
                           </div>
                           <div className="text-center">
-                            <p className="text-sm font-medium text-white/65">Tap to add a photo or video</p>
-                            <p className="text-xs text-white/30 mt-1">Stories disappear after 24 hours</p>
+                            <p className="text-sm font-semibold text-white/55 mb-1">Add photo or video</p>
+                            <p className="text-xs text-white/20">Up to 100 MB · disappears after 24 hrs</p>
                           </div>
+                        </button>
+
+                        <div className="flex items-center gap-3 px-2">
+                          <div className="flex-1 h-px bg-white/[0.06]" />
+                          <span className="text-[10px] text-white/20 font-medium tracking-wider">or</span>
+                          <div className="flex-1 h-px bg-white/[0.06]" />
+                        </div>
+
+                        <button onClick={() => { closeSheet(); router.push("/stories/new"); }}
+                          className="w-full flex items-center gap-4 px-5 py-4 rounded-[22px] bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.05] hover:border-white/[0.13] active:scale-[0.99] transition-all duration-150">
+                          <div className="w-11 h-11 rounded-2xl bg-white/[0.06] flex items-center justify-center shrink-0">
+                            <Type size={18} strokeWidth={1.5} className="text-white/50" />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="text-sm font-semibold text-white/70 mb-0.5">Text Story</p>
+                            <p className="text-xs text-white/28 leading-snug">Write, mention people, tag a location</p>
+                          </div>
+                          <ChevronRight size={15} strokeWidth={2} className="text-white/20 shrink-0" />
                         </button>
                       </div>
                     )}

@@ -8,7 +8,7 @@ type OwnedEntity = {
   id: string;
   name: string;
   is_verified: boolean;
-  type: "business" | "organization";
+  type: "business" | "organization" | "group";
   slug: string;
 };
 
@@ -20,7 +20,7 @@ export default function ManagedEntitiesTab({ userId }: { userId: string }) {
     async function fetchEntities() {
       if (!userId) return;
 
-      const [businessesRes, orgsRes] = await Promise.all([
+      const [businessesRes, orgsRes, groupsRes] = await Promise.all([
         supabase
           .from("businesses")
           .select("id, name, is_verified, slug")
@@ -29,6 +29,12 @@ export default function ManagedEntitiesTab({ userId }: { userId: string }) {
           .from("organizations")
           .select("id, name, is_verified, slug")
           .eq("owner_id", userId),
+        supabase
+          .from("groups")
+          .select("id, name, is_verified, slug, group_members!inner(profile_id, role, status)")
+          .eq("group_members.profile_id", userId)
+          .in("group_members.role", ["owner", "admin"])
+          .eq("group_members.status", "active"),
       ]);
 
       const loadedEntities: OwnedEntity[] = [];
@@ -45,6 +51,18 @@ export default function ManagedEntitiesTab({ userId }: { userId: string }) {
       if (orgsRes.data) {
         loadedEntities.push(
           ...orgsRes.data.map((o) => ({ ...o, type: "organization" as const })),
+        );
+      }
+
+      if (groupsRes.data) {
+        loadedEntities.push(
+          ...groupsRes.data.map((g) => ({ 
+            id: g.id, 
+            name: g.name, 
+            is_verified: g.is_verified, 
+            slug: g.slug, 
+            type: "group" as const 
+          })),
         );
       }
 
@@ -122,6 +140,8 @@ export default function ManagedEntitiesTab({ userId }: { userId: string }) {
                     className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded inline-block ${
                       entity.type === "business"
                         ? "bg-blue-900/40 text-blue-400"
+                        : entity.type === "group"
+                        ? "bg-purple-900/40 text-purple-400"
                         : "bg-emerald-900/40 text-emerald-400"
                     }`}
                   >
@@ -145,16 +165,22 @@ export default function ManagedEntitiesTab({ userId }: { userId: string }) {
                   {entity.name}
                 </h3>
                 <p className="opacity-60 text-sm truncate">
-                  /{entity.type}s/{entity.slug}
+                  {entity.type === "group" ? `/groups/${entity.slug}` : `/${entity.type}s/${entity.slug}`}
                 </p>
               </div>
               <div className="mt-6 flex gap-3">
-                <Link href={`/profile/entities/${entity.id}`} className="flex-1 wac-button-secondary py-2 text-xs text-center font-bold inline-block">
+                <Link 
+                  href={entity.type === "group" ? `/groups/${entity.slug}/settings` : `/profile/entities/${entity.id}`} 
+                  className="flex-1 wac-button-secondary py-2 text-xs text-center font-bold inline-block"
+                >
                   Edit
                 </Link>
-                <button className="flex-1 bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-white transition rounded-xl py-2 text-xs">
+                <Link 
+                  href={entity.type === "group" ? `/groups/${entity.slug}` : `/${entity.type}s/${entity.slug}`} 
+                  className="flex-1 bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--accent)] hover:text-white transition rounded-xl py-2 text-xs text-center font-bold inline-block"
+                >
                   View Public
-                </button>
+                </Link>
               </div>
             </div>
           ))}

@@ -168,7 +168,7 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
         {/* Name + verified */}
         <div className="flex items-center gap-1 min-w-0 mb-0.5">
           <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
-          {person.is_verified && <VerifiedBadge className="shrink-0 mt-px" />}
+          {person.is_verified && <VerifiedBadge size="sm" className="shrink-0 mt-px" />}
         </div>
 
         {/* Headline */}

@@ -8,7 +8,12 @@
       "Bash(find /c/Users/Admin/Desktop/wac -maxdepth 1 -type f \\\\\\(-name .env* -o -name next.config.* -o -name tailwind.config.* \\\\\\))",
       "Bash(ls -la *.sql)",
       "Bash(grep -r \"businesses_directory\\\\|organizations_directory\\\\|recently_viewed\" /c/Users/Admin/Desktop/wac --include=*.ts --include=*.tsx -l)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(find /c/Users/Admin/Desktop/wac/components/directory -name *.tsx -o -name *.ts)",
+      "Bash(find c:UsersAdminDesktopwacapp -name *story* -type f)",
+      "Bash(grep -r post_type.*story c:UsersAdminDesktopwac --include=*.ts --include=*.tsx)",
+      "Bash(find c:UsersAdminDesktopwac -name *.tsx -o -name *.ts)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

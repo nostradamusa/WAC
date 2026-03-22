@@ -122,7 +122,6 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
   const [showSortOptions, setShowSortOptions] = useState(false);
   const [internalRefresh, setInternalRefresh] = useState(0);
   const [postLive, setPostLive]               = useState(false);
-  const [tabBarHidden, setTabBarHidden]       = useState(false);
   const postLiveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
 
@@ -161,18 +160,12 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
     };
   }, []);
 
-  // ── Scroll-aware tab bar hide ─────────────────────────────────────────────
-  // Listens for the wac-feed-scroll event dispatched by CommunityHub's left
-  // column onScroll handler. Hides the tab bar when scrolling down past the
-  // stories row (y > 100), reveals it on any upward scroll.
   useEffect(() => {
-    const handler = (e: Event) => {
-      const d = (e as CustomEvent<{ direction: string; y: number }>).detail;
-      if (d.direction === "down" && d.y > 100) setTabBarHidden(true);
-      else if (d.direction === "up") setTabBarHidden(false);
+    const handleRefresh = () => {
+      setInternalRefresh((n) => n + 1);
     };
-    window.addEventListener("wac-feed-scroll", handler);
-    return () => window.removeEventListener("wac-feed-scroll", handler);
+    window.addEventListener("wac-refresh-feed", handleRefresh);
+    return () => window.removeEventListener("wac-refresh-feed", handleRefresh);
   }, []);
 
   const handlePostCreated = useCallback(() => {
@@ -192,25 +185,8 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
       {/* ── Composer + stories row ── */}
       <CreatePostBox onPostCreated={handlePostCreated} />
 
-      {/*
-        Sticky tab bar — sticks to top-0 of the parent overflow-y scroll column.
-        When tabBarHidden, collapses to height-0 with a smooth max-height + opacity
-        transition so feed content fills the freed space. overflow:hidden on the
-        outer sticky wrapper is safe here — it only clips children, it does NOT
-        break the element's own sticky positioning.
-        The sort dropdown (absolute-positioned child) is only interactable when
-        the bar is visible, so overflow:hidden is harmless when collapsed.
-      */}
-      <div
-        className="sticky top-0 z-10 bg-[var(--background)]/95 backdrop-blur-md"
-        style={{
-          maxHeight: tabBarHidden ? 0 : 80,
-          overflow: tabBarHidden ? "hidden" : "visible",
-          opacity: tabBarHidden ? 0 : 1,
-          pointerEvents: tabBarHidden ? "none" : undefined,
-          transition: "max-height 0.3s ease, opacity 0.25s ease",
-        }}
-      >
+      {/* ── Feed Tab Bar ── */}
+      <div className="relative z-10 bg-[var(--background)]">
         <div className="border-b border-white/[0.08] py-3 mb-4 flex items-center justify-between">
 
           <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full">
@@ -292,9 +268,18 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
 
       {/* ── Feed states ── */}
       {isLoading ? (
-        <div className="space-y-4">
+        <div>
           {[1, 2, 3].map((n) => (
-            <div key={n} className="wac-card p-5 h-40 animate-pulse bg-white/[0.02]" />
+            <div key={n} className="border-b border-white/[0.07] px-4 py-4 animate-pulse">
+              <div className="flex gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/[0.06] shrink-0" />
+                <div className="flex-1 space-y-2 pt-0.5">
+                  <div className="h-3 bg-white/[0.06] rounded-full w-32" />
+                  <div className="h-3 bg-white/[0.04] rounded-full w-full" />
+                  <div className="h-3 bg-white/[0.04] rounded-full w-4/5" />
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : errorLine ? (
@@ -331,7 +316,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div>
           {posts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}

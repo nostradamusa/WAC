@@ -4,7 +4,7 @@ import { MessageSquare, MoreVertical, Phone, Video, Info, Image as ImageIcon, Fi
 import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import { use } from "react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 type ChatMessage = {
   id: number;
@@ -14,17 +14,20 @@ type ChatMessage = {
   time: string;
   avatar?: string;
   reactions?: string[];
+  mediaUrl?: string;
+  mediaType?: "image" | "video" | null;
+  status?: "sent" | "delivered" | "read";
 };
 
 const directChatHistory: ChatMessage[] = [
   { id: 1, sender: "other", name: "Arben Lleshi", text: "Hey! Did you see the new community hub feature?", time: "10:30 AM", avatar: "https://i.pravatar.cc/150?u=a", reactions: [] },
-  { id: 2, sender: "me", text: "I did! It looks amazing. The new Pulse feed is exactly what we needed to stay connected.", time: "10:35 AM", reactions: ['🔥'] },
+  { id: 2, sender: "me", text: "I did! It looks amazing. The new Pulse feed is exactly what we needed to stay connected.", time: "10:35 AM", reactions: ['🔥'], status: "read" },
   { id: 3, sender: "other", name: "Arben Lleshi", text: "Looking forward to the real estate workshop next week! Will you be organizing a carpool from the Bronx?", time: "10:42 AM", avatar: "https://i.pravatar.cc/150?u=a", reactions: [] },
 ];
 
 const groupChatHistory: ChatMessage[] = [
   { id: 1, sender: "other", name: "Teuta Hoxha", text: "Is anyone heading to the workshop from the Bronx?", time: "9:00 AM", avatar: "https://i.pravatar.cc/150?u=x", reactions: [] },
-  { id: 2, sender: "other", name: "Ilir Meta", text: "We should definitely coordinate that carpool. I can drive.", time: "9:15 AM", avatar: "https://i.pravatar.cc/150?u=q", reactions: ['👍', '🚘'] },
+  { id: 2, sender: "other", name: "Ilir Meta", text: "We should definitely coordinate that carpool. I can drive.", time: "9:15 AM", avatar: "https://i.pravatar.cc/150?u=q", reactions: ['👍'] },
   { id: 3, sender: "other", name: "Teuta Hoxha", text: "Perfect, thank you!", time: "9:18 AM", avatar: "https://i.pravatar.cc/150?u=x", reactions: ['❤️'] }
 ];
 
@@ -41,336 +44,332 @@ export default function ActiveChatPage({
   
   const [messages, setMessages] = useState(isGroup ? groupChatHistory : directChatHistory);
   const [inputText, setInputText] = useState("");
-  const [connectionStatus, setConnectionStatus] = useState<"none" | "pending" | "connected">("none");
+  const [connectionStatus, setConnectionStatus] = useState<"none" | "pending" | "connected">("connected");
   const isConnected = connectionStatus === "connected";
+
   const [isEmojiOpen, setIsEmojiOpen] = useState(false);
   const [reactingTo, setReactingTo] = useState<number | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fullScreenMedia, setFullScreenMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Guaranteed instant scroll to bottom on layout shift or new message
+    const timer = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [messages, isEmojiOpen]);
+
+  // Simulate read receipts for newly sent messages
+  useEffect(() => {
+    const unreadMessages = messages.filter(m => m.sender === "me" && m.status === "sent");
+    if (unreadMessages.length === 0) return;
+
+    const timer = setTimeout(() => {
+      setMessages(prev => prev.map(m => m.sender === "me" && m.status === "sent" ? { ...m, status: "read" } : m));
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   const canMessage = isGroup || isConnected;
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
+  const handleReact = (msgId: number, emoji: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id === msgId) {
+        const reactions = m.reactions || [];
+        return { 
+          ...m, 
+          reactions: reactions.includes(emoji) 
+            ? [] 
+            : [emoji] 
+        };
+      }
+      return m;
+    }));
+    setReactingTo(null);
+  };
 
-    setMessages([...messages, {
+
+  const handleSend = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim() && !selectedFile) return;
+
+    let mediaUrl: string | undefined = undefined;
+    let mediaType: 'image' | 'video' | null = null;
+    let textToSend = inputText.trim();
+
+    if (selectedFile) {
+      mediaUrl = URL.createObjectURL(selectedFile);
+      if (selectedFile.type.startsWith('video/')) mediaType = 'video';
+      else mediaType = 'image'; 
+    }
+
+    setMessages(prev => [...prev, {
       id: Date.now(),
       sender: "me",
-      text: inputText,
-      time: "Just now",
+      text: textToSend,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       name: "Me",
-      avatar: ""
+      mediaUrl,
+      mediaType,
+      status: "sent"
     }]);
+    
     setInputText("");
+    setSelectedFile(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[var(--background)] relative h-full pt-16 md:pt-20">
+    <div className="flex-1 flex flex-col bg-[#161513] relative h-full font-sans text-white/90">
       
-      {/* Top Bar Navigation (Desktop & Mobile) */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0 bg-black/40 backdrop-blur-md">
+      {/* ── Top Bar Navigation ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 bg-[#0A0A0A] border-b border-white/5 relative z-20">
         <div className="flex items-center gap-3">
-          <Link href="/messages" className="md:hidden p-2 -ml-2 text-white/60 hover:text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          {/* Back button */}
+          <Link href="/messages" className="p-2 -ml-2 text-white/60 hover:text-white transition rounded-full hover:bg-white/5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           </Link>
-          
-          {isGroup ? (
-            <div className="w-10 h-10 shrink-0 flex items-center justify-center relative bg-transparent">
-              <div className="w-full h-full relative">
-                 <img src="https://i.pravatar.cc/150?u=q" className="w-7 h-7 rounded-full absolute top-0 right-0 border-2 border-[var(--background)] object-cover z-10" />
-                 <img src="https://i.pravatar.cc/150?u=x" className="w-7 h-7 rounded-full absolute bottom-0 left-0 border-2 border-[var(--background)] object-cover z-20" />
-              </div>
-            </div>
-          ) : (
-             <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden border border-white/20">
-                <img src="https://i.pravatar.cc/150?u=a" alt="Avatar" className="w-full h-full object-cover" />
-             </div>
-          )}
 
-          <div>
-            <h2 className="font-bold text-sm tracking-wide">{isGroup ? "Real Estate Committee" : "Arben Lleshi"}</h2>
-            <p className="text-xs text-emerald-400 flex items-center gap-1">
-              {isGroup ? (
-                 <span className="text-white/50">3 Members</span>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                  Online
-                </>
-              )}
-            </p>
-          </div>
+          {/* Contact Profile Info */}
+          <Link href="/profile" className="flex items-center gap-3 group">
+             <div className="w-10 h-10 rounded-full border border-white/10 shrink-0 overflow-hidden relative shadow-sm">
+                <img src="https://i.pravatar.cc/150?u=a" alt="Arben Lleshi" className="w-full h-full object-cover grayscale opacity-90 transition-transform group-hover:scale-110" />
+             </div>
+             <div className="flex flex-col">
+                <span className="font-bold text-sm text-white group-hover:text-[#b08d57] transition-colors">Arben Lleshi</span>
+                <span className="text-[11px] font-medium text-emerald-500/80 flex items-center gap-1.5 mt-0.5">
+                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shadow-[0_0_5px_rgba(16,185,129,0.3)]"></span>
+                   Active now
+                </span>
+             </div>
+          </Link>
         </div>
 
-        <div className="flex items-center gap-2">
-           <button className="p-2 text-white/60 hover:text-[var(--accent)] transition rounded-full hover:bg-white/5">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        {/* Action icons */}
+        <div className="flex items-center gap-1">
+           <button className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
            </button>
         </div>
       </div>
 
-      {/* Chat History Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 wac-scrollbar bg-[rgba(255,255,255,0.01)]">
-        <div className="text-center py-6">
-           {isGroup ? (
-              <>
-                 <div className="w-20 h-20 rounded-full mx-auto mb-4 bg-white/5 border border-white/10 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/40"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                 </div>
-                 <h3 className="font-serif text-xl tracking-tight mb-1">Real Estate Committee</h3>
-                 <p className="opacity-60 text-sm mb-4">You created this group chat on Jan 14, 2026.</p>
-              </>
-           ) : (
-              <>
-                 <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-4 border-2 border-[var(--border)]"><img src="https://i.pravatar.cc/150?u=a" alt="Avatar" className="w-full h-full object-cover"/></div>
-                 <h3 className="font-serif text-xl tracking-tight mb-1">Arben Lleshi</h3>
-                 <p className="opacity-60 text-sm mb-4">You are connected on WAC and both members of Albanian Professionals Network.</p>
-                 <Link href="/people/arbenll" className="wac-button-secondary py-1 px-4 text-xs font-bold w-auto inline-block">View Profile</Link>
-              </>
-           )}
+      {/* ── Chat History Form ────────────────────────────────────────────────── */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto wac-scrollbar pb-6 px-4 md:px-8">
+        
+        {/* Header Profile Info */}
+        <div className="flex flex-col items-center justify-center py-10 max-w-lg mx-auto text-center border-b border-white/[0.05] mb-8">
+           <div className="w-[72px] h-[72px] rounded-full overflow-hidden mb-4 border border-white/20 shadow-lg">
+             <img src="https://i.pravatar.cc/150?u=a" alt="Avatar" className="w-full h-full object-cover grayscale opacity-80" />
+           </div>
+           
+           <h2 className="text-[22px] font-serif font-bold text-white mb-2">Arben Lleshi</h2>
+           <p className="text-[14px] text-white/50 leading-relaxed mb-6 font-medium">
+             You are connected on WAC and both members of Albanian Professionals Network.
+           </p>
+           
+           <button className="px-6 py-2 rounded-full border border-white/10 bg-[#1A1A1A] text-[13px] font-bold hover:bg-white/5 hover:border-white/20 transition-all text-white/90">
+             View Profile
+           </button>
         </div>
         
-        <div className="border-b border-white/10 w-full relative h-[1px] my-8">
-           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--background)] px-4 text-[10px] uppercase font-bold tracking-widest text-[var(--accent)] opacity-80">Today</span>
+        {/* Today Divider */}
+        <div className="flex items-center justify-center mb-10">
+           <span className="text-[10px] font-black tracking-[0.15em] text-[#b08d57] uppercase">Today</span>
         </div>
 
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex w-full ${msg.sender === "me" ? "justify-end" : "justify-start"} gap-3 group relative mb-2`}>
-            {msg.sender === "other" && isGroup && msg.avatar && (
-               <img src={msg.avatar} alt="Avatar" className="w-8 h-8 rounded-full shrink-0 border border-white/10 mt-1" />
-            )}
-            <div className={`flex flex-col ${msg.sender === "me" ? "items-end" : "items-start"} max-w-[80%]`}>
-               {msg.sender === "other" && isGroup && msg.name && (
-                  <span className="text-xs font-bold text-white/50 mb-1 ml-1">{msg.name}</span>
-               )}
-               
-               <div className="relative flex items-center gap-2">
+        <div className="flex flex-col space-y-7 max-w-4xl mx-auto">
+          {messages.map((msg, idx) => {
+            const isMe = msg.sender === "me";
+            return (
+              <div key={msg.id} className={`flex flex-col relative group ${isMe ? "items-end" : "items-start"}`}>
+                
+                <div className={`flex items-end gap-2 ${isMe ? "flex-row-reverse" : "flex-row"} relative`}>
+                  {/* Bubble */}
                   <div 
-                     className={`p-3 md:p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-sm relative ${
-                       msg.sender === "me" 
-                         ? "bg-[rgba(176,141,87,0.1)] border border-[#b08d57]/30 text-white rounded-tr-sm" 
-                         : "bg-white/5 border border-white/10 text-white/90 rounded-tl-sm"
-                     }`}
+                    onClick={() => setReactingTo(reactingTo === msg.id ? null : msg.id)}
+                    className={`relative px-5 py-3.5 max-w-[85%] md:max-w-xs lg:max-w-md cursor-pointer text-[14.5px] leading-relaxed transition-opacity hover:opacity-90 flex flex-col gap-2.5
+                      ${isMe 
+                        ? "bg-[#2A2113] border border-[#b08d57]/20 text-white/95 rounded-[20px] rounded-tr-sm" 
+                        : "bg-[#252525] border border-white/[0.05] text-white/90 rounded-[20px] rounded-tl-sm"}`}
                   >
-                    {msg.text}
-
-                    {/* Render specific reactions and hover add button */}
-                    <div className={`absolute -bottom-3 ${msg.sender === "me" ? "right-2" : "left-2"} flex gap-1 z-10 origin-bottom`}>
-                       {(msg.reactions && msg.reactions.length > 0) ? (
-                          <div className="flex gap-1 bg-[#111] border border-[var(--border)] rounded-full px-2 py-1 shadow-md origin-bottom group-hover:pr-7 transition-all duration-300 relative">
-                             {msg.reactions.map((r, idx) => (
-                                <span key={idx} className="flex items-center justify-center">
-                                   <ReactionIcon 
-                                      type={r} 
-                                      size={14} 
-                                      animateOnClick={false} 
-                                      onClick={(e) => {
-                                         e.stopPropagation();
-                                         setMessages(prev => prev.map(m => {
-                                            if (m.id === msg.id) {
-                                               return { ...m, reactions: (m.reactions || []).filter(x => x !== r) };
-                                            }
-                                            return m;
-                                         }));
-                                      }}
-                                   />
-                                </span>
-                             ))}
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setReactingTo(msg.id); }}
-                                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-white/40 hover:text-[var(--accent)] hover:bg-white/10 rounded-full transition-opacity duration-200 opacity-0 group-hover:opacity-100" 
-                                title="React"
-                             >
-                                <Smile size={12} />
-                             </button>
-                          </div>
-                       ) : (
-                          <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 transform scale-75 group-hover:scale-100 bg-[#111] border border-[var(--border)] rounded-full shadow-md">
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); setReactingTo(msg.id); }}
-                                className="p-1 text-white/40 hover:text-[var(--accent)] hover:bg-white/5 rounded-full transition" 
-                                title="React"
-                             >
-                                <Smile size={12} />
-                             </button>
-                          </div>
-                       )}
-                    </div>
+                    {/* Media Attachment */}
+                    {msg.mediaUrl && (
+                       <div 
+                          className="relative rounded-xl overflow-hidden cursor-zoom-in group/media max-h-[250px] bg-black/40 border border-white/5"
+                          onClick={(e) => {
+                             e.stopPropagation();
+                             setFullScreenMedia({ url: msg.mediaUrl!, type: msg.mediaType || 'image' });
+                          }}
+                       >
+                         <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors pointer-events-none z-10" />
+                         {msg.mediaType === 'video' ? (
+                            <video src={msg.mediaUrl} className="w-full h-full object-cover" />
+                         ) : (
+                            <img src={msg.mediaUrl} alt="Attachment" className="w-full h-full object-cover" />
+                         )}
+                       </div>
+                    )}
+                    
+                    {msg.text && <div>{msg.text}</div>}
+                    
+                    {/* Render existing reactions if any */}
+                    {msg.reactions && msg.reactions.length > 0 && (
+                       <div className={`absolute -bottom-3 ${isMe ? '-left-2' : '-right-2'} flex gap-1 z-10`}>
+                          {msg.reactions.map((r, i) => (
+                             <div key={i} className="w-7 h-7 bg-[#1A1A1A] border-[1.5px] border-[#2A2113] rounded-full flex items-center justify-center text-[13px] shadow-sm">
+                                {r}
+                             </div>
+                          ))}
+                       </div>
+                    )}
                   </div>
 
-
-                  {/* Inline Reaction Picker Overlay */}
-                  {reactingTo === msg.id && (
-                     <div className={`absolute top-full mt-3 ${msg.sender === "me" ? "right-0" : "left-0"} bg-[#111] border border-[var(--border)] rounded-full p-1 shadow-xl flex gap-1 z-50 animate-fade-in-up`}>
-                        {SUPPORTED_REACTIONS.map(r => (
-                           <button 
-                              key={r.type} 
-                              onClick={() => {
-                                 setMessages(prev => prev.map(m => {
-                                    if (m.id === msg.id) {
-                                       const currentReactions = m.reactions || [];
-                                       const hasReaction = currentReactions.includes(r.type);
-                                       return { 
-                                          ...m, 
-                                          reactions: hasReaction ? [] : [r.type]
-                                       };
-                                    }
-                                    return m;
-                                 }));
-                                 setReactingTo(null);
-                              }}
-                              className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition"
-                           >
-                              <ReactionIcon type={r.type} size={18} animateOnClick={false} />
-                           </button>
-                        ))}
-                     </div>
-                  )}
-               </div>
-               
-               <span className="text-[10px] opacity-40 mt-1 px-1 font-medium">{msg.time}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Message Input Box */}
-      <div className="p-4 bg-black/40 backdrop-blur-md border-t border-white/10 shrink-0 relative">
-         
-         {/* AI Smart Replies (Only if connected) */}
-         {isConnected && (
-            <div className="absolute -top-14 left-0 w-full px-4 flex gap-2 overflow-x-auto wac-scrollbar pb-2">
-               <button 
-                  onClick={() => setInputText("I'd love to organize a carpool. Let's coordinate!")}
-                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(176,141,87,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(176,141,87,0.15)]"
-               >
-                  <Sparkles size={12} />
-                  Sure, let's coordinate.
-               </button>
-               <button 
-                  onClick={() => setInputText("I won't be able to carpool this time, but I'll see you there!")}
-                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full bg-[rgba(176,141,87,0.08)] border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_4px_12px_rgba(176,141,87,0.15)]"
-               >
-                  <Sparkles size={12} />
-                  I can't carpool, sorry.
-               </button>
-            </div>
-         )}
-
-         {isConnected ? (
-            <>
-               <form onSubmit={handleSend} className="relative flex items-end gap-2 max-w-4xl mx-auto">
-                  <label className="p-3 text-white/40 hover:text-[var(--accent)] cursor-pointer transition mb-1 disabled:opacity-50">
-                     <input type="file" className="hidden" />
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                  </label>
-                  <div className="flex-1 relative">
-                     {isEmojiOpen && (
-                        <div className="absolute bottom-full right-1 mb-2 bg-[#111] border border-[var(--border)] rounded-xl p-2 shadow-xl flex gap-1 z-50">
+                  {/* Hover Actions (Desktop) or active state (Mobile) */}
+                  <div className={`opacity-0 md:group-hover:opacity-100 ${reactingTo === msg.id ? "opacity-100" : ""} transition-opacity flex items-center gap-1 relative z-20`}>
+                     <button 
+                       onClick={() => setReactingTo(reactingTo === msg.id ? null : msg.id)} 
+                       className={`p-1.5 rounded-full transition-colors ${reactingTo === msg.id ? "text-white bg-white/10" : "text-white/40 hover:text-white hover:bg-white/10"}`}
+                     >
+                        <Smile size={16} strokeWidth={2} />
+                     </button>
+                     
+                     {/* Reaction Picker Overlay */}
+                     {reactingTo === msg.id && (
+                        <div className={`absolute bottom-[130%] ${isMe ? 'left-0' : 'right-0'} bg-[#222] border border-white/10 rounded-full py-1.5 px-3 flex gap-2.5 shadow-xl z-50 animate-in fade-in zoom-in-95`}>
                            {commonEmojis.map(emoji => (
                               <button 
                                  key={emoji} 
-                                 type="button" 
-                                 onClick={() => {
-                                    setInputText(prev => prev + emoji);
-                                    setIsEmojiOpen(false);
-                                 }}
-                                 className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-lg transition text-lg"
+                                 onClick={() => handleReact(msg.id, emoji)}
+                                 className="hover:scale-125 transition-transform text-[18px]"
                               >
                                  {emoji}
                               </button>
                            ))}
                         </div>
                      )}
-                     <div className="absolute right-3 top-2 flex items-center gap-1 z-10 transition-opacity">
-                        <button 
-                           type="button" 
-                           onClick={() => setIsEmojiOpen(!isEmojiOpen)}
-                           className="p-1.5 text-white/40 hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors group relative"
-                           title="Add emoji"
-                        >
-                           <Smile size={16} />
-                        </button>
-                        <button 
-                           type="button" 
-                           className="p-1.5 text-[var(--accent)] hover:bg-[var(--accent)]/20 rounded-lg transition-colors group relative"
-                           title="Draft with AI Copilot"
-                        >
-                           <Sparkles size={16} />
-                           <span className="absolute bottom-full mb-2 right-0 w-max px-2 py-1 bg-[#111] border border-[var(--accent)]/30 text-[10px] text-[var(--accent)] font-bold rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                              Draft with AI
-                           </span>
-                        </button>
-                     </div>
-                     
-                     <textarea 
-                        rows={1}
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Type a message or use AI to draft..."
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 pr-12 text-sm outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(176,141,87,0.1)] transition-all resize-none max-h-32 min-h-[46px] wac-scrollbar break-words placeholder:opacity-50"
-                        style={{ fieldSizing: "content" } as any}
-                        onKeyDown={(e) => {
-                           if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSend(e);
-                           }
-                        }}
-                     />
-                     <button type="button" className="absolute right-10 bottom-2.5 text-white/40 hover:text-[var(--accent)] transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 14a2 2 0 1 1 2-2 2 2 0 0 1-2 2zm1-5a1 1 0 1 1-1-1 1 1 0 0 1 1 1h-1"/></svg>
-                     </button>
                   </div>
-                  <button 
-                     type="submit" 
-                     disabled={!inputText.trim()}
-                     className={`p-3 rounded-xl mb-1 flex items-center justify-center transition ${inputText.trim() ? "bg-[var(--accent)] text-black shadow-[0_0_15px_rgba(176,141,87,0.4)]" : "bg-white/5 text-white/30 cursor-not-allowed"}`}
-                  >
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-               </form>
-               <div className="text-center mt-2 flex items-center justify-center gap-2">
-                  <span className="text-[10px] opacity-30 font-medium">Press Enter to send. Shift + Enter for a new line.</span>
+                </div>
+                
+                {/* Time & Read Receipts Below */}
+                <span className={`text-[10px] mt-1.5 font-medium px-1 flex items-center gap-1 ${isMe ? "justify-end text-white/50" : "justify-start text-white/40"}`}>
+                  {msg.time}
+                  {isMe && msg.status && (
+                    <span className="flex items-center ml-0.5">
+                      {msg.status === 'sent' && <Check size={12} className="text-white/30" />}
+                      {msg.status === 'delivered' && <CheckCheck size={12} className="text-white/40" />}
+                      {msg.status === 'read' && <CheckCheck size={12} className="text-[#0ea5e9]" />}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Input Area ───────────────────────────────────────────────────────── */}
+      <div className="px-3 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-5 pt-3 shrink-0 bg-[#0A0A0A]/95 backdrop-blur-md relative z-10 transition-all border-t border-white/[0.03]">
+         
+         <div className="max-w-4xl mx-auto">
+
+            {/* Main Input Row */}
+            <div className="flex items-end gap-2.5">
+               {/* Paperclip */}
+               <label className="p-2.5 mb-1 text-white/40 hover:text-white cursor-pointer transition shrink-0 relative hover:bg-white/5 rounded-full">
+                  <input type="file" className="hidden" onChange={handleFileChange} />
+                  <Paperclip size={20} strokeWidth={2} />
+                  {selectedFile && (
+                    <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#b08d57] rounded-full border-2 border-[#0A0A0A]" />
+                  )}
+               </label>
+               
+               {/* Central Pill Input */}
+               <div className="flex-1 min-w-0 bg-[#1A1A1A] border border-white/5 rounded-[20px] relative flex items-end focus-within:border-[#b08d57]/40 focus-within:bg-[#1E1E1E] transition-all shadow-sm">
+                  <textarea 
+                     rows={1}
+                     value={inputText}
+                     onChange={(e) => setInputText(e.target.value)}
+                     placeholder="Message..."
+                     className="w-full bg-transparent py-3 pl-4 pr-[44px] text-[14.5px] outline-none resize-none max-h-[120px] min-h-[44px] wac-scrollbar placeholder:text-white/30"
+                     style={{ fieldSizing: "content" } as any}
+                     onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                           e.preventDefault();
+                           handleSend();
+                        }
+                     }}
+                  />
+                  
+                  {/* Inner Action Buttons (Emoji) */}
+                  <div className="absolute right-1.5 top-1.5 bottom-1.5 flex flex-col justify-end items-center py-0.5">
+                    <div className="flex gap-1">
+                       <button type="button" onClick={() => setIsEmojiOpen(!isEmojiOpen)} className="p-1.5 text-white/30 hover:text-white transition group relative focus:outline-none rounded-full hover:bg-white/5">
+                          <Smile size={18} className="hover:scale-110 transition-transform" />
+                          {isEmojiOpen && (
+                             <div className="absolute bottom-[130%] right-0 bg-[#222] border border-white/10 rounded-lg p-2 flex gap-1 shadow-xl z-50 animate-in fade-in zoom-in-95">
+                                {commonEmojis.map(emoji => (
+                                   <div 
+                                      key={emoji} 
+                                      onClick={(e) => {
+                                         e.stopPropagation();
+                                         setInputText(prev => prev + emoji);
+                                         setIsEmojiOpen(false);
+                                      }}
+                                      className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded cursor-pointer text-xl"
+                                   >
+                                      {emoji}
+                                   </div>
+                                ))}
+                             </div>
+                          )}
+                       </button>
+                    </div>
+                  </div>
                </div>
-            </>
-         ) : (
-            <div className="max-w-md mx-auto text-center py-4 bg-white/5 rounded-2xl border border-white/10 flex flex-col items-center">
-               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2 text-white/40"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-               <p className="text-sm font-medium mb-1">
-                 {connectionStatus === "pending" ? "Request Sent" : "Messaging is locked"}
-               </p>
-               <p className="text-xs text-white/50 mb-4 px-6">
-                 {connectionStatus === "pending" 
-                   ? "Your connection request has been sent. You will be able to message Arben once they accept." 
-                   : "You need to be connected with Arben to send direct messages. Send a connection request to start chatting."}
-               </p>
-               {connectionStatus === "none" ? (
-                 <div className="w-full px-6 flex flex-col gap-3">
-                    <textarea 
-                       placeholder="Add a note to introduce yourself..." 
-                       rows={2}
-                       className="w-full bg-[rgba(255,255,255,0.03)] border border-white/10 rounded-xl py-2 px-3 text-xs focus:border-[var(--accent)] outline-none resize-none placeholder:text-white/30 text-white/90"
-                    ></textarea>
-                    <button 
-                       onClick={() => setConnectionStatus("pending")} 
-                       className="bg-[var(--accent)] text-black font-bold py-2.5 px-6 text-sm rounded-full hover:bg-[var(--accent)]/90 hover:shadow-[0_0_15px_rgba(176,141,87,0.4)] transition-all mx-auto w-max inline-block mt-2"
-                    >
-                       Send Connection Request
-                    </button>
-                 </div>
+               
+               {/* Send Button Square */}
+               <button 
+                  onClick={() => handleSend()}
+                  disabled={!inputText.trim() && !selectedFile}
+                  className={`w-11 h-11 rounded-[18px] mb-0.5 shrink-0 flex items-center justify-center transition-all shadow-sm ${
+                     (inputText.trim() || selectedFile) ? "bg-[#b08d57] text-[#151311] hover:bg-[#9a7545] hover:scale-105" : "bg-[#1A1A1A] text-white/20 cursor-not-allowed border border-white/5"
+                  }`}
+               >
+                  <Send size={18} strokeWidth={2.5} className="ml-0.5" />
+               </button>
+            </div>
+         </div>
+      </div>
+
+      {/* Full Screen Media Modal */}
+      {fullScreenMedia && (
+         <div 
+            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 backdrop-blur-sm cursor-zoom-out animate-in fade-in"
+            onClick={() => setFullScreenMedia(null)}
+         >
+            <button className="absolute top-6 right-6 p-3 text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors z-[110]">
+               <X size={24} />
+            </button>
+            <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+               {fullScreenMedia.type === 'video' ? (
+                  <video src={fullScreenMedia.url} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" controls autoPlay />
                ) : (
-                 <button disabled className="bg-white/5 border border-white/10 text-white py-2.5 px-6 text-sm mx-auto flex items-center justify-center opacity-50 cursor-not-allowed rounded-full">
-                    Pending Acceptance...
-                 </button>
-               )}
-               {/* Quick dev toggle to simulate acceptance */}
-               {connectionStatus === "pending" && (
-                 <button onClick={() => setConnectionStatus("connected")} className="text-[10px] text-white/20 hover:text-white/50 mt-4 underline">
-                    (Simulate Acceptance)
-                 </button>
+                  <img src={fullScreenMedia.url} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" alt="Full screen media" />
                )}
             </div>
-         )}
-      </div>
+         </div>
+      )}
+
     </div>
   );
 }

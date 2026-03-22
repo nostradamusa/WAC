@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { Search, Edit, Settings, MoreHorizontal, CheckCircle2, Navigation, MessageSquarePlus } from "lucide-react";
+import NewMessageSheet from "@/components/messages/NewMessageSheet";
 
 const mockConversations = [
   {
@@ -44,116 +46,174 @@ const mockConversations = [
 ];
 
 export default function MessagesInboxPage() {
-  const [activeTab, setActiveTab] = useState<"focused" | "other">("focused");
+  const [activeTab, setActiveTab] = useState<"all" | "unread" | "requests">("all");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
+
+  useEffect(() => {
+    const handleNewMessageReq = () => setIsNewMessageOpen(true);
+    window.addEventListener("wac-new-message", handleNewMessageReq);
+    return () => window.removeEventListener("wac-new-message", handleNewMessageReq);
+  }, []);
 
   return (
     <>
-      {/* LEFT SIDEBAR: Conversations List */}
-      <div className="w-full md:w-80 lg:w-96 flex-shrink-0 border-r border-white/10 bg-[var(--background)] flex flex-col h-full pt-16 md:pt-20">
-        <div className="p-4 border-b border-white/10 shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-serif tracking-tight font-bold">
+      {/* ── LEFT SIDEBAR: Conversations List ───────────────────────────────────── */}
+      <div className="w-full md:w-[380px] lg:w-[420px] flex-shrink-0 border-r border-white/5 bg-[#0A0A0A] flex flex-col h-full pt-16 md:pt-16 relative z-10">
+        
+        {/* Header Area */}
+        <div className="px-5 pt-6 pb-4 shrink-0 bg-gradient-to-b from-[#0A0A0A] to-transparent relative z-20">
+          <div className="flex items-center justify-between mb-5">
+            <h1 className="text-2xl font-serif tracking-tight font-bold text-white drop-shadow-sm">
               Messages
             </h1>
-            <div className="flex items-center gap-3">
-               <button className="text-xs font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 px-3 py-1.5 rounded-full transition">
-                  Mark all read
+            <div className="flex items-center gap-1.5">
+               <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white/[0.03] border border-white/5 text-white/50 hover:text-white hover:bg-white/10 active:scale-95 transition-all" title="Settings">
+                  <Settings size={17} strokeWidth={1.8} />
                </button>
-               <button className="text-white/50 hover:text-white transition p-1.5 rounded-full hover:bg-white/5" title="Settings">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+               <button 
+                 onClick={() => setIsNewMessageOpen(true)}
+                 className="w-9 h-9 flex items-center justify-center rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57] hover:bg-[#b08d57] hover:text-black active:scale-95 transition-all shadow-sm" title="New Message">
+                  <MessageSquarePlus size={16} strokeWidth={2.2} />
                </button>
             </div>
           </div>
 
-          <div className="relative mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input 
-              id="messages-search"
-              name="messages-search"
-              type="text" 
-              placeholder="Search messages..." 
-              className="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-9 pr-4 text-sm outline-none focus:border-[var(--accent)] transition"
-            />
+          {/* Search Bar - Premium Glassmorphic */}
+          <div className="relative mb-5 group">
+            <div className={`absolute inset-0 bg-gradient-to-r from-[#b08d57]/20 to-transparent rounded-full blur-md opacity-0 transition-opacity duration-300 ${searchFocused ? "opacity-100" : ""}`} />
+            <div className={`relative flex items-center bg-[#151515] border rounded-full overflow-hidden transition-all duration-300 ${searchFocused ? "border-[#b08d57]/40 ring-1 ring-[#b08d57]/20" : "border-white/10 hover:border-white/25"}`}>
+              <div className="pl-4 pr-2 text-white/40 group-hover:text-white/60 transition-colors">
+                <Search size={16} strokeWidth={2} />
+              </div>
+              <input 
+                id="messages-search"
+                type="text" 
+                placeholder="Search conversations..." 
+                className="w-full bg-transparent py-2.5 pr-4 text-[14px] text-white placeholder:text-white/30 outline-none"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+              />
+            </div>
           </div>
 
-          <div className="flex gap-2 shrink-0">
-             <button 
-               onClick={() => setActiveTab("focused")}
-               className={`flex-1 py-1.5 text-xs font-bold rounded-full transition ${activeTab === "focused" ? "bg-white/10 text-white" : "bg-transparent text-white/50 hover:bg-white/5"}`}
-             >
-               All
-             </button>
-             <button 
-               onClick={() => setActiveTab("other")}
-               className={`flex-1 py-1.5 text-xs font-bold rounded-full transition ${activeTab === "other" ? "bg-white/10 text-white" : "bg-transparent text-white/50 hover:bg-white/5"}`}
-             >
-               Unread
-             </button>
-             <button 
-               className="flex-1 py-1.5 text-xs font-bold rounded-full bg-transparent text-white/50 hover:bg-white/5 transition flex justify-center items-center gap-1"
-             >
-               Requests
-               <span className="w-4 h-4 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-[9px] border border-red-500/30">1</span>
-             </button>
+          {/* Underline Tabs Navigation */}
+          <div className="flex items-center gap-6 border-b border-white/[0.06] relative">
+            {(["all", "unread", "requests"] as const).map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`pb-3 text-[13px] font-semibold tracking-wide capitalize relative transition-colors ${
+                  activeTab === tab ? "text-white" : "text-white/40 hover:text-white/70"
+                }`}
+              >
+                {tab}
+                {tab === "requests" && (
+                  <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-[#b08d57]/20 text-[#b08d57] text-[10px] font-bold leading-none border border-[#b08d57]/30">
+                    1
+                  </span>
+                )}
+                {activeTab === tab && (
+                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#b08d57] rounded-t-full" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto wac-scrollbar pb-32 md:pb-6">
-          {mockConversations.map((chat) => (
-            <Link 
-              href={`/messages/${chat.id}`} 
-              key={chat.id}
-              className="flex items-start gap-3 p-4 border-b border-white/5 hover:bg-white/5 transition block"
-            >
-              <div className={`w-12 h-12 rounded-full shrink-0 border border-white/10 flex items-center justify-center relative ${chat.type === 'group' ? 'bg-transparent' : 'bg-white/5 overflow-hidden'}`}>
-                {chat.type === 'group' && chat.images ? (
-                   <div className="w-full h-full relative">
-                      <img src={chat.images[0]} className="w-8 h-8 rounded-full absolute top-0 right-0 border-2 border-[var(--background)] object-cover z-10" />
-                      <img src={chat.images[1]} className="w-8 h-8 rounded-full absolute bottom-0 left-0 border-2 border-[var(--background)] object-cover z-20" />
-                   </div>
-                ) : chat.avatar ? (
-                  <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-lg font-bold text-[var(--accent)]">{chat.name.charAt(0)}</span>
+        {/* Conversation List */}
+        <div className="flex-1 overflow-y-auto wac-scrollbar pb-32 md:pb-6 px-2">
+          {mockConversations.map((chat) => {
+            const isUnread = chat.unread > 0;
+            return (
+              <Link 
+                href={`/messages/${chat.id}`} 
+                key={chat.id}
+                className={`relative flex items-center gap-3.5 p-3 mx-1 mb-1 rounded-2xl transition-all duration-200 group
+                  ${isUnread ? "bg-[#b08d57]/[0.03] hover:bg-[#b08d57]/[0.06]" : "bg-transparent hover:bg-white/[0.04]"}`}
+              >
+                {/* Subtle Unread Glow Indicator */}
+                {isUnread && (
+                  <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-8 bg-[#b08d57] rounded-r-lg shadow-[0_0_8px_rgba(176,141,87,0.6)]" />
                 )}
-                {chat.type === 'organization' && (
-                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 rounded-full border border-[var(--background)]"></div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-baseline mb-1">
-                  <h3 className="font-bold text-sm truncate pr-2">{chat.name}</h3>
-                  <span className="text-xs opacity-50 shrink-0">{chat.time}</span>
+
+                {/* Avatar Composition */}
+                <div className={`relative w-14 h-14 rounded-full shrink-0 flex items-center justify-center
+                  ${chat.type === 'group' ? 'bg-transparent' : 'bg-[#1A1A1A] border border-white/10 overflow-hidden'}`}
+                >
+                  {chat.type === 'group' && chat.images ? (
+                    <div className="w-full h-full relative">
+                      <img src={chat.images[0]} className="w-[34px] h-[34px] rounded-full absolute top-0 right-0 border-[2.5px] border-[#0A0A0A] object-cover shadow-sm z-10" />
+                      <img src={chat.images[1]} className="w-[34px] h-[34px] rounded-full absolute bottom-0 left-0 border-[2.5px] border-[#0A0A0A] object-cover shadow-sm z-20" />
+                    </div>
+                  ) : chat.avatar ? (
+                    <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className={`text-[22px] font-serif tracking-tight font-bold ${isUnread ? "text-[#b08d57]" : "text-white/40"}`}>
+                      {chat.name.charAt(0)}
+                    </span>
+                  )}
+                  {chat.type === 'organization' && (
+                    <div className="absolute -bottom-0.5 -right-0.5 w-[14px] h-[14px] bg-blue-500 rounded-full border-2 border-[#0A0A0A]" />
+                  )}
                 </div>
-                <p className={`text-sm truncate ${chat.unread > 0 ? "text-white font-medium" : "opacity-60"}`}>
-                  {chat.lastMessage}
-                </p>
-              </div>
-              {chat.unread > 0 && (
-                <div className="w-5 h-5 rounded-full bg-[var(--accent)] text-black text-[10px] font-bold flex items-center justify-center shrink-0 mt-4">
-                  {chat.unread}
+
+                {/* Text Content */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <div className="flex justify-between items-center mb-0.5">
+                    <h3 className={`text-[15px] truncate pr-2 tracking-tight ${isUnread ? "font-bold text-white drop-shadow-sm" : "font-semibold text-white/80"}`}>
+                      {chat.name}
+                    </h3>
+                    <span className={`text-[11px] shrink-0 font-medium ${isUnread ? "text-[#b08d57]" : "text-white/30"}`}>
+                      {chat.time}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className={`text-[13px] truncate leading-tight ${isUnread ? "text-white/90 font-medium" : "text-white/40 font-normal"}`}>
+                      {chat.lastMessage}
+                    </p>
+                    {isUnread && (
+                      <span className="shrink-0 w-4 h-4 rounded-full bg-[#b08d57] text-black flex items-center justify-center text-[9px] font-extrabold pb-[0.5px]">
+                        {chat.unread}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       </div>
 
-      {/* RIGHT MAIN AREA: Empty State / Chat Frame */}
-      <div className="hidden md:flex flex-1 flex-col bg-[var(--background)] relative pt-24 md:pt-32 mt-16 md:mt-20">
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center pb-20">
-           <div className="w-24 h-24 rounded-full bg-[rgba(176,141,87,0.05)] flex items-center justify-center border border-[var(--accent)]/30 mb-6 drop-shadow-2xl">
-             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>
+      {/* ── RIGHT MAIN AREA: Premium Empty State ───────────────────────────────────── */}
+      <div className="hidden md:flex flex-1 flex-col relative pt-16 md:pt-16 bg-[#070707] z-0 overflow-hidden">
+        
+        {/* Subtle Background Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#b08d57]/[0.02] rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center z-10">
+           <div className="relative mb-8 group">
+             <div className="absolute inset-0 bg-[#b08d57]/10 rounded-full blur-xl scale-125 transition-transform duration-700 group-hover:scale-150" />
+             <div className="w-28 h-28 rounded-full bg-gradient-to-b from-[#1a1711] to-[#0A0A0A] flex items-center justify-center border border-[#b08d57]/20 shadow-2xl relative z-10">
+               <Navigation size={42} strokeWidth={1} className="text-[#b08d57] opacity-80 -ml-1 mt-1" />
+             </div>
            </div>
-           <h2 className="text-3xl font-serif tracking-tight mb-3">Your Conversations</h2>
-           <p className="opacity-60 max-w-md mx-auto mb-8 text-sm">
-             Send private messages, network with professionals, and reach out to organizations securely on the World Albanian Congress platform.
+           
+           <h2 className="text-3xl font-serif tracking-tight text-white mb-4 drop-shadow-sm">
+             Your Network
+           </h2>
+           <p className="text-[15px] text-white/40 max-w-[340px] mx-auto mb-10 leading-relaxed font-normal">
+             Send secure messages, coordinate with organizations, and grow your presence on the World Albanian Congress.
            </p>
-           <button className="wac-button-primary px-8 py-2.5 text-sm font-bold">
-             Start a New Message
+           
+           <button className="flex items-center gap-2.5 bg-white text-black hover:bg-gray-200 px-7 py-3.5 rounded-full text-[14px] font-bold transition-all shadow-lg active:scale-95">
+             <MessageSquarePlus size={18} strokeWidth={2} />
+             Start a Conversation
            </button>
         </div>
       </div>
+      
+      <NewMessageSheet isOpen={isNewMessageOpen} onClose={() => setIsNewMessageOpen(false)} />
     </>
   );
 }

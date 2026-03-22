@@ -113,7 +113,7 @@ export default function OrganizationCard({ organization }: { organization: Organ
         {/* Name + verified */}
         <div className="flex items-center gap-1 min-w-0 mb-0.5">
           <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
-          {organization.is_verified && <VerifiedBadge className="shrink-0 mt-px" />}
+          {organization.is_verified && <VerifiedBadge size="sm" className="shrink-0 mt-px" />}
         </div>
 
         {/* Subtitle */}

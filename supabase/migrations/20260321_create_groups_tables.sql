@@ -50,6 +50,7 @@ ALTER TABLE groups        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE group_members ENABLE ROW LEVEL SECURITY;
 
 -- Public and private groups are visible to everyone; secret groups only to members
+DROP POLICY IF EXISTS "groups_select" ON groups;
 CREATE POLICY "groups_select" ON groups
   FOR SELECT USING (
     privacy IN ('public', 'private')
@@ -63,11 +64,13 @@ CREATE POLICY "groups_select" ON groups
   );
 
 -- Only the authenticated user who owns the row may insert
+DROP POLICY IF EXISTS "groups_insert" ON groups;
 CREATE POLICY "groups_insert" ON groups
   FOR INSERT TO authenticated
   WITH CHECK (created_by = auth.uid());
 
 -- Only the owner or an admin member may update
+DROP POLICY IF EXISTS "groups_update" ON groups;
 CREATE POLICY "groups_update" ON groups
   FOR UPDATE TO authenticated
   USING (
@@ -82,10 +85,12 @@ CREATE POLICY "groups_update" ON groups
   );
 
 -- Members are readable by anyone
+DROP POLICY IF EXISTS "group_members_select" ON group_members;
 CREATE POLICY "group_members_select" ON group_members
   FOR SELECT USING (true);
 
 -- Authenticated users may insert their own membership row
+DROP POLICY IF EXISTS "group_members_insert" ON group_members;
 CREATE POLICY "group_members_insert" ON group_members
   FOR INSERT TO authenticated
   WITH CHECK (profile_id = auth.uid());

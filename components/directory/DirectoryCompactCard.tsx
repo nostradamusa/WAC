@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { User, Briefcase, Landmark, Calendar, UserPlus, MapPin } from "lucide-react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
@@ -64,7 +65,7 @@ export type DirectoryCompactCardProps = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function DirectoryCompactCard({
+const DirectoryCompactCard = memo(function DirectoryCompactCard({
   href,
   name,
   avatarUrl,
@@ -90,6 +91,7 @@ export default function DirectoryCompactCard({
           <img
             src={avatarUrl}
             alt={name}
+            loading="lazy"
             className="w-9 h-9 rounded-full border-2 border-[var(--card)] object-cover shadow ring-1 ring-white/[0.10]"
           />
         ) : (
@@ -115,11 +117,7 @@ export default function DirectoryCompactCard({
           <span className="text-[11px] font-semibold text-white leading-tight truncate group-hover:text-white/90">
             {name}
           </span>
-          {isVerified && (
-            <VerifiedBadge
-              className="shrink-0 [&_svg]:w-2.5 [&_svg]:h-2.5"
-            />
-          )}
+          {isVerified && <VerifiedBadge size="xs" className="shrink-0" />}
         </div>
 
         {/* Subtitle */}
@@ -152,4 +150,6 @@ export default function DirectoryCompactCard({
       </div>
     </Link>
   );
-}
+});
+
+export default DirectoryCompactCard;

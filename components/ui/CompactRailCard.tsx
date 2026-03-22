@@ -81,11 +81,7 @@ export default function CompactRailCard({
         {/* Name row */}
         <div className="flex items-center gap-0.5 min-w-0">
           <span className="text-[11px] font-semibold text-white leading-tight truncate">{name}</span>
-          {isVerified && (
-            <VerifiedBadge
-              className="shrink-0 opacity-80 [&_svg]:w-2.5 [&_svg]:h-2.5"
-            />
-          )}
+          {isVerified && <VerifiedBadge size="xs" className="shrink-0 opacity-80" />}
         </div>
 
         {/* Supporting line */}

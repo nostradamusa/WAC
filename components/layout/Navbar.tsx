@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, Plus, MessageCircle, Compass, CalendarDays, Activity, Network, Telescope,
-  ChevronDown, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check,
+  ChevronDown, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check, MessageSquarePlus,
 } from "lucide-react";
 import LanguageToggle from "./LanguageToggle";
 import { useActor } from "@/components/providers/ActorProvider";
@@ -62,7 +62,12 @@ export default function Navbar() {
   const router   = useRouter();
 
   // Fires the context-aware create action for the current page
-  function handleComposeTap() {
+  const handleComposeTap = () => {
+    // If we're strictly on directory/events/groups, show the desktop popover or go to context-create page.
+    if (pathname.startsWith("/messages")) {
+      window.dispatchEvent(new CustomEvent("wac-new-message"));
+      return;
+    }
     if (pathname.startsWith("/directory")) {
       setShowNetworkMenu((v) => !v);
       return;
@@ -159,6 +164,7 @@ export default function Navbar() {
   const createLabel = pathname.startsWith("/directory") ? "Add to Network"
     : pathname.startsWith("/events") ? "Create Event"
     : pathname.startsWith("/groups") ? "Create Group"
+    : pathname.startsWith("/messages") ? "New Message"
     : "Create Post";
 
   // ── Add to Network menu items ─────────────────────────────────────────────
@@ -535,6 +541,12 @@ export default function Navbar() {
                   <Link
                     key={href}
                     href={href}
+                    onClick={(e) => {
+                      if (isActive && href === "/community") {
+                        e.preventDefault();
+                        window.dispatchEvent(new CustomEvent("wac-refresh-feed"));
+                      }
+                    }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 ${
                       isActive
                         ? "bg-[#b08d57]/10 border-[#b08d57]/30 text-[#b08d57] drop-shadow-[0_0_10px_rgba(176,141,87,0.3)]"
@@ -564,7 +576,11 @@ export default function Navbar() {
                 }`}
                 aria-label={createLabel}
               >
-                <Plus className="w-4 h-4" strokeWidth={2.5} />
+                {pathname.startsWith("/messages") ? (
+                  <MessageSquarePlus className="w-4 h-4" strokeWidth={2.5} />
+                ) : (
+                  <Plus className="w-4 h-4" strokeWidth={2.5} />
+                )}
               </button>
 
               {/* Hover tooltip — hidden while menu is open */}
@@ -704,7 +720,11 @@ export default function Navbar() {
                 setShowCreateTip(false);
               }}
             >
-              <Plus size={20} strokeWidth={2.5} />
+              {pathname.startsWith("/messages") ? (
+                <MessageSquarePlus size={20} strokeWidth={2.5} />
+              ) : (
+                <Plus size={20} strokeWidth={2.5} />
+              )}
             </button>
             {/* Long-press tooltip — not shown on Directory (menu opens instead) */}
             <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 pointer-events-none transition-all duration-150 z-10 ${

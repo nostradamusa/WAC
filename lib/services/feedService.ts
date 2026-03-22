@@ -286,14 +286,14 @@ export async function addPostComment(
       .single();
 
     if (error) {
-      console.error("Error inserting comment:", error);
-      return { success: false, error };
+      console.error("Error inserting comment:", error.message, error.code, error.details, error.hint);
+      return { success: false, error: error.message };
     }
 
     return { success: true, data };
   } catch (error: any) {
-    console.error("addPostComment catch error:", error);
-    return { success: false, error };
+    console.error("addPostComment catch error:", error?.message ?? error);
+    return { success: false, error: error?.message ?? error };
   }
 }
 

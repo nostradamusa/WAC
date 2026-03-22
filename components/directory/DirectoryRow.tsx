@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { User, Briefcase, Landmark, Calendar } from "lucide-react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
@@ -59,7 +60,7 @@ export type DirectoryRowProps = {
   isVerified?: boolean;
 };
 
-export default function DirectoryRow({
+const DirectoryRow = memo(function DirectoryRow({
   href,
   name,
   avatarUrl,
@@ -81,7 +82,12 @@ export default function DirectoryRow({
         className={`w-10 h-10 rounded-full shrink-0 ${avatarBg} flex items-center justify-center overflow-hidden`}
       >
         {avatarUrl ? (
-          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+          <img
+            src={avatarUrl}
+            alt={name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
         ) : initials ? (
           <span className={`text-xs font-bold uppercase leading-none ${avatarText}`}>{initials}</span>
         ) : (
@@ -95,11 +101,7 @@ export default function DirectoryRow({
           <span className="text-sm font-semibold text-white leading-tight truncate group-hover:text-white/90">
             {name}
           </span>
-          {isVerified && (
-            <VerifiedBadge
-              className="shrink-0 [&_svg]:w-3 [&_svg]:h-3"
-            />
-          )}
+          {isVerified && <VerifiedBadge size="xs" className="shrink-0" />}
         </div>
         {line2 && (
           <p className="text-xs text-white/45 truncate mt-0.5 leading-tight">{line2}</p>
@@ -109,7 +111,7 @@ export default function DirectoryRow({
         )}
       </div>
 
-      {/* Action — stops navigation, placeholder for fast-action wiring */}
+      {/* Action */}
       <button
         onClick={(e) => {
           e.preventDefault();
@@ -121,4 +123,6 @@ export default function DirectoryRow({
       </button>
     </Link>
   );
-}
+});
+
+export default DirectoryRow;

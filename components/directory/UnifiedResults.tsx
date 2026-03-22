@@ -45,43 +45,40 @@ function buildScopeUrl(query: string | undefined, scope: string): string {
 function personCompact(p: EnrichedDirectoryPerson): DirectoryCompactCardProps {
   const name = p.full_name || p.username || "Member";
   return {
-    href:         p.username ? `/people/${p.username}` : "#",
+    href:       p.username ? `/people/${p.username}` : "#",
     name,
-    avatarUrl:    p.avatar_url,
-    initials:     mkInitials(name),
-    entityKind:   "person",
-    line2:        p.headline?.trim() || p.profession_name?.trim() || p.specialty_name?.trim() || undefined,
-    line3:        loc(p.city, p.state, abbrevCountry(p.country)) || undefined,
-    isVerified:   p.is_verified,
-    verifiedType: "person",
+    avatarUrl:  p.avatar_url,
+    initials:   mkInitials(name),
+    entityKind: "person",
+    line2:      p.headline?.trim() || p.profession_name?.trim() || p.specialty_name?.trim() || undefined,
+    line3:      loc(p.city, p.state, abbrevCountry(p.country)) || undefined,
+    isVerified: p.is_verified,
   };
 }
 
 function bizCompact(b: BusinessProfile): DirectoryCompactCardProps {
   return {
-    href:         `/businesses/${b.slug}`,
-    name:         b.name,
-    avatarUrl:    b.logo_url,
-    initials:     mkInitials(b.name),
-    entityKind:   "business",
-    line2:        b.industry_name?.trim() || b.business_type?.trim() || undefined,
-    line3:        loc(b.city, b.state, abbrevCountry(b.country)) || undefined,
-    isVerified:   b.is_verified,
-    verifiedType: "business",
+    href:       `/businesses/${b.slug}`,
+    name:       b.name,
+    avatarUrl:  b.logo_url,
+    initials:   mkInitials(b.name),
+    entityKind: "business",
+    line2:      b.industry_name?.trim() || b.business_type?.trim() || undefined,
+    line3:      loc(b.city, b.state, abbrevCountry(b.country)) || undefined,
+    isVerified: b.is_verified,
   };
 }
 
 function orgCompact(o: OrganizationDirectoryEntry): DirectoryCompactCardProps {
   return {
-    href:         `/organizations/${o.slug}`,
-    name:         o.name,
-    avatarUrl:    o.logo_url,
-    initials:     mkInitials(o.name),
-    entityKind:   "organization",
-    line2:        o.organization_type?.trim() || undefined,
-    line3:        loc(o.city, o.state, abbrevCountry(o.country)) || undefined,
-    isVerified:   o.is_verified,
-    verifiedType: "organization",
+    href:       `/organizations/${o.slug}`,
+    name:       o.name,
+    avatarUrl:  o.logo_url,
+    initials:   mkInitials(o.name),
+    entityKind: "organization",
+    line2:      o.organization_type?.trim() || undefined,
+    line3:      loc(o.city, o.state, abbrevCountry(o.country)) || undefined,
+    isVerified: o.is_verified,
   };
 }
 
@@ -90,43 +87,40 @@ function orgCompact(o: OrganizationDirectoryEntry): DirectoryCompactCardProps {
 function personRow(p: EnrichedDirectoryPerson): DirectoryRowProps {
   const name = p.full_name || p.username || "Member";
   return {
-    href:         p.username ? `/people/${p.username}` : "#",
+    href:       p.username ? `/people/${p.username}` : "#",
     name,
-    avatarUrl:    p.avatar_url,
-    initials:     mkInitials(name),
-    entityKind:   "person",
-    line2:        p.headline?.trim() || p.profession_name?.trim() || p.specialty_name?.trim() || undefined,
-    line3:        loc(p.city, p.state, abbrevCountry(p.country)) || undefined,
-    isVerified:   p.is_verified,
-    verifiedType: "person",
+    avatarUrl:  p.avatar_url,
+    initials:   mkInitials(name),
+    entityKind: "person",
+    line2:      p.headline?.trim() || p.profession_name?.trim() || p.specialty_name?.trim() || undefined,
+    line3:      loc(p.city, p.state, abbrevCountry(p.country)) || undefined,
+    isVerified: p.is_verified,
   };
 }
 
 function bizRow(b: BusinessProfile): DirectoryRowProps {
   return {
-    href:         `/businesses/${b.slug}`,
-    name:         b.name,
-    avatarUrl:    b.logo_url,
-    initials:     mkInitials(b.name),
-    entityKind:   "business",
-    line2:        b.industry_name?.trim() || b.business_type?.trim() || undefined,
-    line3:        loc(b.city, b.state, abbrevCountry(b.country)) || undefined,
-    isVerified:   b.is_verified,
-    verifiedType: "business",
+    href:       `/businesses/${b.slug}`,
+    name:       b.name,
+    avatarUrl:  b.logo_url,
+    initials:   mkInitials(b.name),
+    entityKind: "business",
+    line2:      b.industry_name?.trim() || b.business_type?.trim() || undefined,
+    line3:      loc(b.city, b.state, abbrevCountry(b.country)) || undefined,
+    isVerified: b.is_verified,
   };
 }
 
 function orgRow(o: OrganizationDirectoryEntry): DirectoryRowProps {
   return {
-    href:         `/organizations/${o.slug}`,
-    name:         o.name,
-    avatarUrl:    o.logo_url,
-    initials:     mkInitials(o.name),
-    entityKind:   "organization",
-    line2:        o.organization_type?.trim() || undefined,
-    line3:        loc(o.city, o.state, abbrevCountry(o.country)) || undefined,
-    isVerified:   o.is_verified,
-    verifiedType: "organization",
+    href:       `/organizations/${o.slug}`,
+    name:       o.name,
+    avatarUrl:  o.logo_url,
+    initials:   mkInitials(o.name),
+    entityKind: "organization",
+    line2:      o.organization_type?.trim() || undefined,
+    line3:      loc(o.city, o.state, abbrevCountry(o.country)) || undefined,
+    isVerified: o.is_verified,
   };
 }
 
