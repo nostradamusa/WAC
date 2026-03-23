@@ -11,10 +11,10 @@ import { supabase } from "@/lib/supabase";
 import { 
   getUserConversations, ConversationOverview, getMessages, sendMessage, 
   toggleMessageReactionDB, MessageInterface, searchMessagingContacts, 
-  getOrCreateConversation, createGroupConversation, MessagingContact 
+  getOrCreateConversation, createGroupConversation, MessagingContact, MessagingActorType 
 } from "@/lib/services/messagingService";
 import { useActor } from "@/components/providers/ActorProvider";
-import { ReactionIcon, ReactionType, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
+import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 
 // Helper for formatting time (e.g. "Mar 11" or "1:00 PM")
 function formatMsgTime(isoString: string) {
@@ -24,6 +24,10 @@ function formatMsgTime(isoString: string) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
+  return type === "person" ? "user" : type;
 }
 
 
@@ -74,17 +78,21 @@ export default function FloatingMessagingIcon() {
   }, []);
 
   useEffect(() => {
-    if (!currentActor?.id) {
-      setConversations([]);
-      return;
-    }
-
     const fetchConvs = async () => {
-      const data = await getUserConversations(currentActor.id);
+      if (!currentActor?.id) {
+        setConversations([]);
+        return;
+      }
+
+      const data = await getUserConversations(currentActor.id, toMessagingActorType(currentActor.type));
       setConversations(data);
     };
 
-    fetchConvs();
+    void fetchConvs();
+
+    if (!currentActor?.id) {
+      return;
+    }
 
     // Subscribe to conversations realtime updates
     const channel = supabase.channel('conversations_updates')
@@ -122,7 +130,7 @@ export default function FloatingMessagingIcon() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeConversation?.id]);
+  }, [activeConversation]);
 
   // If we are already on the full screen messages route, hide this overlay, hide this overlay
   if (pathname?.startsWith("/messages")) {
@@ -161,7 +169,7 @@ export default function FloatingMessagingIcon() {
     if (selectedContacts.length === 1) {
       // Start Direct Message
       const contact = selectedContacts[0];
-      const res = await getOrCreateConversation(currentActor.id, contact.id, contact.type);
+      const res = await getOrCreateConversation(currentActor.id, toMessagingActorType(currentActor.type), contact.id, contact.type);
       
       if (res.success && res.conversationId) {
         const mockOverview: ConversationOverview = {
@@ -185,7 +193,12 @@ export default function FloatingMessagingIcon() {
       }
     } else {
       // Start Group Chat
-      const res = await createGroupConversation(currentActor.id, selectedContacts.map(c => ({ id: c.id, type: c.type })), groupName);
+      const res = await createGroupConversation(
+        currentActor.id,
+        toMessagingActorType(currentActor.type),
+        selectedContacts.map(c => ({ id: c.id, type: c.type })),
+        groupName
+      );
       
       if (res.success && res.conversationId) {
          const mockOverview: ConversationOverview = {
@@ -489,8 +502,7 @@ export default function FloatingMessagingIcon() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        // ensure we cast as any or refactor type if msg.id is string
-                        setActiveReactionMsgId(activeReactionMsgId === (msg.id as any) ? null : (msg.id as any));
+                        setActiveReactionMsgId(activeReactionMsgId === msg.id ? null : msg.id);
                       }}
                       className="p-1.5 bg-[#111] border border-white/10 rounded-full hover:bg-white/20 text-white/50 hover:text-white transition-colors shadow-sm"
                     >
@@ -499,7 +511,7 @@ export default function FloatingMessagingIcon() {
                   </div>
                   
                   {/* Reaction Popover */}
-                  {activeReactionMsgId === (msg.id as any) && (
+                  {activeReactionMsgId === msg.id && (
                     <div 
                       className={`absolute top-[80%] ${isMe ? "-left-4" : "-right-4"} bg-[#1a1a1a] border border-white/10 rounded-full px-2 py-1.5 shadow-xl z-50 flex items-center gap-1 animate-in zoom-in-95 duration-150`}
                       onClick={(e) => e.stopPropagation()}
@@ -552,7 +564,7 @@ export default function FloatingMessagingIcon() {
                   await sendMessage(
                     activeConversation.id, 
                     currentActor.id, 
-                    currentActor.type === 'person' ? 'user' : (currentActor.type as any), 
+                    toMessagingActorType(currentActor.type),
                     txt
                   );
                 }
@@ -570,7 +582,7 @@ export default function FloatingMessagingIcon() {
                     await sendMessage(
                       activeConversation.id, 
                       currentActor.id, 
-                      currentActor.type === 'person' ? 'user' : (currentActor.type as any), 
+                      toMessagingActorType(currentActor.type),
                       txt
                     );
                   }

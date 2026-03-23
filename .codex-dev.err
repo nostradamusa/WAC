@@ -1,0 +1,326 @@
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ ./app/events/new/page.tsx
+Error:   x Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1534:1]
+ 1531 |                         helperText="This keeps the hosting entity clear while showing members who the real point of contact is."
+ 1532 |                       />
+ 1533 |                     </div>
+ 1534 |                   )}
+      :                    ^
+ 1535 | 
+ 1536 |                   <div className="border-t border-white/[0.05] pt-4">
+ 1537 |                     <PersonDirectoryMultiPicker
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+<w> [webpack.cache.PackFileCacheStrategy] Restoring pack failed from C:\Users\Admin\Desktop\wac\.next\dev\cache\webpack\client-development-fallback.pack.gz: Error: incorrect header check
+⨯ ./app/events/new/page.tsx
+Error:   x Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1534:1]
+ 1531 |                         helperText="This keeps the hosting entity clear while showing members who the real point of contact is."
+ 1532 |                       />
+ 1533 |                     </div>
+ 1534 |                   )}
+      :                    ^
+ 1535 | 
+ 1536 |                   <div className="border-t border-white/[0.05] pt-4">
+ 1537 |                     <PersonDirectoryMultiPicker
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1540:1]
+ 1537 |                           ]}
+ 1538 |                         />
+ 1539 |                       </div>
+ 1540 | ,->                 </Card>
+ 1541 | |   
+ 1542 | `->                 {/* Network links */}
+ 1543 |                     <Card>
+ 1544 |                       <FieldLabel>Link a supporting organization, business, or group</FieldLabel>
+ 1544 |                       <p className="text-[11px] text-white/28 mb-3 leading-relaxed">
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1540:1]
+ 1537 |                           ]}
+ 1538 |                         />
+ 1539 |                       </div>
+ 1540 | ,->                 </Card>
+ 1541 | |   
+ 1542 | `->                 {/* Network links */}
+ 1543 |                     <Card>
+ 1544 |                       <FieldLabel>Link a supporting organization, business, or group</FieldLabel>
+ 1544 |                       <p className="text-[11px] text-white/28 mb-3 leading-relaxed">
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1525:1]
+ 1522 |                         ) : null}
+ 1523 |     
+ 1524 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1525 | ,->                   </p>
+ 1526 | `->                   <div className="flex gap-2 mb-5">
+ 1527 |                         <div className="relative w-40 shrink-0">
+ 1528 |                           <select
+ 1528 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1525:1]
+ 1522 |                         ) : null}
+ 1523 |     
+ 1524 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1525 | ,->                   </p>
+ 1526 | `->                   <div className="flex gap-2 mb-5">
+ 1527 |                         <div className="relative w-40 shrink-0">
+ 1528 |                           <select
+ 1528 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1526:1]
+ 1523 |                         ) : null}
+ 1524 |     
+ 1525 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1526 | ,->                   </p>
+ 1527 | `->                   <div className="flex gap-2 mb-5">
+ 1528 |                         <div className="relative w-40 shrink-0">
+ 1529 |                           <select
+ 1529 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1526:1]
+ 1523 |                         ) : null}
+ 1524 |     
+ 1525 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1526 | ,->                   </p>
+ 1527 | `->                   <div className="flex gap-2 mb-5">
+ 1528 |                         <div className="relative w-40 shrink-0">
+ 1529 |                           <select
+ 1529 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1526:1]
+ 1523 |                         ) : null}
+ 1524 |     
+ 1525 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1526 | ,->                   </p>
+ 1527 | `->                   <div className="flex gap-2 mb-5">
+ 1528 |                         <div className="relative w-40 shrink-0">
+ 1529 |                           <select
+ 1529 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1526:1]
+ 1523 |                         ) : null}
+ 1524 |     
+ 1525 |                         Use this when the event should appear on an entity page, even if the primary host is still a person. This is the clearest option when a staff member is the point of contact but the organization is the real host.
+ 1526 | ,->                   </p>
+ 1527 | `->                   <div className="flex gap-2 mb-5">
+ 1528 |                         <div className="relative w-40 shrink-0">
+ 1529 |                           <select
+ 1529 |                             value={linkedType}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1568:1]
+ 1565 |                         onChange={setCategory}
+ 1566 |                         options={EVENT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+ 1567 |                       />
+ 1568 | ,->                 </Card>
+ 1569 | |   
+ 1570 | `->               </div>
+ 1571 |                 )}
+ 1572 |     
+ 1572 |                 {/* ── 3. Publishing ──────────────────────────────────────────────── */}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ ./app/events/new/page.tsx
+Error:   x Expected '</', got 'jsx text'
+      ,-[C:\Users\Admin\Desktop\wac\app\events\new\page.tsx:1568:1]
+ 1565 |                         onChange={setCategory}
+ 1566 |                         options={EVENT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+ 1567 |                       />
+ 1568 | ,->                 </Card>
+ 1569 | |   
+ 1570 | `->               </div>
+ 1571 |                 )}
+ 1572 |     
+ 1572 |                 {/* ── 3. Publishing ──────────────────────────────────────────────── */}
+      `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./app/events/new/page.tsx
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⨯ SyntaxError: Unexpected end of JSON input
+    at JSON.parse (<anonymous>) {
+  page: '/'
+}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.

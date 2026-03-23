@@ -12,6 +12,13 @@ export type ActorIdentity = {
   role?: string;
 };
 
+type EntityRow = {
+  id: string;
+  name: string;
+  slug: string | null;
+  logo_url: string | null;
+};
+
 type ActorContextType = {
   /** The authenticated user — never changes while signed in */
   loggedInUserId: string | null;
@@ -87,10 +94,10 @@ export function ActorProvider({ children }: { children: React.ReactNode }) {
         const [businessesRes, orgsRes] = await Promise.all([
           businessIds.length > 0
             ? supabase.from("businesses").select("id, name, slug, logo_url").in("id", businessIds)
-            : Promise.resolve({ data: [] as any[] }),
+            : Promise.resolve({ data: [] as EntityRow[] }),
           orgIds.length > 0
             ? supabase.from("organizations").select("id, name, slug, logo_url").in("id", orgIds)
-            : Promise.resolve({ data: [] as any[] }),
+            : Promise.resolve({ data: [] as EntityRow[] }),
         ]);
 
         if (businessesRes.data) {

@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { Plus, X, Search, CheckCircle2 } from "lucide-react";
-import Image from "next/image";
 import { useScrollDirection } from "@/lib/hooks/useScrollDirection";
-import { searchMessagingContacts, getOrCreateConversation, MessagingContact } from "@/lib/services/messagingService";
+import { searchMessagingContacts, getOrCreateConversation, MessagingContact, MessagingActorType } from "@/lib/services/messagingService";
 import { useDebounce } from "@/lib/hooks/useDebounce";
-import { supabase } from "@/lib/supabase";
+import { useActor } from "@/components/providers/ActorProvider";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+
+function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
+  return type === "person" ? "user" : type;
+}
 
 export default function NewMessageFAB() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,10 +22,11 @@ export default function NewMessageFAB() {
   const [isCreating, setIsCreating] = useState(false);
   const [filteredContacts, setFilteredContacts] = useState<MessagingContact[]>([]);
   const debouncedQuery = useDebounce(searchQuery, 300);
+  const { currentActor } = useActor();
 
   useEffect(() => {
     if (!debouncedQuery || debouncedQuery.length < 2) {
-      setFilteredContacts([]);
+      setTimeout(() => setFilteredContacts([]), 0);
       return;
     }
 
@@ -38,17 +42,16 @@ export default function NewMessageFAB() {
 
   const handleStartChat = async (contact: MessagingContact) => {
     setIsCreating(true);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUserId = sessionData.session?.user.id;
     
-    if (!currentUserId) {
+    if (!currentActor) {
       alert("You must be logged in to send a message.");
       setIsCreating(false);
       return;
     }
 
     const { success, conversationId } = await getOrCreateConversation(
-      currentUserId,
+      currentActor.id,
+      toMessagingActorType(currentActor.type),
       contact.id,
       contact.type
     );
@@ -107,7 +110,7 @@ export default function NewMessageFAB() {
                  </div>
                ) : filteredContacts.length === 0 ? (
                  <div className="p-8 text-center text-white/50 text-sm">
-                   No contacts found matching "{searchQuery}"
+                   No contacts found matching &quot;{searchQuery}&quot;
                  </div>
                ) : (
                  <div className="p-2 flex flex-col gap-1">

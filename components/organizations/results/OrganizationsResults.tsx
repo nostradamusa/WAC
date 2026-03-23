@@ -46,7 +46,7 @@ export default function OrganizationsResults() {
         );
 
         setOrganizations(filtered);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error fetching organizations:", err);
         setError("Failed to load organizations.");
       } finally {

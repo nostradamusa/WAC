@@ -3,6 +3,19 @@ import type { PersonDirectoryRow } from "@/lib/types/person-directory";
 import type { BusinessProfile } from "@/lib/types/business-directory";
 import type { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
 
+type EntityCountRow = {
+  name: string | null;
+  description?: string | null;
+  industry_name?: string | null;
+  organization_type?: string | null;
+  city: string | null;
+  country: string | null;
+};
+
+function toError(err: unknown, fallbackMessage: string): Error {
+  return err instanceof Error ? err : new Error(fallbackMessage);
+}
+
 // A combined type matching our new `v_people_directory_enriched` PostgreSQL view
 export type EnrichedDirectoryPerson = PersonDirectoryRow & {
   id: string;
@@ -136,9 +149,9 @@ export async function getPeopleDirectory(
     }
 
     return { data: people, error: null, count: people.length };
-  } catch (err: any) {
-    console.error("Error fetching people directory:", err?.message ?? err?.code ?? JSON.stringify(err), err);
-    return { data: [], error: err, count: 0 };
+  } catch (err: unknown) {
+    console.error("Error fetching people directory:", err);
+    return { data: [], error: toError(err, "Failed to fetch people directory"), count: 0 };
   }
 }
 
@@ -235,9 +248,9 @@ export async function getEntitiesDirectory(filters: SearchFilters): Promise<{
     }
 
     return { businesses, organizations, error: null };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error fetching entities directory:", err);
-    return { businesses: [], organizations: [], error: err };
+    return { businesses: [], organizations: [], error: toError(err, "Failed to fetch entities directory") };
   }
 }
 
@@ -248,7 +261,7 @@ export async function getEntitiesDirectory(filters: SearchFilters): Promise<{
 export type RecentlyViewedItem = {
   id: string;
   entity_id: string;
-  entity_type: "profile" | "business" | "association";
+  entity_type: "profile" | "business" | "organization";
   name: string;
   avatar_url: string | null;
   username_or_slug: string | null;
@@ -387,7 +400,7 @@ export async function getEntitiesCount(q: string): Promise<number> {
     let count = 0;
 
     if (bizRes.data) {
-      count += bizRes.data.filter((b: any) => {
+      count += (bizRes.data as EntityCountRow[]).filter((b) => {
         const searchString =
           `${b.name || ""} ${b.description || ""} ${b.industry_name || ""} ${b.city || ""} ${b.country || ""}`.toLowerCase();
         return searchString.includes(qLower);
@@ -395,7 +408,7 @@ export async function getEntitiesCount(q: string): Promise<number> {
     }
 
     if (orgRes.data) {
-      count += orgRes.data.filter((o: any) => {
+      count += (orgRes.data as EntityCountRow[]).filter((o) => {
         const searchString =
           `${o.name || ""} ${o.description || ""} ${o.organization_type || ""} ${o.city || ""} ${o.country || ""}`.toLowerCase();
         return searchString.includes(qLower);

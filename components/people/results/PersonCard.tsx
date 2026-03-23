@@ -70,7 +70,13 @@ const BADGE_CONFIG = [
   { key: "open_to_mentor",       urlParam: "mentor=true", label: "Mentoring",    Icon: GraduationCap, color: "bg-blue-500/10 text-blue-400 border-blue-500/20"       },
   { key: "open_to_invest",       urlParam: "invest=true", label: "Investing",    Icon: HandCoins,     color: "bg-amber-500/10 text-amber-400 border-amber-500/20"    },
   { key: "open_to_collaborate",  urlParam: "collab=true", label: "Collab",       Icon: Users,         color: "bg-rose-500/10 text-rose-400 border-rose-500/20"       },
-] as const;
+] as const satisfies ReadonlyArray<{
+  key: keyof DirectoryPerson;
+  urlParam: string;
+  label: string;
+  Icon: typeof Briefcase;
+  color: string;
+}>;
 
 // ── Component ──────────────────────────────────────────────────────────────
 
@@ -85,7 +91,7 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
   const primaryLine  = buildPrimary(person);
   const location     = buildLocation(person);
   const roots        = buildRoots(person);
-  const badges       = BADGE_CONFIG.filter((b) => !!(person as any)[b.key]);
+  const badges       = BADGE_CONFIG.filter((b) => Boolean(person[b.key]));
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();

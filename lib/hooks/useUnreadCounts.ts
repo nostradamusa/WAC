@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type ConversationParticipant = {
+  conversation_id: string;
+};
+
 // ─── Unread message count ──────────────────────────────────────────────────────
 // Counts messages in the current actor's conversations that are unread and not
 // sent by the current signed-in user.
@@ -11,9 +15,12 @@ export function useUnreadMessageCount(actorId: string | null | undefined, userId
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!actorId || !userId) { setCount(0); return; }
-
     async function fetch() {
+      if (!actorId || !userId) {
+        setCount(0);
+        return;
+      }
+
       // Get conversation IDs where this actor is a participant
       const { data: participations } = await supabase
         .from("conversation_participants")
@@ -22,7 +29,7 @@ export function useUnreadMessageCount(actorId: string | null | undefined, userId
 
       if (!participations || participations.length === 0) { setCount(0); return; }
 
-      const convIds = participations.map((p: any) => p.conversation_id);
+      const convIds = (participations as ConversationParticipant[]).map((p) => p.conversation_id);
 
       const { count: unread } = await supabase
         .from("messages")
@@ -55,9 +62,12 @@ export function useNotificationCount(userId: string | null | undefined, userEmai
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!userId) { setCount(0); return; }
-
     async function fetch() {
+      if (!userId) {
+        setCount(0);
+        return;
+      }
+
       const [connectionRes, inviteRes] = await Promise.all([
         supabase
           .from("connection_requests")

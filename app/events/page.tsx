@@ -4,6 +4,7 @@ import { Suspense, useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EventsResults from "@/components/events/EventsResults";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import { supabase } from "@/lib/supabase";
 import SectionLabel from "@/components/ui/SectionLabel";
 import {
@@ -94,6 +95,40 @@ function eventColors(source?: CalRelationship) {
   return REL_COLORS[source ?? "browse"];
 }
 
+function getEventMetaBadge(event: CalEvent): { label: string; className: string } | null {
+  if (event.current_user_approval_status === "pending") {
+    return {
+      label: "Pending",
+      className: "bg-amber-500/15 text-amber-300 border border-amber-500/20",
+    };
+  }
+
+  if (typeof event.capacity === "number" && typeof event.attending_count === "number") {
+    const remaining = Math.max(event.capacity - event.attending_count, 0);
+    if (remaining === 0) {
+      return {
+        label: "Full",
+        className: "bg-red-500/15 text-red-300 border border-red-500/20",
+      };
+    }
+    if (remaining <= 5) {
+      return {
+        label: `${remaining} left`,
+        className: "bg-amber-500/15 text-amber-300 border border-amber-500/20",
+      };
+    }
+  }
+
+  if (event.access_mode === "approval") {
+    return {
+      label: "Approval",
+      className: "bg-white/[0.06] text-white/55 border border-white/[0.10]",
+    };
+  }
+
+  return null;
+}
+
 interface CalEvent {
   id:          string;
   title:       string;
@@ -102,6 +137,12 @@ interface CalEvent {
   location:    string | null;
   description: string | null;
   created_by:  string | null;
+  access_mode?: string | null;
+  capacity?: number | null;
+  requires_approval?: boolean;
+  attending_count?: number;
+  current_user_rsvp_status?: "going" | "interested" | "not_going" | null;
+  current_user_approval_status?: "approved" | "pending" | "declined" | "waitlisted" | null;
   source?:     CalRelationship; // classified after fetch — never defaults to personal
 }
 
@@ -265,6 +306,16 @@ const CAL_VIEW_TABS: { id: CalViewMode; label: string; icon: React.ElementType }
   { id: "agenda", label: "Agenda", icon: AlignJustify  },
 ];
 
+function sourceLabelForChip(id: string, fallback: string): string {
+  if (id === "orgs") return "Orgs";
+  if (id === "businesses") return "Businesses";
+  if (id === "people") return "People";
+  if (id === "personal") return "Private";
+  if (id === "rsvps") return "RSVPs";
+  if (id === "groups") return "Groups";
+  return fallback;
+}
+
 // ── Event composer constants ──────────────────────────────────────────────────
 
 const REPEAT_OPTIONS = [
@@ -364,18 +415,14 @@ function SelectField({
   return (
     <div className="relative flex items-center gap-1.5">
       {Icon && <Icon size={11} className="text-white/30 shrink-0" />}
-      <div className="relative flex-1">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-white/60 outline-none focus:border-teal-400/25 transition-colors cursor-pointer [color-scheme:dark]"
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>
-          ))}
-        </select>
-        <ChevronDown size={9} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-      </div>
+      <PremiumSelect
+        value={value}
+        onChange={onChange}
+        options={options}
+        className="flex-1"
+        compact
+        triggerClassName="w-full rounded-lg border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-xs text-white/60"
+      />
     </div>
   );
 }
@@ -485,8 +532,12 @@ function CreateEventModal({
       <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={onClose} />
       <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[84vh]">
 
+        <div className="flex justify-center pt-3 sm:hidden shrink-0">
+          <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0">
+        <div className="flex items-center justify-between px-4 pt-3 pb-3 sm:px-5 sm:pt-4 shrink-0">
           <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.08] rounded-full">
             {(["event", "task"] as const).map((t) => (
               <button key={t} onClick={() => set({ type: t })}
@@ -503,7 +554,7 @@ function CreateEventModal({
         </div>
 
         {/* Title */}
-        <div className="px-5 pb-4 shrink-0">
+        <div className="px-4 pb-4 shrink-0 sm:px-5">
           <input
             type="text" value={draft.title} onChange={(e) => set({ title: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
@@ -513,14 +564,14 @@ function CreateEventModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 pb-2 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-4 sm:px-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
           {/* ── TASK mode — lightweight ── */}
           {isTask && (
             <>
               <div>
                 <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1.5">Due date</label>
-                <div className="flex gap-1.5">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
                   <input type="time" value={draft.startTime} onChange={(e) => set({ startTime: e.target.value })} className={timeInputCls} />
                 </div>
@@ -537,7 +588,7 @@ function CreateEventModal({
               <div className="space-y-2.5">
                 <div>
                   <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">Start</label>
-                  <div className="flex gap-1.5">
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                     <input type="date" value={draft.startDate} onChange={(e) => handleStartDateChange(e.target.value)} className={dateInputCls} />
                     {!draft.allDay && (
                       <input type="time" value={draft.startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={timeInputCls} />
@@ -548,7 +599,7 @@ function CreateEventModal({
                 {/* Duration chips */}
                 {!draft.allDay && (
                   <div>
-                    <div className="flex gap-1 items-center">
+                    <div className="flex flex-wrap gap-1 items-center">
                       {DURATION_CHIPS.map(({ label, minutes }) => {
                         const expectedEnd = addMinutesToTime(draft.startTime, minutes);
                         const isActive    = draft.endTime === expectedEnd && draft.startDate === draft.endDate;
@@ -579,7 +630,7 @@ function CreateEventModal({
                 {/* End */}
                 <div>
                   <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">End</label>
-                  <div className="flex gap-1.5">
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                     <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
                     {!draft.allDay && (
                       <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />
@@ -587,21 +638,22 @@ function CreateEventModal({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 pt-0.5">
+                <div className="flex flex-col items-start gap-3 pt-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <Toggle checked={draft.allDay} onChange={() => set({ allDay: !draft.allDay })} />
                     <span className="text-xs text-white/48">All day</span>
                   </label>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <RotateCcw size={10} className="text-white/25 shrink-0" />
-                    <div className="relative">
-                      <select value={draft.repeat} onChange={(e) => set({ repeat: e.target.value })}
-                        className="appearance-none bg-transparent text-xs text-white/48 outline-none cursor-pointer pr-3.5">
-                        {REPEAT_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
-                      </select>
-                      <ChevronDown size={9} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <RotateCcw size={10} className="text-white/25 shrink-0" />
+                      <PremiumSelect
+                        value={draft.repeat}
+                        onChange={(nextValue) => set({ repeat: nextValue })}
+                        options={REPEAT_OPTIONS}
+                        compact
+                        className="min-w-[11.5rem]"
+                        triggerClassName="border-white/[0.08] bg-white/[0.03] text-xs text-white/58"
+                      />
                     </div>
-                  </div>
                 </div>
               </div>
 
@@ -615,7 +667,7 @@ function CreateEventModal({
 
               <div className="border-t border-white/[0.06]" />
 
-              <div className="grid grid-cols-2 gap-2 pb-1">
+              <div className="grid grid-cols-1 gap-2 pb-1 sm:grid-cols-2">
                 <SelectField icon={CalendarDays} value={draft.calendar}   onChange={(v) => set({ calendar: v })}   options={CALENDAR_OPTIONS}   />
                 <SelectField icon={Eye}          value={draft.visibility} onChange={(v) => set({ visibility: v })} options={DISCOVERY_OPTIONS} />
               </div>
@@ -626,19 +678,20 @@ function CreateEventModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3.5 border-t border-white/[0.07] flex items-center justify-between shrink-0">
-          <button onClick={onClose} className="text-xs font-medium text-white/38 hover:text-white/60 transition-colors">Cancel</button>
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-3.5 border-t border-white/[0.07] shrink-0 sm:px-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <button onClick={onClose} className="text-left text-xs font-medium text-white/38 hover:text-white/60 transition-colors">Cancel</button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {!isTask && (
               <button onClick={() => onMoreOptions(draft)}
-                className="px-3 py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/38 hover:text-white/65 hover:border-white/18 transition-colors">
-                Full Event Builder →
+                className="w-full sm:w-auto px-3 py-2 sm:py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/38 hover:text-white/65 hover:border-white/18 transition-colors">
+                Full Event Builder
               </button>
             )}
             <button
               disabled={!draft.title.trim() || isSaving || saved}
               onClick={handleCreate}
-              className="wac-btn-primary wac-btn-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
+              className="w-full sm:w-auto wac-btn-primary wac-btn-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
             >
               {saved
                 ? <><CheckCircle2 size={11} />Saved!</>
@@ -647,6 +700,7 @@ function CreateEventModal({
                   : isTask ? "Save Task" : "Create"
               }
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -770,8 +824,12 @@ function FullEventEditorModal({
 
       <div className="relative z-10 w-full sm:max-w-xl bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[96vh] sm:max-h-[88vh]">
 
+        <div className="flex justify-center pt-3 sm:hidden shrink-0">
+          <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
+        </div>
+
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06] shrink-0">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06] shrink-0 sm:px-5">
           <h2 className="text-sm font-semibold text-white/80">New Event</h2>
           <button onClick={onClose}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/65 hover:bg-white/[0.05] transition-colors">
@@ -780,15 +838,15 @@ function FullEventEditorModal({
         </div>
 
         {/* ── Tab bar ── */}
-        <div className="flex border-b border-white/[0.06] shrink-0">
+        <div className="flex gap-1 overflow-x-auto border-b border-white/[0.06] px-4 py-2 shrink-0 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {EDITOR_TABS.map(({ id, label }) => {
             const active = activeTab === id;
             return (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition-all border-b-2 -mb-px ${
-                  active ? "border-teal-400 text-teal-400" : "border-transparent text-white/35 hover:text-white/60"
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                  active ? "border-teal-400/25 bg-teal-500/[0.12] text-teal-400" : "border-white/[0.08] text-white/35 hover:text-white/60 hover:border-white/[0.14]"
                 }`}
               >
                 {label}
@@ -802,7 +860,7 @@ function FullEventEditorModal({
 
           {/* ────────────── BASICS ────────────── */}
           {activeTab === "basics" && (
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-4 py-4 space-y-4 sm:px-5">
               {/* Event / Task */}
               <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.08] rounded-full w-fit">
                 {(["event", "task"] as const).map((t) => (
@@ -829,9 +887,9 @@ function FullEventEditorModal({
               <div>
                 <div className={sectionHead}>Date &amp; Time</div>
                 <div className="space-y-2.5">
-                  <div className="flex items-center gap-2">
+                  <div className="space-y-1.5 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
                     <span className="text-[10px] text-white/30 w-8 shrink-0">Start</span>
-                    <div className="flex gap-1.5 flex-1">
+                    <div className="grid gap-1.5 flex-1 sm:grid-cols-2">
                       <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
                       {!draft.allDay && <input type="time" value={draft.startTime} onChange={(e) => handleEditorStartTimeChange(e.target.value)} className={timeInputCls} />}
                     </div>
@@ -839,7 +897,7 @@ function FullEventEditorModal({
 
                   {/* Duration chips */}
                   {!draft.allDay && (
-                    <div className="flex items-center gap-2 pl-10">
+                    <div className="sm:pl-10">
                       <div className="flex gap-1 flex-wrap">
                         {DURATION_CHIPS.map(({ label, minutes }) => {
                           const expectedEnd = addMinutesToTime(draft.startTime, minutes);
@@ -866,27 +924,28 @@ function FullEventEditorModal({
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  <div className="space-y-1.5 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
                     <span className="text-[10px] text-white/30 w-8 shrink-0">End</span>
-                    <div className="flex gap-1.5 flex-1">
+                    <div className="grid gap-1.5 flex-1 sm:grid-cols-2">
                       <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
                       {!draft.allDay && <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-4 pt-0.5">
+                  <div className="flex flex-col items-start gap-3 pt-0.5 sm:flex-row sm:items-center sm:justify-between">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                       <Toggle checked={draft.allDay} onChange={() => set({ allDay: !draft.allDay })} />
                       <span className="text-xs text-white/48">All day</span>
                     </label>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <RotateCcw size={10} className="text-white/25 shrink-0" />
-                      <div className="relative">
-                        <select value={draft.repeat} onChange={(e) => set({ repeat: e.target.value })}
-                          className="appearance-none bg-transparent text-xs text-white/48 outline-none cursor-pointer pr-3.5">
-                          {REPEAT_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
-                        </select>
-                        <ChevronDown size={9} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-                      </div>
+                      <PremiumSelect
+                        value={draft.repeat}
+                        onChange={(nextValue) => set({ repeat: nextValue })}
+                        options={REPEAT_OPTIONS}
+                        compact
+                        className="min-w-[11.5rem]"
+                        triggerClassName="border-white/[0.08] bg-white/[0.03] text-xs text-white/58"
+                      />
                     </div>
                   </div>
                 </div>
@@ -902,12 +961,12 @@ function FullEventEditorModal({
 
           {/* ────────────── HOSTING ────────────── */}
           {activeTab === "hosting" && (
-            <div className="px-5 py-4 space-y-5">
+            <div className="px-4 py-4 space-y-5 sm:px-5">
 
               {/* Host as */}
               <div>
                 <div className={sectionHead}>Host as</div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {HOST_AS_OPTIONS.map(({ value, label }) => {
                     const active = hostAs === value;
                     return (
@@ -941,17 +1000,20 @@ function FullEventEditorModal({
               {/* Link to entity */}
               <div>
                 <div className={sectionHead}>Link to Group / Org / Business</div>
-                <div className="flex gap-2">
-                  <div className="relative shrink-0">
-                    <select value={linkedType} onChange={(e) => setLinkedType(e.target.value as typeof linkedType)}
-                      className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-white/55 outline-none cursor-pointer [color-scheme:dark]">
-                      <option value=""             className="bg-[#111]">Type</option>
-                      <option value="group"        className="bg-[#111]">Group</option>
-                      <option value="organization" className="bg-[#111]">Org</option>
-                      <option value="business"     className="bg-[#111]">Business</option>
-                    </select>
-                    <ChevronDown size={9} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                  </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <PremiumSelect
+                    value={linkedType}
+                    onChange={(nextValue) => setLinkedType(nextValue as typeof linkedType)}
+                    options={[
+                      { value: "", label: "Type" },
+                      { value: "group", label: "Group" },
+                      { value: "organization", label: "Org" },
+                      { value: "business", label: "Business" },
+                    ]}
+                    compact
+                    className="shrink-0 sm:w-auto min-w-[7rem]"
+                    triggerClassName="w-full rounded-lg border-white/[0.08] bg-white/[0.04] text-xs text-white/58"
+                  />
                   <input type="text" value={linkedSearch} onChange={(e) => setLinkedSearch(e.target.value)}
                     placeholder={linkedType ? `Search ${linkedType}s…` : "Select type first"}
                     disabled={!linkedType}
@@ -962,13 +1024,13 @@ function FullEventEditorModal({
               {/* Category */}
               <div>
                 <div className={sectionHead}>Category</div>
-                <div className="relative">
-                  <select value={category} onChange={(e) => setCategory(e.target.value)}
-                    className="w-full appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5 pr-8 text-xs text-white/60 outline-none focus:border-teal-400/25 cursor-pointer [color-scheme:dark]">
-                    {EVENT_CATEGORIES.map((c) => <option key={c} value={c} className="bg-[#111] text-white">{c}</option>)}
-                  </select>
-                  <ChevronDown size={9} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                </div>
+                <PremiumSelect
+                  value={category}
+                  onChange={setCategory}
+                  options={EVENT_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                  compact
+                  triggerClassName="w-full rounded-lg border-white/[0.08] bg-white/[0.04] text-xs text-white/60"
+                />
               </div>
 
               {/* Post to Pulse */}
@@ -984,7 +1046,7 @@ function FullEventEditorModal({
 
           {/* ────────────── PUBLISHING ────────────── */}
           {activeTab === "publishing" && (
-            <div className="px-5 py-4 space-y-5">
+            <div className="px-4 py-4 space-y-5 sm:px-5">
 
               {/* Calendar destination */}
               <div>
@@ -1040,7 +1102,7 @@ function FullEventEditorModal({
 
           {/* ────────────── ADVANCED ────────────── */}
           {activeTab === "advanced" && (
-            <div className="px-5 py-4 space-y-5">
+            <div className="px-4 py-4 space-y-5 sm:px-5">
 
               {/* RSVP Controls */}
               <div>
@@ -1110,17 +1172,19 @@ function FullEventEditorModal({
                           <X size={11} />
                         </button>
                       </div>
-                      <div className="flex items-center gap-3 mt-2.5">
-                        <div className="relative">
-                          <select value={q.type} onChange={(e) => updateQuestion(i, "type", e.target.value as QuestionItem["type"])}
-                            className="appearance-none bg-transparent text-[10px] text-white/38 outline-none cursor-pointer pr-3.5">
-                            <option value="text"   className="bg-[#111] text-white">Short answer</option>
-                            <option value="yesno"  className="bg-[#111] text-white">Yes / No</option>
-                            <option value="choice" className="bg-[#111] text-white">Multiple choice</option>
-                          </select>
-                          <ChevronDown size={8} className="absolute right-0 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-                        </div>
-                        <label className="flex items-center gap-1.5 ml-auto cursor-pointer">
+                      <div className="mt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <PremiumSelect
+                          value={q.type}
+                          onChange={(nextValue) => updateQuestion(i, "type", nextValue as QuestionItem["type"])}
+                          options={[
+                            { value: "text", label: "Short answer" },
+                            { value: "yesno", label: "Yes / No" },
+                            { value: "choice", label: "Multiple choice" },
+                          ]}
+                          compact
+                          triggerClassName="min-h-7 border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] text-white/52"
+                        />
+                        <label className="flex items-center gap-1.5 cursor-pointer sm:ml-auto">
                           <span className="text-[10px] text-white/30">Required</span>
                           <Toggle checked={q.required} onChange={() => updateQuestion(i, "required", !q.required)} />
                         </label>
@@ -1141,31 +1205,33 @@ function FullEventEditorModal({
               <div>
                 <div className={sectionHead}>Reminders</div>
                 <div className="space-y-3.5">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
                       <span className="text-xs text-white/55">RSVP reminder</span>
                       <p className="text-[10px] text-white/28 mt-0.5">Remind guests who haven't responded yet</p>
                     </div>
-                    <div className="relative shrink-0">
-                      <select value={rsvpReminder} onChange={(e) => setRsvpReminder(e.target.value)}
-                        className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-white/55 outline-none cursor-pointer [color-scheme:dark]">
-                        {REMINDER_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
-                      </select>
-                      <ChevronDown size={9} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                    </div>
+                    <PremiumSelect
+                      value={rsvpReminder}
+                      onChange={setRsvpReminder}
+                      options={REMINDER_OPTIONS}
+                      compact
+                      className="shrink-0 min-w-[10rem]"
+                      triggerClassName="w-full rounded-lg border-white/[0.08] bg-white/[0.04] text-xs text-white/58"
+                    />
                   </div>
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
                       <span className="text-xs text-white/55">Event reminder</span>
                       <p className="text-[10px] text-white/28 mt-0.5">Send to all RSVPs before the event starts</p>
                     </div>
-                    <div className="relative shrink-0">
-                      <select value={eventReminder} onChange={(e) => setEventReminder(e.target.value)}
-                        className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg pl-2.5 pr-6 py-1.5 text-xs text-white/55 outline-none cursor-pointer [color-scheme:dark]">
-                        {REMINDER_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-[#111] text-white">{o.label}</option>)}
-                      </select>
-                      <ChevronDown size={9} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                    </div>
+                    <PremiumSelect
+                      value={eventReminder}
+                      onChange={setEventReminder}
+                      options={REMINDER_OPTIONS}
+                      compact
+                      className="shrink-0 min-w-[10rem]"
+                      triggerClassName="w-full rounded-lg border-white/[0.08] bg-white/[0.04] text-xs text-white/58"
+                    />
                   </div>
                 </div>
               </div>
@@ -1185,7 +1251,8 @@ function FullEventEditorModal({
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-5 py-3.5 border-t border-white/[0.07] flex items-center justify-between shrink-0">
+        <div className="px-4 py-3.5 border-t border-white/[0.07] shrink-0 sm:px-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col items-start gap-1">
             <button onClick={onClose}
               className="text-xs font-medium text-white/38 hover:text-white/60 transition-colors">
@@ -1193,17 +1260,17 @@ function FullEventEditorModal({
             </button>
             {saveError && <p className="text-[10px] text-red-400">{saveError}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             {!isLastTab && (
               <button onClick={goNextTab}
-                className="px-3 py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/45 hover:text-white/70 hover:border-white/18 transition-colors">
-                Next →
+                className="w-full sm:w-auto px-3 py-2 sm:py-1.5 rounded-full border border-white/[0.1] text-xs font-medium text-white/45 hover:text-white/70 hover:border-white/18 transition-colors">
+                Next
               </button>
             )}
             <button
               disabled={!draft.title.trim() || isSaving || saved}
               onClick={handleSaveEvent}
-              className="wac-btn-primary wac-btn-md disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5">
+              className="w-full sm:w-auto wac-btn-primary wac-btn-md disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
               {saved
                 ? <><CheckCircle2 size={12} />Saved!</>
                 : isSaving
@@ -1211,6 +1278,7 @@ function FullEventEditorModal({
                   : "Save Event"
               }
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -1276,6 +1344,10 @@ function CalEventDetailModal({
   const dateLabel  = start.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   const timeLabel  = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const endLabel   = end?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const remainingSpots =
+    typeof event.capacity === "number" && typeof event.attending_count === "number"
+      ? Math.max(event.capacity - event.attending_count, 0)
+      : null;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1293,7 +1365,7 @@ function CalEventDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full sm:max-w-md bg-[#0e0e0e] border border-white/[0.09] rounded-t-[28px] sm:rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative z-10 flex max-h-[calc(100vh-10px)] w-full flex-col overflow-hidden rounded-t-[28px] border border-white/[0.09] bg-[#0e0e0e] shadow-2xl sm:max-h-[85vh] sm:max-w-md sm:rounded-2xl">
 
         {/* Mobile drag handle */}
         <div className="flex justify-center pt-3 sm:hidden">
@@ -1304,14 +1376,14 @@ function CalEventDetailModal({
         <div className={`h-[2px] w-full mt-3 sm:mt-0 ${c.rule}`} />
 
         {/* Header — title + source badge + close */}
-        <div className="flex items-start gap-3 px-5 pt-4 pb-3">
+        <div className="flex items-start gap-3 px-4 pt-4 pb-3 sm:px-5">
           <div className="flex-1 min-w-0">
             {/* Source badge */}
             <div className={`inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full mb-2.5 ${c.bg} border ${c.border}`}>
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
               <span className={`text-[9px] font-semibold uppercase tracking-[0.12em] ${c.text}`}>{relLabel}</span>
             </div>
-            <h2 className="text-[16px] font-semibold text-white leading-snug">{event.title}</h2>
+            <h2 className="text-[15px] font-semibold leading-snug text-white sm:text-[16px]">{event.title}</h2>
           </div>
           <button onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl text-white/28 hover:text-white/60 hover:bg-white/[0.06] shrink-0 transition-colors mt-0.5">
@@ -1319,8 +1391,9 @@ function CalEventDetailModal({
           </button>
         </div>
 
+        <div className="min-h-0 overflow-y-auto">
         {/* Metadata section */}
-        <div className="px-5 pb-4 space-y-2.5 border-b border-white/[0.07]">
+        <div className="px-4 pb-4 space-y-2.5 border-b border-white/[0.07] sm:px-5">
 
           {/* Date + time row */}
           <div className="flex items-center gap-3">
@@ -1345,22 +1418,74 @@ function CalEventDetailModal({
             </div>
           )}
 
+          {(event.access_mode || remainingSpots !== null || event.current_user_approval_status || event.current_user_rsvp_status) && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {event.access_mode && event.access_mode !== "open" && (
+                <span className="text-[10px] font-medium text-white/60 bg-white/[0.05] border border-white/[0.08] px-2.5 py-1 rounded-full">
+                  {event.access_mode === "approval" ? "Approval Required" : event.access_mode}
+                </span>
+              )}
+              {remainingSpots !== null && (
+                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full border ${
+                  remainingSpots === 0
+                    ? "text-red-300 border-red-500/20 bg-red-500/10"
+                    : remainingSpots <= 5
+                    ? "text-amber-300 border-amber-500/20 bg-amber-500/10"
+                    : "text-white/60 border-white/[0.08] bg-white/[0.05]"
+                }`}>
+                  {remainingSpots === 0 ? "Full" : `${remainingSpots} spots left`}
+                </span>
+              )}
+              {event.current_user_approval_status === "pending" && (
+                <span className="text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                  Pending Approval
+                </span>
+              )}
+              {event.current_user_approval_status === "waitlisted" && event.current_user_rsvp_status === "going" && (
+                <span className="text-[10px] font-medium text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                  Waitlisted
+                </span>
+              )}
+              {event.current_user_approval_status === "declined" && event.current_user_rsvp_status === "going" && (
+                <span className="text-[10px] font-medium text-white/50 bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 rounded-full">
+                  Declined
+                </span>
+              )}
+              {event.current_user_rsvp_status === "not_going" && (
+                <span className="text-[10px] font-medium text-white/50 bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 rounded-full">
+                  Not Going
+                </span>
+              )}
+              {event.current_user_approval_status === "approved" && event.current_user_rsvp_status === "going" && (
+                <span className="text-[10px] font-medium text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                  Going
+                </span>
+              )}
+              {event.current_user_rsvp_status === "interested" && (
+                <span className="text-[10px] font-medium text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                  Interested
+                </span>
+              )}
+            </div>
+          )}
+
         </div>
 
         {/* Description section */}
         {event.description && (
-          <div className="px-5 py-4 border-b border-white/[0.07]">
+          <div className="px-4 py-4 border-b border-white/[0.07] sm:px-5">
             <div className="flex items-start gap-2.5">
               <AlignLeft size={12} className="text-white/25 mt-0.5 shrink-0" />
               <p className="text-[12.5px] text-white/50 leading-relaxed whitespace-pre-line">{event.description}</p>
             </div>
           </div>
         )}
+        </div>
 
         {/* Actions */}
-        <div className="px-5 py-4 flex items-center gap-3">
+        <div className="border-t border-white/[0.07] px-4 py-4 sm:px-5">
           {/* Destructive — left aligned, text-only */}
-          <div className="flex-1 min-w-0">
+          <div className="mb-3 min-w-0 sm:mb-0 sm:flex-1">
             <button onClick={handleDelete} disabled={isDeleting}
               className="text-[11px] font-medium text-red-400/45 hover:text-red-400 transition-colors disabled:opacity-40 flex items-center gap-1.5">
               {isDeleting && <Loader2 size={10} className="animate-spin" />}
@@ -1369,14 +1494,16 @@ function CalEventDetailModal({
             {deleteError && <p className="text-[10px] text-red-400 mt-0.5">{deleteError}</p>}
           </div>
           {/* Confirm/edit — right aligned */}
-          <button onClick={onClose}
-            className="px-4 py-1.5 rounded-full text-xs font-medium text-white/35 border border-white/[0.09] hover:text-white/58 hover:border-white/[0.16] transition-colors shrink-0">
-            Close
-          </button>
-          <button onClick={onEdit}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors shrink-0 ${c.bg} ${c.text} border ${c.border} ${c.hover}`}>
-            Edit Event
-          </button>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button onClick={onClose}
+              className="w-full rounded-full border border-white/[0.09] px-4 py-2 text-xs font-medium text-white/35 transition-colors hover:border-white/[0.16] hover:text-white/58 sm:w-auto sm:py-1.5">
+              Close
+            </button>
+            <button onClick={onEdit}
+              className={`w-full rounded-full px-4 py-2 text-xs font-semibold transition-colors ${c.bg} ${c.text} border ${c.border} ${c.hover} sm:w-auto sm:py-1.5`}>
+              Edit Event
+            </button>
+          </div>
         </div>
 
       </div>
@@ -1574,12 +1701,21 @@ function ImportCalendarModal({
 // ── CalendarModeView ──────────────────────────────────────────────────────────
 
 function CalendarModeView() {
+  const router = useRouter();
   const today = new Date();
 
   const [calView, setCalView] = useState<CalViewMode>("month");
+  const [isCompactCalendar, setIsCompactCalendar] = useState(false);
   const [navDate, setNavDate] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
+
+  useEffect(() => {
+    const syncCompactMode = () => setIsCompactCalendar(window.innerWidth < 640);
+    syncCompactMode();
+    window.addEventListener("resize", syncCompactMode);
+    return () => window.removeEventListener("resize", syncCompactMode);
+  }, []);
 
   function switchCalView(v: CalViewMode) {
     if (v === "week" && calView !== "week") {
@@ -1608,7 +1744,7 @@ function CalendarModeView() {
   }
 
   const [activeSources, setActiveSources] = useState<Set<string>>(
-    new Set(CAL_SOURCES.map((s) => s.id))
+    new Set(CAL_SOURCES.filter((source) => !source.disabled).map((source) => source.id))
   );
   function toggleSource(id: string) {
     setActiveSources((prev) => {
@@ -1635,13 +1771,26 @@ function CalendarModeView() {
     setActiveSources((prev) => { const s = new Set(prev); s.delete(id); return s; });
   }
 
-  // Navbar `+` in Calendar mode → open Quick Create
-  useEffect(() => {
-    const handler = () => setModalDraft(makeDraft(new Date()));
-    window.addEventListener("events-compose", handler);
-    return () => window.removeEventListener("events-compose", handler);
-  }, []);
+  const availableSourceIds = useMemo(
+    () => [
+      ...CAL_SOURCES.filter((source) => source.id !== "imported" && !source.disabled).map((source) => source.id),
+      ...importedCals.map((calendar) => calendar.id),
+    ],
+    [importedCals]
+  );
+  const activeSourceCount = availableSourceIds.filter((id) => activeSources.has(id)).length;
+  const allSourcesActive = availableSourceIds.length > 0 && activeSourceCount === availableSourceIds.length;
+  const anySourcesActive = activeSourceCount > 0;
 
+  function showAllSources() {
+    setActiveSources(new Set(availableSourceIds));
+  }
+
+  function hideAllSources() {
+    setActiveSources(new Set());
+  }
+
+  // Navbar `+` in Calendar mode → open Quick Create
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selDayIdx,   setSelDayIdx]   = useState<number | null>(null);
   const [selStartH,   setSelStartH]   = useState<number | null>(null);
@@ -1680,7 +1829,7 @@ function CalendarModeView() {
       const [{ data, error }, { data: { user: authUser } }] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, start_time, end_time, location, description, created_by")
+          .select("id, title, start_time, end_time, location, description, created_by, access_mode, capacity, requires_approval")
           .gte("start_time", start.toISOString())
           .lte("start_time", end.toISOString())
           .order("start_time", { ascending: true }),
@@ -1692,11 +1841,53 @@ function CalendarModeView() {
         setCalEvents([]);
       } else {
         const uid = authUser?.id ?? null;
-        const classified = (data ?? []).map((ev: any): CalEvent => ({
-          ...ev,
-          // Only mark personal if the current user created it — never assume
-          source: (uid && ev.created_by === uid) ? "personal" : "browse",
-        }));
+        const eventRows = ((data ?? []) as Omit<CalEvent, "source">[]);
+        const eventIds = eventRows.map((event) => event.id);
+        let rsvpRows: Array<{
+          event_id: string;
+          user_id: string;
+          status: "going" | "interested" | "not_going";
+          approval_status: "approved" | "pending" | "declined" | "waitlisted";
+        }> = [];
+
+        if (eventIds.length > 0) {
+          const { data: rsvpData, error: rsvpError } = await supabase
+            .from("event_rsvps")
+            .select("event_id, user_id, status, approval_status")
+            .in("event_id", eventIds);
+
+          if (rsvpError) {
+            console.error("[CalFetch] RSVP error:", rsvpError.message);
+          } else {
+            rsvpRows = rsvpData ?? [];
+          }
+        }
+
+        const attendeeCountByEvent = new Map<string, number>();
+        const currentUserRsvpByEvent = new Map<string, typeof rsvpRows[number]>();
+        for (const rsvp of rsvpRows) {
+          if (rsvp.status === "going" && rsvp.approval_status !== "declined" && rsvp.approval_status !== "waitlisted") {
+            attendeeCountByEvent.set(rsvp.event_id, (attendeeCountByEvent.get(rsvp.event_id) ?? 0) + 1);
+          }
+          if (uid && rsvp.user_id === uid) {
+            currentUserRsvpByEvent.set(rsvp.event_id, rsvp);
+          }
+        }
+
+        const classified = eventRows.map((ev): CalEvent => {
+          const currentUserRsvp = currentUserRsvpByEvent.get(ev.id);
+          return {
+            ...ev,
+            attending_count: attendeeCountByEvent.get(ev.id) ?? 0,
+            current_user_rsvp_status: currentUserRsvp?.status ?? null,
+            current_user_approval_status: currentUserRsvp?.approval_status ?? null,
+            source: (uid && ev.created_by === uid)
+              ? "personal"
+              : currentUserRsvp && currentUserRsvp.status !== "not_going"
+              ? "rsvp"
+              : "browse",
+          };
+        });
         console.log("[CalFetch] fetched", classified.length, "events:", classified);
         setCalEvents(classified);
       }
@@ -1710,6 +1901,12 @@ function CalendarModeView() {
   const [showFullEditor,   setShowFullEditor]   = useState(false);
   const [editingEventId,   setEditingEventId]   = useState<string | null>(null);
   const [selectedCalEvent, setSelectedCalEvent] = useState<CalEvent | null>(null);
+
+  useEffect(() => {
+    const handler = () => router.push("/events/new");
+    window.addEventListener("events-compose", handler);
+    return () => window.removeEventListener("events-compose", handler);
+  }, [router]);
 
   function closeModal() {
     setModalDraft(null); setShowFullEditor(false); setEditingEventId(null);
@@ -1841,6 +2038,17 @@ function CalendarModeView() {
         : `${MONTH_NAMES[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTH_NAMES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getDate()}`
       : `${MONTH_NAMES[navDate.getMonth()]} ${navDate.getFullYear()}`;
 
+  const quickSourceControls = [
+    ...CAL_SOURCES.filter((source) => source.id !== "imported" && !source.disabled),
+    ...importedCals.map((calendar) => ({
+      id: calendar.id,
+      label: calendar.name,
+      dot: calendar.colorDot,
+      disabled: false,
+    })),
+  ];
+  const visibleMonthLineCount = isCompactCalendar ? 5 : 7;
+
   const selLo = selStartH !== null && selEndH !== null ? Math.min(selStartH, selEndH) : null;
   const selHi = selStartH !== null && selEndH !== null ? Math.max(selStartH, selEndH) : null;
 
@@ -1854,38 +2062,90 @@ function CalendarModeView() {
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Toolbar */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <button onClick={prevPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors">
-              <ChevronLeft size={15} />
-            </button>
-            <span className="text-[15px] font-semibold text-white/85 min-w-[170px] text-center tracking-tight">{periodLabel}</span>
-            <button onClick={nextPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors">
-              <ChevronRight size={15} />
-            </button>
+        <div className="sticky top-[64px] sm:top-[72px] z-20 mb-3 space-y-3 rounded-2xl border border-white/[0.06] bg-[var(--background)]/92 px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button onClick={prevPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-[15px] font-semibold text-white/85 min-w-0 sm:min-w-[170px] text-center tracking-tight truncate">{periodLabel}</span>
+                <button onClick={nextPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0 xl:hidden" />}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0 hidden xl:block" />}
+              {/* Mobile source filter — sidebar is hidden on mobile */}
+              <button
+                onClick={() => setShowSourceSheet(true)}
+                className={`lg:hidden relative w-9 h-9 flex items-center justify-center rounded-xl border transition-colors shrink-0 ${
+                  activeSourceCount < availableSourceIds.length
+                    ? "bg-teal-500/[0.12] border-teal-400/20 text-teal-400/80"
+                    : "border-white/[0.09] text-white/35 hover:text-white/65 hover:border-white/18"
+                }`}>
+                <SlidersHorizontal size={13} />
+                <span className="absolute -right-1 -top-1 min-w-[16px] rounded-full border border-[var(--background)] bg-white/[0.14] px-1 py-[1px] text-[8px] font-semibold leading-none text-white/70">
+                  {activeSourceCount}
+                </span>
+              </button>
+              <div className="grid flex-1 grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-1 min-w-0">
+                {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
+                  const active = calView === id;
+                  return (
+                    <button key={id} onClick={() => switchCalView(id)}
+                      className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] sm:text-xs font-medium transition-all ${
+                        active ? "bg-white/[0.09] text-white/85 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" : "text-white/38 hover:text-white/65"
+                      }`}>
+                      <Icon size={11} className="shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0" />}
-            {/* Mobile source filter — sidebar is hidden on mobile */}
-            <button
-              onClick={() => setShowSourceSheet(true)}
-              className={`lg:hidden w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
-                activeSources.size < (CAL_SOURCES.filter(s => s.id !== "imported").length + importedCals.length)
-                  ? "bg-teal-500/[0.12] border-teal-400/20 text-teal-400/80"
-                  : "border-white/[0.09] text-white/35 hover:text-white/65 hover:border-white/18"
-              }`}>
-              <SlidersHorizontal size={13} />
-            </button>
-            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] border border-white/[0.07] rounded-lg">
-              {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
-                const active = calView === id;
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/28">
+                {activeSourceCount}/{availableSourceIds.length} calendars visible
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={showAllSources}
+                  disabled={allSourcesActive}
+                  className="rounded-full border border-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/42 transition-colors hover:text-white/68 hover:border-white/[0.14] disabled:cursor-default disabled:opacity-35"
+                >
+                  All
+                </button>
+                <button
+                  onClick={hideAllSources}
+                  disabled={!anySourcesActive}
+                  className="rounded-full border border-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/42 transition-colors hover:text-white/68 hover:border-white/[0.14] disabled:cursor-default disabled:opacity-35"
+                >
+                  None
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {quickSourceControls.map(({ id, label, dot }) => {
+                const active = activeSources.has(id);
                 return (
-                  <button key={id} onClick={() => switchCalView(id)}
-                    className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      active ? "bg-white/[0.08] text-white/80" : "text-white/30 hover:text-white/55"
-                    }`}>
-                    <Icon size={11} />
-                    <span className="hidden sm:inline">{label}</span>
+                  <button
+                    key={id}
+                    onClick={() => toggleSource(id)}
+                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                      active
+                        ? "border-white/[0.14] bg-white/[0.08] text-white/75"
+                        : "border-white/[0.08] bg-transparent text-white/32 hover:text-white/55 hover:border-white/[0.14]"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot} ${active ? "opacity-80" : "opacity-35"}`} />
+                    <span className="truncate max-w-[88px] sm:max-w-[110px]">{sourceLabelForChip(id, label)}</span>
                   </button>
                 );
               })}
@@ -1899,7 +2159,10 @@ function CalendarModeView() {
             <div className="wac-card p-0 overflow-hidden">
               <div className="grid grid-cols-7 border-b border-white/[0.05]">
                 {DAY_ABBREVS.map((d) => (
-                  <div key={d} className="py-2 text-center text-[10px] font-semibold tracking-wider text-white/25 uppercase">{d}</div>
+                  <div key={d} className="py-2 text-center text-[10px] font-semibold tracking-wider text-white/25 uppercase">
+                    <span className="sm:hidden">{d.slice(0, 1)}</span>
+                    <span className="hidden sm:inline">{d}</span>
+                  </div>
                 ))}
               </div>
               <div className="grid grid-cols-7">
@@ -1914,7 +2177,7 @@ function CalendarModeView() {
                   const dayEvs = dateKey ? (eventsMap.get(dateKey) ?? []) : [];
                   return (
                     <div key={i} onClick={() => day !== null && handleDayClick(day)}
-                      className={`relative min-h-[90px] sm:min-h-[104px] p-1 sm:p-1.5 border-b border-r border-white/[0.04] transition-colors ${lastInRow ? "border-r-0" : ""} ${
+                      className={`relative min-h-[104px] sm:min-h-[128px] p-1 sm:p-1.5 border-b border-r border-white/[0.04] transition-colors ${lastInRow ? "border-r-0" : ""} ${
                         day === null ? "bg-white/[0.01]"
                         : isSelected ? "bg-white/[0.04] cursor-pointer"
                         : isWeekend  ? "bg-white/[0.012] cursor-pointer hover:bg-white/[0.03]"
@@ -1922,6 +2185,11 @@ function CalendarModeView() {
                       }`}>
                       {day !== null && (
                         <>
+                          {dayEvs.length > 0 && (
+                            <span className="absolute right-1 top-1 rounded-full border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[8px] font-semibold leading-none text-white/42">
+                              {dayEvs.length}
+                            </span>
+                          )}
                           <span className={`inline-flex items-center justify-center w-6 h-6 text-[11px] rounded-full ${
                             isToday    ? "bg-teal-500/20 text-teal-400 font-semibold ring-1 ring-teal-400/40"
                             : isSelected ? "bg-white/10 text-white/80 font-semibold"
@@ -1929,23 +2197,34 @@ function CalendarModeView() {
                           }`}>
                             {day}
                           </span>
-                          {/* Event chips — up to 3 visible, then "+N more" overflow */}
-                          <div className="mt-1 space-y-[2px]">
-                            {dayEvs.slice(0, 3).map((ev) => {
+                          {/* Compact density lines — fits more events per day without crowding the cell */}
+                          <div className="mt-1.5 space-y-1">
+                            {dayEvs.slice(0, visibleMonthLineCount).map((ev) => {
                               const c = eventColors(ev.source);
+                              const badge = getEventMetaBadge(ev);
                               return (
-                                <button key={ev.id}
+                                <button
+                                  key={ev.id}
+                                  title={ev.title}
                                   onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
-                                  className={`w-full text-left px-1.5 py-[2px] text-[9px] font-semibold rounded truncate leading-tight transition-colors ${c.bg} ${c.text} ${c.border} border ${c.hover}`}>
-                                  {ev.title}
+                                  className="w-full text-left transition-opacity hover:opacity-100 opacity-90"
+                                >
+                                  <div className="flex items-center gap-1">
+                                    <span className={`h-[4px] flex-1 rounded-full ${c.rule}`} />
+                                    {badge && (
+                                      <span className={`shrink-0 rounded-full px-1 py-0.5 text-[7px] font-semibold leading-none ${badge.className}`}>
+                                        {badge.label}
+                                      </span>
+                                    )}
+                                  </div>
                                 </button>
                               );
                             })}
-                            {dayEvs.length > 3 && (
+                            {dayEvs.length > visibleMonthLineCount && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleDayClick(day); }}
                                 className="w-full text-left px-1 py-[1px] text-[8px] text-white/35 hover:text-white/60 leading-none transition-colors font-medium">
-                                +{dayEvs.length - 3} more
+                                +{dayEvs.length - visibleMonthLineCount} more
                               </button>
                             )}
                           </div>
@@ -1975,53 +2254,66 @@ function CalendarModeView() {
           <>
             <div className="wac-card p-0 overflow-hidden select-none"
               onMouseUp={handleGridMouseUp} onMouseLeave={handleGridMouseUp}>
-              <div className="grid border-b border-white/[0.05]" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
-                <div />
-                {weekDays.map((d, i) => {
-                  const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                  const isToday = key === todayKey;
-                  return (
-                    <div key={i} className="py-2 text-center">
-                      <div className="text-[9px] font-semibold tracking-wider text-white/25 uppercase">{DAY_ABBREVS[d.getDay()]}</div>
-                      <div className={`text-sm font-semibold mt-0.5 ${isToday ? "text-teal-400" : "text-white/45"}`}>{d.getDate()}</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="overflow-y-auto max-h-[420px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {WEEK_HOURS.map((hour) => (
-                  <div key={hour} className="grid border-b border-white/[0.03] last:border-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
-                    <div className="px-2 pt-1.5 text-right text-[10px] text-white/20 leading-none shrink-0">{formatHour(hour)}</div>
-                    {weekDays.map((d, dayIdx) => {
-                      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                      const slotEvs = (eventsMap.get(dk) ?? []).filter(
-                        (ev) => new Date(ev.start_time).getHours() === hour
-                      );
+              <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="min-w-[720px]">
+                  <div className="grid border-b border-white/[0.05]" style={{ gridTemplateColumns: "3.5rem repeat(7, minmax(5.75rem, 1fr))" }}>
+                    <div className="sticky left-0 z-10 bg-[var(--background)]" />
+                    {weekDays.map((d, i) => {
+                      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                      const isToday = key === todayKey;
                       return (
-                        <div key={dayIdx}
-                          onMouseDown={(e) => handleSlotMouseDown(dayIdx, hour, e)}
-                          onMouseEnter={() => handleSlotMouseEnter(dayIdx, hour)}
-                          className={`relative h-10 border-l border-white/[0.03] cursor-pointer transition-colors overflow-hidden ${
-                            isSlotSelected(dayIdx, hour) ? "bg-teal-500/[0.14]" : "hover:bg-white/[0.04]"
-                          }`}
-                        >
-                          {slotEvs.map((ev) => {
-                            const c = eventColors(ev.source);
-                            return (
-                              <button key={ev.id}
-                                onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                className={`absolute inset-x-[2px] top-[2px] bottom-[2px] ${c.bg} border ${c.border} rounded px-1 flex items-center ${c.hover} transition-colors z-10`}>
-                                <span className={`text-[8px] font-semibold ${c.text} truncate leading-none`}>{ev.title}</span>
-                              </button>
-                            );
-                          })}
+                        <div key={i} className="py-2 text-center">
+                          <div className="text-[9px] font-semibold tracking-wider text-white/25 uppercase">{DAY_ABBREVS[d.getDay()]}</div>
+                          <div className={`text-sm font-semibold mt-0.5 ${isToday ? "text-teal-400" : "text-white/45"}`}>{d.getDate()}</div>
                         </div>
                       );
                     })}
                   </div>
-                ))}
+                  <div className="overflow-y-auto max-h-[470px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {WEEK_HOURS.map((hour) => (
+                      <div key={hour} className="grid border-b border-white/[0.03] last:border-0" style={{ gridTemplateColumns: "3.5rem repeat(7, minmax(5.75rem, 1fr))" }}>
+                        <div className="sticky left-0 z-10 bg-[var(--background)] px-2 pt-1.5 text-right text-[10px] text-white/20 leading-none shrink-0">{formatHour(hour)}</div>
+                        {weekDays.map((d, dayIdx) => {
+                          const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                          const slotEvs = (eventsMap.get(dk) ?? []).filter(
+                            (ev) => new Date(ev.start_time).getHours() === hour
+                          );
+                          return (
+                            <div key={dayIdx}
+                              onMouseDown={(e) => handleSlotMouseDown(dayIdx, hour, e)}
+                              onMouseEnter={() => handleSlotMouseEnter(dayIdx, hour)}
+                              className={`relative h-11 border-l border-white/[0.03] cursor-pointer transition-colors overflow-hidden ${
+                                isSlotSelected(dayIdx, hour) ? "bg-teal-500/[0.14]" : "hover:bg-white/[0.04]"
+                              }`}
+                            >
+                              {slotEvs.map((ev) => {
+                                const c = eventColors(ev.source);
+                                const badge = getEventMetaBadge(ev);
+                                return (
+                                  <button key={ev.id}
+                                    onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    className={`absolute inset-x-[2px] top-[2px] bottom-[2px] ${c.bg} border ${c.border} rounded px-1 flex items-center ${c.hover} transition-colors z-10`}>
+                                    <span className={`text-[8px] font-semibold ${c.text} truncate leading-none`}>{ev.title}</span>
+                                    {badge && (
+                                      <span className={`ml-1 shrink-0 rounded px-1 py-[1px] text-[7px] leading-none ${badge.className}`}>
+                                        {badge.label}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
+            </div>
+            <div className="mt-2 px-1 sm:hidden">
+              <p className="text-[10px] text-white/22">Swipe sideways to browse the full week without squeezing each day.</p>
             </div>
             <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
               <p className="text-xs text-white/28">Click and drag on any column to select a time range and create an event.</p>
@@ -2070,7 +2362,7 @@ function CalendarModeView() {
           const todayKey = `${_today.getFullYear()}-${p2(_today.getMonth() + 1)}-${p2(_today.getDate())}`;
 
           return (
-            <div>
+            <div className="space-y-3 sm:space-y-4">
               {[...dayGroups.entries()].map(([dk, dayEvs]) => {
                 const dayDate   = new Date(dayEvs[0].start_time);
                 const isToday   = dk === todayKey;
@@ -2078,7 +2370,7 @@ function CalendarModeView() {
                 const dayLabel  = dayDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
                 return (
-                  <div key={dk} className="mb-3">
+                  <div key={dk} className="mb-4">
 
                     {/* Date divider header */}
                     <div className="flex items-center gap-3 mb-2">
@@ -2095,36 +2387,49 @@ function CalendarModeView() {
                     </div>
 
                     {/* Events for this day */}
-                    <div className="space-y-1 pl-0">
+                    <div className="space-y-2 pl-0">
                       {dayEvs.map((ev) => {
                         const c         = eventColors(ev.source);
+                        const badge     = getEventMetaBadge(ev);
                         const evStart   = new Date(ev.start_time);
                         const evEnd     = ev.end_time ? new Date(ev.end_time) : null;
                         const timeLabel = evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
                         const endLabel  = evEnd?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
                         return (
                           <button key={ev.id} onClick={() => openEventDetail(ev)}
-                            className={`w-full text-left flex items-stretch gap-0 rounded-lg border border-white/[0.07] overflow-hidden transition-colors hover:border-white/[0.14] ${isPast ? "opacity-55 hover:opacity-80" : ""}`}>
+                            className={`w-full overflow-hidden rounded-xl border border-white/[0.07] text-left transition-colors hover:border-white/[0.14] ${isPast ? "opacity-55 hover:opacity-80" : ""}`}>
                             {/* Relationship color bar */}
-                            <div className={`w-[3px] shrink-0 ${c.rule}`} />
-                            {/* Time column */}
-                            <div className="w-[64px] shrink-0 flex flex-col justify-center px-2 py-2 border-r border-white/[0.05]">
-                              <span className="text-[10px] font-semibold text-white/50 leading-none">{timeLabel}</span>
-                              {endLabel && <span className="text-[9px] text-white/28 mt-0.5 leading-none">{endLabel}</span>}
-                            </div>
-                            {/* Content */}
-                            <div className="flex-1 min-w-0 px-3 py-2 flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className={`text-[13px] font-semibold leading-snug truncate ${c.text}`}>{ev.title}</div>
-                                {ev.location && (
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    <MapPin size={9} className="text-white/25 shrink-0" />
-                                    <span className="text-[10px] text-white/30 truncate">{ev.location}</span>
-                                  </div>
-                                )}
+                            <div className={`h-[3px] w-full ${c.rule} sm:h-auto sm:w-[3px] sm:shrink-0`} />
+                            <div className="flex flex-col sm:flex-row sm:items-stretch">
+                              {/* Time column */}
+                              <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-3 py-2 sm:w-[70px] sm:shrink-0 sm:flex-col sm:justify-center sm:border-b-0 sm:border-r sm:px-2.5">
+                                <div className="flex items-center gap-2 sm:block">
+                                  <span className="text-[10px] font-semibold leading-none text-white/50">{timeLabel}</span>
+                                  {endLabel && <span className="text-[9px] leading-none text-white/28 sm:mt-0.5 sm:block">{endLabel}</span>}
+                                </div>
+                                <div className={`h-2 w-2 rounded-full ${c.dot} opacity-40 sm:hidden`} />
                               </div>
-                              {/* Source dot */}
-                              <div className={`w-2 h-2 rounded-full shrink-0 ${c.dot} opacity-40`} />
+                              {/* Content */}
+                              <div className="flex min-w-0 flex-1 items-start justify-between gap-2.5 px-3 py-2.5 sm:px-3.5">
+                                <div className="min-w-0">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                    <div className={`truncate text-[13px] font-semibold leading-snug ${c.text}`}>{ev.title}</div>
+                                    {badge && (
+                                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none ${badge.className}`}>
+                                        {badge.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {ev.location && (
+                                    <div className="mt-0.5 flex items-center gap-1">
+                                      <MapPin size={9} className="shrink-0 text-white/25" />
+                                      <span className="truncate text-[10px] text-white/30">{ev.location}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Source dot */}
+                                <div className={`hidden h-2 w-2 rounded-full shrink-0 ${c.dot} opacity-40 sm:block`} />
+                              </div>
                             </div>
                           </button>
                         );
@@ -2144,7 +2449,28 @@ function CalendarModeView() {
 
         {/* Source legend */}
         <div className="wac-card p-4">
-          <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25 mb-3">Sources</div>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Sources</div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={showAllSources}
+                disabled={allSourcesActive}
+                className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/24 transition-colors hover:text-white/48 disabled:cursor-default disabled:opacity-30"
+              >
+                All
+              </button>
+              <button
+                onClick={hideAllSources}
+                disabled={!anySourcesActive}
+                className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/24 transition-colors hover:text-white/48 disabled:cursor-default disabled:opacity-30"
+              >
+                None
+              </button>
+            </div>
+          </div>
+          <div className="mb-3 text-[10px] text-white/22">
+            {activeSourceCount} of {availableSourceIds.length} shown
+          </div>
           <div className="space-y-2.5">
             {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {
               const active = !disabled && activeSources.has(id);
@@ -2203,6 +2529,7 @@ function CalendarModeView() {
             <div className="space-y-3">
               {calEvents.slice(0, 5).map((ev) => {
                 const c = eventColors(ev.source);
+                const badge = getEventMetaBadge(ev);
                 const d = new Date(ev.start_time);
                 return (
                   <button key={ev.id} onClick={() => openEventDetail(ev)} className="w-full text-left flex items-start gap-2 group">
@@ -2213,7 +2540,14 @@ function CalendarModeView() {
                         {" · "}
                         {d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                       </div>
-                      <div className="text-[11px] text-white/52 group-hover:text-white/78 leading-snug transition-colors truncate">{ev.title}</div>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="text-[11px] text-white/52 group-hover:text-white/78 leading-snug transition-colors truncate">{ev.title}</div>
+                        {badge && (
+                          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 );
@@ -2242,6 +2576,27 @@ function CalendarModeView() {
                 <button onClick={() => setShowSourceSheet(false)} className="text-white/25 hover:text-white/55 transition-colors">
                   <X size={14} />
                 </button>
+              </div>
+              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                <span className="text-[11px] text-white/42">
+                  {activeSourceCount} of {availableSourceIds.length} calendars visible
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={showAllSources}
+                    disabled={allSourcesActive}
+                    className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/38 transition-colors hover:text-white/62 disabled:cursor-default disabled:opacity-30"
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={hideAllSources}
+                    disabled={!anySourcesActive}
+                    className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/38 transition-colors hover:text-white/62 disabled:cursor-default disabled:opacity-30"
+                  >
+                    None
+                  </button>
+                </div>
               </div>
               <div className="space-y-4">
                 {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {

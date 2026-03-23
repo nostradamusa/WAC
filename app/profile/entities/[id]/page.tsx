@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import {
   Building2, Globe, Image as ImageIcon, Calendar,
   Settings, CheckCircle, ExternalLink, Link as LinkIcon,
@@ -753,16 +754,15 @@ function TeamSection({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative w-full">
               <Shield size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-              <select
+              <PremiumSelect
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as InviteRole)}
-                className={`w-full pl-11 pr-10 py-3.5 rounded-xl border border-[var(--border)] bg-[#111] text-sm text-white outline-none transition appearance-none cursor-pointer capitalize ${btnBorder}`}
-              >
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                onChange={(nextValue) => setInviteRole(nextValue as InviteRole)}
+                options={ROLE_OPTIONS.map((r) => ({
+                  value: r,
+                  label: r.charAt(0).toUpperCase() + r.slice(1),
+                }))}
+                triggerClassName={`w-full pl-11 pr-10 py-3.5 rounded-xl border-[var(--border)] bg-[#111] text-sm text-white capitalize ${btnBorder}`}
+              />
             </div>
 
             <button

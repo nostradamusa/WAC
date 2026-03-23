@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { FormEvent } from "react";
 
@@ -143,12 +144,12 @@ export default function PeopleFilters({
           </button>
         </div>
 
-        <a
+        <Link
           href="/people"
           className="block text-center text-sm font-medium underline opacity-80"
         >
           Clear all filters
-        </a>
+        </Link>
       </form>
 
       <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm">

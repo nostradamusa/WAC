@@ -54,13 +54,14 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
 
     const q = query.trim();
     if (!q) {
-      setResults([]);
-      setOpen(false);
-      setLoading(false);
+      debounceRef.current = setTimeout(() => {
+        setResults([]);
+        setOpen(false);
+        setLoading(false);
+      }, 0);
       return;
     }
 
-    setLoading(true);
     debounceRef.current = setTimeout(async () => {
       const { data, error } = await supabase
         .from("organizations_directory_v1")
@@ -79,6 +80,7 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
     onChange(org);
     setQuery("");
     setResults([]);
+    setLoading(false);
     setOpen(false);
   }
 
@@ -86,6 +88,7 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
     onChange(null);
     setQuery("");
     setResults([]);
+    setLoading(false);
     setOpen(false);
   }
 
@@ -131,7 +134,11 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
         <input
           type="text"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={(e) => {
+            const nextQuery = e.target.value;
+            setQuery(nextQuery);
+            setLoading(nextQuery.trim().length > 0);
+          }}
           onFocus={() => { if (results.length > 0) setOpen(true); }}
           placeholder="Search WAC organizations by name..."
           autoComplete="off"
@@ -145,7 +152,7 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
           ) : query ? (
             <button
               type="button"
-              onClick={() => { setQuery(""); setResults([]); setOpen(false); }}
+              onClick={() => { setQuery(""); setResults([]); setLoading(false); setOpen(false); }}
               className="p-1 rounded-full hover:bg-white/[0.08] text-white/25 hover:text-white/55 transition-colors"
               aria-label="Clear search"
             >

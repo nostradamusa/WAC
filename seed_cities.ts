@@ -15,18 +15,32 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+type RawCity = {
+  name?: string;
+  lat?: string;
+  lng?: string;
+  country?: string;
+};
+
+type CompleteRawCity = {
+  name: string;
+  lat: string;
+  lng: string;
+  country: string;
+};
+
 async function main() {
   console.log("Downloading World Cities dataset...");
   try {
     const res = await fetch("https://raw.githubusercontent.com/lutangar/cities.json/master/cities.json");
-    const citiesData = await res.json();
+    const citiesData = (await res.json()) as RawCity[];
 
     console.log(`Fetched ${citiesData.length} total raw cities. Processing...`);
 
     // Clean up and filter
     const formattedCities = citiesData
-      .filter((c: any) => c.name && c.lat && c.lng && c.country)
-      .map((c: any) => ({
+      .filter((c): c is CompleteRawCity => Boolean(c.name && c.lat && c.lng && c.country))
+      .map((c) => ({
         city_name: c.name,
         country_name: c.country, // it's usually a 2-letter code in this dataset, but sufficient for our ILIKE match
         lat: parseFloat(c.lat),

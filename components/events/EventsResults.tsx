@@ -9,6 +9,35 @@ interface EventsResultsProps {
   eventType?: string;
 }
 
+type EventRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  organization_id: string | null;
+  host_entity_type: "organization" | "business" | "group" | null;
+  host_entity_id: string | null;
+  linked_entity_type: "organization" | "business" | "group" | null;
+  linked_entity_id: string | null;
+  hosting_metadata: unknown;
+  location_name: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  start_time: string;
+  end_time: string;
+  event_type: string | null;
+  visibility: string;
+  access_mode: string | null;
+  capacity: number | null;
+};
+
+type EventRsvpRow = {
+  event_id: string;
+  status: "going" | "interested" | "not_going";
+  approval_status: "approved" | "pending" | "declined" | "waitlisted";
+  user_id: string;
+};
+
 function EventsResultsInner({ eventType }: EventsResultsProps) {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
@@ -18,36 +47,96 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchEvents() {
       setLoading(true);
       setError(null);
+
       try {
-        const { data, error: sbError } = await supabase.rpc("get_events_scored", {
-          p_search_query: searchQuery || null,
-          p_user_lat: null,
-          p_user_lng: null,
-        });
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        if (sbError) throw sbError;
+        let query = supabase
+          .from("events")
+          .select("id, title, description, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, location_name, city, state, country, start_time, end_time, event_type, visibility, access_mode, capacity")
+          .order("start_time", { ascending: true });
 
-        let eventData = (data as any[]) || [];
-
-        if (eventType) {
-          eventData = eventData.filter(
-            (e: any) => e.event_type?.toLowerCase() === eventType.toLowerCase()
+        if (searchQuery.trim()) {
+          query = query.or(
+            `title.ilike.%${searchQuery.trim()}%,description.ilike.%${searchQuery.trim()}%,city.ilike.%${searchQuery.trim()}%,location_name.ilike.%${searchQuery.trim()}%`
           );
         }
 
-        setEvents(eventData as EventEntry[]);
-      } catch (err: any) {
-        console.error("Error fetching events:", err);
-        setError(`Failed to load events. ${err.message || ""}`);
+        if (eventType) {
+          query = query.ilike("event_type", eventType);
+        }
+
+        const { data: eventRows, error: eventsError } = await query.limit(60);
+        if (eventsError) throw eventsError;
+
+        const rows = (eventRows ?? []) as EventRow[];
+        const eventIds = rows.map((event) => event.id);
+
+        let rsvpRows: EventRsvpRow[] = [];
+        if (eventIds.length > 0) {
+          const { data: rsvpData, error: rsvpError } = await supabase
+            .from("event_rsvps")
+            .select("event_id, status, approval_status, user_id")
+            .in("event_id", eventIds);
+
+          if (rsvpError) throw rsvpError;
+          rsvpRows = (rsvpData ?? []) as EventRsvpRow[];
+        }
+
+        const attendeeCountByEvent = new Map<string, number>();
+        const currentUserRsvpByEvent = new Map<string, EventRsvpRow>();
+
+        for (const rsvp of rsvpRows) {
+          if (rsvp.status === "going" && rsvp.approval_status !== "declined" && rsvp.approval_status !== "waitlisted") {
+            attendeeCountByEvent.set(
+              rsvp.event_id,
+              (attendeeCountByEvent.get(rsvp.event_id) ?? 0) + 1
+            );
+          }
+
+          if (user?.id && rsvp.user_id === user.id) {
+            currentUserRsvpByEvent.set(rsvp.event_id, rsvp);
+          }
+        }
+
+        const mappedEvents: EventEntry[] = rows.map((event) => {
+          const currentUserRsvp = currentUserRsvpByEvent.get(event.id);
+          return {
+            ...event,
+            attending_count: attendeeCountByEvent.get(event.id) ?? 0,
+            current_user_rsvp_status: currentUserRsvp?.status ?? null,
+            current_user_approval_status: currentUserRsvp?.approval_status ?? null,
+          };
+        });
+
+        if (!cancelled) {
+          setEvents(mappedEvents);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          console.error("Error fetching events:", err);
+          setError(
+            `Failed to load events.${err instanceof Error && err.message ? ` ${err.message}` : ""}`
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    fetchEvents();
+    void fetchEvents();
+    return () => {
+      cancelled = true;
+    };
   }, [searchQuery, eventType]);
 
   if (loading) {

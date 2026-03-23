@@ -19,7 +19,7 @@ export default function OrganizationEventsTab({
         const { data, error } = await supabase
           .from("events")
           .select("*")
-          .eq("organization_id", organizationId)
+          .or(`organization_id.eq.${organizationId},and(host_entity_type.eq.organization,host_entity_id.eq.${organizationId}),and(linked_entity_type.eq.organization,linked_entity_id.eq.${organizationId})`)
           .order("start_time", { ascending: true });
 
         if (error) throw error;

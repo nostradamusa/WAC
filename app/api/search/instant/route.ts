@@ -29,7 +29,8 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json({ results: sparseResults });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown search error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

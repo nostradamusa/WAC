@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { getGroupBySlug, updateGroup } from "@/lib/services/groupService";
 import OrgSearchCombobox, { type OrgResult } from "@/components/ui/OrgSearchCombobox";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import type { GroupData } from "@/lib/types/group";
 
 const MAX_FILE_MB = 5;
@@ -373,19 +374,17 @@ export default function GroupSettingsPage() {
                 <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
                   Category <span className="text-[#b08d57]/60">*</span>
                 </label>
-                <select
+                <PremiumSelect
                   id="group-category"
                   name="group-category"
-                  required
                   value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white appearance-none cursor-pointer"
-                >
-                  <option value="" disabled>Select a category</option>
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
-                  ))}
-                </select>
+                  onChange={setCategory}
+                  options={[
+                    { value: "", label: "Select a category", disabled: true },
+                    ...CATEGORIES.map((cat) => ({ value: cat, label: cat })),
+                  ]}
+                  triggerClassName="w-full border-[var(--border)] bg-[#111] px-5 py-3 text-sm text-white"
+                />
               </div>
 
               <div>

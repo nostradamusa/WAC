@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createGroup } from "@/lib/services/groupService";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 import {
   ChevronLeft,
   Network,
@@ -97,6 +98,7 @@ const JOIN_OPTIONS: {
 export default function CreateGroupPage() {
   const router = useRouter();
 
+  const [category,     setCategory]     = useState("");
   const [privacy,      setPrivacy]      = useState<Privacy>("private");
   const [joinPolicy,   setJoinPolicy]   = useState<JoinPolicy>("request");
   const [linkedOrg,    setLinkedOrg]    = useState<OrgResult | null>(null);
@@ -234,17 +236,16 @@ export default function CreateGroupPage() {
                 <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
                   Category <span className="text-[#b08d57]/60">*</span>
                 </label>
-                <select
+                <PremiumSelect
                   name="category"
-                  required
-                  defaultValue=""
-                  className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white appearance-none cursor-pointer"
-                >
-                  <option value="" disabled className="text-white/30">Select a category</option>
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat} className="bg-[#111]">{cat}</option>
-                  ))}
-                </select>
+                  value={category}
+                  onChange={setCategory}
+                  options={[
+                    { value: "", label: "Select a category", disabled: true },
+                    ...CATEGORIES.map((cat) => ({ value: cat, label: cat })),
+                  ]}
+                  triggerClassName="w-full border-[var(--border)] bg-[#111] px-5 py-3 text-sm text-white"
+                />
               </div>
 
               <div>

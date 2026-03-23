@@ -1,12 +1,14 @@
 import { supabase } from "../supabase";
 
+export type MessagingActorType = "user" | "business" | "organization";
+
 export interface MessagingContact {
   id: string;
   name: string;
   headline: string | null;
   avatar_url: string | null;
   is_verified: boolean;
-  type: 'user' | 'business' | 'organization';
+  type: MessagingActorType;
   username_or_slug: string | null;
 }
 
@@ -73,18 +75,19 @@ export async function searchMessagingContacts(query: string): Promise<MessagingC
 }
 
 export async function getOrCreateConversation(
-  currentUserId: string,
+  currentActorId: string,
+  currentActorType: MessagingActorType,
   targetId: string,
-  targetType: 'user' | 'business' | 'organization'
-): Promise<{ success: boolean; conversationId?: string; error?: any }> {
+  targetType: MessagingActorType
+): Promise<{ success: boolean; conversationId?: string; error?: unknown }> {
   try {
     // 1. Check if a direct conversation already exists between these two exact actors
     // This requires finding a conversation where BOTH participants exist AND it's a 'direct' type
     const { data: existingConversations, error: searchError } = await supabase
       .from("conversation_participants")
       .select("conversation_id")
-      .eq("actor_id", currentUserId)
-      .eq("actor_type", 'user'); // Assuming the current user initiates as a 'user'
+      .eq("actor_id", currentActorId)
+      .eq("actor_type", currentActorType);
 
     if (searchError) throw searchError;
 
@@ -121,7 +124,7 @@ export async function getOrCreateConversation(
     const { error: addParticipantsError } = await supabase
       .from("conversation_participants")
       .insert([
-        { conversation_id: conversationId, actor_id: currentUserId, actor_type: 'user' },
+        { conversation_id: conversationId, actor_id: currentActorId, actor_type: currentActorType },
         { conversation_id: conversationId, actor_id: targetId, actor_type: targetType }
       ]);
 
@@ -136,10 +139,11 @@ export async function getOrCreateConversation(
 }
 
 export async function createGroupConversation(
-  currentUserId: string,
-  participants: { id: string; type: 'user' | 'business' | 'organization' }[],
+  currentActorId: string,
+  currentActorType: MessagingActorType,
+  participants: { id: string; type: MessagingActorType }[],
   groupName?: string
-): Promise<{ success: boolean; conversationId?: string; error?: any }> {
+): Promise<{ success: boolean; conversationId?: string; error?: unknown }> {
   try {
     // 1. Create a new group conversation
     const { data: newConversation, error: createConvError } = await supabase
@@ -154,7 +158,7 @@ export async function createGroupConversation(
 
     // 2. Add all participants, including the current user
     const allParticipants = [
-      { conversation_id: conversationId, actor_id: currentUserId, actor_type: 'user' },
+      { conversation_id: conversationId, actor_id: currentActorId, actor_type: currentActorType },
       ...participants.map(p => ({
         conversation_id: conversationId,
         actor_id: p.id,
@@ -191,20 +195,21 @@ export interface ConversationOverview {
     id: string;
     name: string;
     avatar_url: string | null;
-    type: 'user' | 'business' | 'organization';
+    type: MessagingActorType;
     is_online?: boolean;
   };
   participants?: {
     id: string;
     name: string;
     avatar_url: string | null;
-    type: 'user' | 'business' | 'organization';
+    type: MessagingActorType;
   }[];
   unread_count: number;
 }
 
 export async function getUserConversations(
-  userId: string
+  actorId: string,
+  actorType: MessagingActorType
 ): Promise<ConversationOverview[]> {
   try {
     // 1. Fetch conversations the user is in
@@ -215,7 +220,8 @@ export async function getUserConversations(
         last_read_at,
         conversations ( id, type, title, updated_at )
       `)
-      .eq("actor_id", userId);
+      .eq("actor_id", actorId)
+      .eq("actor_type", actorType);
 
     if (error) throw error;
     if (!participants || participants.length === 0) return [];
@@ -227,7 +233,7 @@ export async function getUserConversations(
       .from("conversation_participants")
       .select("conversation_id, actor_id, actor_type")
       .in("conversation_id", conversationIds)
-      .neq("actor_id", userId);
+      .or(`actor_id.neq.${actorId},actor_type.neq.${actorType}`);
 
     if (allPartError) throw allPartError;
 
@@ -288,7 +294,7 @@ export async function getUserConversations(
 
       // Simple unread calculation (if the last message was after our last_read_at, it's unread)
       let unread_count = 0;
-      if (lastMsg && lastMsg.sender_id !== userId) {
+      if (lastMsg && !(lastMsg.sender_id === actorId && lastMsg.sender_type === actorType)) {
         const msgDate = new Date(lastMsg.created_at);
         const readDate = new Date(p.last_read_at);
         if (msgDate > readDate) {
@@ -337,7 +343,7 @@ export interface MessageInterface {
   id: string;
   conversation_id: string;
   sender_id: string;
-  sender_type: 'user' | 'business' | 'organization';
+  sender_type: MessagingActorType;
   content: string;
   reactions: string[];
   created_at: string;
@@ -357,10 +363,27 @@ export async function getMessages(conversationId: string): Promise<MessageInterf
   return data as MessageInterface[];
 }
 
+export async function markConversationRead(
+  conversationId: string,
+  actorId: string,
+  actorType: MessagingActorType
+): Promise<void> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("actor_id", actorId)
+    .eq("actor_type", actorType);
+
+  if (error) {
+    console.error("Error marking conversation read:", error);
+  }
+}
+
 export async function sendMessage(
   conversationId: string,
   senderId: string,
-  senderType: 'user' | 'business' | 'organization',
+  senderType: MessagingActorType,
   content: string
 ): Promise<MessageInterface | null> {
   const { data, error } = await supabase
@@ -379,6 +402,16 @@ export async function sendMessage(
     console.error("Error sending message:", error);
     return null;
   }
+
+  const { error: touchError } = await supabase
+    .from("conversations")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", conversationId);
+
+  if (touchError) {
+    console.error("Error updating conversation timestamp:", touchError);
+  }
+
   return data as MessageInterface;
 }
 

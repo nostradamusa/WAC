@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { ChevronLeft, Briefcase, Landmark, Loader2 } from "lucide-react";
 
-export default function CreateEntityPage() {
-  const router = useRouter();
+function CreateEntityPageContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,5 +207,13 @@ export default function CreateEntityPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CreateEntityPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreateEntityPageContent />
+    </Suspense>
   );
 }

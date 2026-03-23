@@ -4,11 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
+import PremiumSelect from "@/components/ui/PremiumSelect";
 
 type TabType = "properties" | "professionals" | "services";
 
 export default function RealEstateHub() {
   const [activeTab, setActiveTab] = useState<TabType>("properties");
+  const [sortOrder, setSortOrder] = useState("newest");
 
   return (
     <div className="w-full">
@@ -101,11 +103,18 @@ export default function RealEstateHub() {
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="flex items-center justify-between mb-8">
                <h2 className="text-2xl font-serif">Latest Listings</h2>
-               <select className="bg-transparent border border-white/20 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)]">
-                 <option value="newest" className="bg-black">Newest First</option>
-                 <option value="price_asc" className="bg-black">Price: Low to High</option>
-                 <option value="price_desc" className="bg-black">Price: High to Low</option>
-               </select>
+               <PremiumSelect
+                 value={sortOrder}
+                 onChange={setSortOrder}
+                 options={[
+                   { value: "newest", label: "Newest First" },
+                   { value: "price_asc", label: "Price: Low to High" },
+                   { value: "price_desc", label: "Price: High to Low" },
+                 ]}
+                 className="min-w-[13rem]"
+                 triggerClassName="rounded-full border-white/20 bg-transparent px-4 py-2 text-sm"
+                 align="right"
+               />
              </div>
              
              {/* Property Grid Placeholder */}
