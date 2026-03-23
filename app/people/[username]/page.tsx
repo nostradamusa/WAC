@@ -22,7 +22,7 @@ export default async function PersonProfilePage({
   }
 
   return (
-    <main className="min-h-screen bg-[var(--background)] pt-24 md:pt-32">
+    <main className="w-full overflow-x-hidden relative min-h-screen bg-[var(--background)] pt-24 md:pt-32">
       <PublicProfile profile={profile} />
     </main>
   );

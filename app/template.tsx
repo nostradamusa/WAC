@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 export default function Template({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const noAnimateRoutes = ["/messages"];
+  const noAnimateRoutes = ["/messages", "/stories/new", "/post"];
 
-  if (noAnimateRoutes.some(route => pathname.startsWith(route))) {
+  if (noAnimateRoutes.some(route => pathname && pathname.startsWith(route))) {
     return <>{children}</>;
   }
 

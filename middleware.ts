@@ -20,7 +20,7 @@ export function middleware(request: NextRequest) {
   const scriptSrc = [
     "'self'",
     "'unsafe-inline'",
-    "'unsafe-eval'",
+    isDev ? "'unsafe-eval'" : "",
     "translate.google.com",
     "http://www.google.com",
     "https://www.google.com",
@@ -32,15 +32,16 @@ export function middleware(request: NextRequest) {
     .join(" ");
 
   const csp = [
-    "default-src 'self'",
+    `default-src 'self' ${isDev ? "'unsafe-eval'" : ""}`,
     `script-src ${scriptSrc}`,
-    "script-src-elem 'self' 'unsafe-inline' translate.google.com http://www.google.com https://www.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com",
+    `script-src-elem 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""} translate.google.com http://www.google.com https://www.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https: http://translate.google.com",
+    "media-src 'self' blob: https:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://translate.googleapis.com https://translate-pa.googleapis.com https://translate.google.com",
-    "frame-src 'none'",
+    "frame-src 'self' https://translate.googleapis.com translate.googleapis.com https://*.google.com",
   ].join("; ");
 
   const response = NextResponse.next();

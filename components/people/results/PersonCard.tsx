@@ -6,12 +6,12 @@ import Link from "next/link";
 import {
   Bookmark,
   Share2,
+  MapPin,
   Briefcase,
   UserPlus,
   GraduationCap,
   HandCoins,
   Users,
-  MapPin,
   X,
 } from "lucide-react";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
@@ -64,8 +64,6 @@ function buildRoots(p: DirectoryPerson) {
   return [...new Set(parts)].join(", ");
 }
 
-// ── Badge config ───────────────────────────────────────────────────────────
-
 const BADGE_CONFIG = [
   { key: "open_to_work",         urlParam: "work=true",   label: "Open to Work", Icon: Briefcase,     color: "bg-green-500/10 text-green-400 border-green-500/20"  },
   { key: "open_to_hire",         urlParam: "hire=true",   label: "Hiring",       Icon: UserPlus,      color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
@@ -87,11 +85,7 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
   const primaryLine  = buildPrimary(person);
   const location     = buildLocation(person);
   const roots        = buildRoots(person);
-
-  // @ts-expect-error banner_url occasionally present in real data
-  const bannerUrl: string | null = person.banner_url ?? null;
-
-  const badges = BADGE_CONFIG.filter((b) => !!(person as any)[b.key]);
+  const badges       = BADGE_CONFIG.filter((b) => !!(person as any)[b.key]);
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
@@ -108,164 +102,143 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
   }
 
   return (
-    <article className="wac-card group overflow-hidden p-0 flex flex-col relative hover:-translate-y-0.5 transition-transform">
+    <article className="wac-card group overflow-hidden p-5 flex flex-col sm:flex-row items-start sm:items-stretch gap-5 relative hover:-translate-y-0.5 transition-transform min-h-[140px]">
+      
+      {/* ── Ambient Glow (Entity Differentiation) ── */}
+      <div className="absolute top-0 left-0 w-[40%] h-[150%] bg-gradient-to-r from-[#b08d57]/[0.03] to-transparent pointer-events-none -translate-y-1/4" />
 
-      {/* ── Banner ──────────────────────────────────────────────────────── */}
-      <div className="relative h-16 shrink-0 overflow-hidden">
-        {bannerUrl ? (
-          <>
-            <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-black/40" />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-700/55 to-slate-800/45" />
-        )}
-
-        {/* Save / share — hover reveal */}
-        <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleSave}
-            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
-          >
-            <Bookmark size={10} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : "text-white"} />
-          </button>
-          <button
-            onClick={handleShare}
-            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
-          >
-            <Share2 size={10} className="text-white" />
-          </button>
-        </div>
+      {/* ── Quiet Hover Utilities (Save/Share) ── */}
+      <div className="absolute top-4 right-4 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 z-20 bg-black/40 backdrop-blur-md rounded-full p-0.5 border border-white/5 shadow-xl">
+        <button
+          onClick={handleSave}
+          title={isSaved ? "Saved" : "Save"}
+          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Bookmark size={13} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : ""} />
+        </button>
+        <button
+          onClick={handleShare}
+          title="Share"
+          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Share2 size={13} />
+        </button>
       </div>
 
-      {/*
-        Avatar — anchored to the article (not inside the banner overflow-hidden),
-        bridging the banner/body boundary. z-20 ensures it paints above body content.
-      */}
-      <div className="absolute left-4 top-10 z-20">
+      {/* ── Zone 1: Identity ────────────────────────────────────────────── */}
+      <div className="shrink-0 pt-0.5 relative z-10 w-16">
         {person.avatar_url ? (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAvatarModal(true); }}
-            className="block rounded-full hover:opacity-90 transition-opacity cursor-zoom-in"
+            className="block rounded-full hover:opacity-90 transition-transform hover:scale-105 cursor-zoom-in relative"
             aria-label="View profile photo"
           >
+            <div className="absolute inset-[-4px] rounded-full border border-[#b08d57]/30 opacity-60" />
             <img
               src={person.avatar_url}
               alt={displayName}
-              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md ring-1 ring-white/[0.12]"
+              className="w-16 h-16 rounded-full border border-[#b08d57]/20 object-cover relative z-10"
             />
           </button>
         ) : (
-          <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-white/[0.08] flex items-center justify-center text-sm font-semibold uppercase text-white/65 shadow-md ring-1 ring-white/[0.08]">
+          <div className="w-16 h-16 rounded-full border border-[#b08d57]/20 bg-[#b08d57]/10 flex items-center justify-center text-lg font-semibold uppercase text-[#b08d57] shadow-[0_0_15px_rgba(176,141,87,0.15)] relative">
+            <div className="absolute inset-[-4px] rounded-full border border-[#b08d57]/30 opacity-60" />
             {initials}
           </div>
         )}
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col px-4 pt-14 pb-4">
+      {/* ── Zone 2: Content & Context ───────────────────────────────────── */}
+      <div className="flex flex-col flex-1 min-w-0 self-stretch pr-2 relative z-10">
+        
+        {/* Entity Badge */}
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[#b08d57]/80 block mb-1">
+          Member
+        </span>
 
-        {/* Name + verified */}
-        <div className="flex items-center gap-1 min-w-0 mb-0.5">
-          <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
-          {person.is_verified && <VerifiedBadge size="sm" className="shrink-0 mt-px" />}
-        </div>
-
-        {/* Headline */}
+        <Link href={profileHref} className="group/title w-fit max-w-full mb-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h2 className="text-lg font-bold text-white/95 leading-tight group-hover/title:text-[#b08d57] transition-colors truncate">
+              {displayName}
+            </h2>
+            {person.is_verified && <VerifiedBadge size="md" className="shrink-0 -mt-0.5" />}
+          </div>
+        </Link>
+        
         {primaryLine && (
-          <p className="text-[11px] text-white/55 line-clamp-1 leading-snug">{primaryLine}</p>
+          <p className="text-[13px] font-medium text-white/60 line-clamp-1 mb-1.5">
+            {primaryLine}
+          </p>
         )}
 
-        {/* Location + Roots */}
-        {(location || roots) && (
-          <div className="flex flex-wrap items-center gap-x-1.5 mt-0.5">
-            {location && (
-              <span className="flex items-center gap-0.5 text-[11px] text-white/35">
-                <MapPin size={9} className="shrink-0" />
-                {location}
-              </span>
-            )}
-            {roots && (
-              <span className="text-[11px] text-white/25">
-                {location && "· "}Roots: {roots}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Dynamic spacer pushes metadata uniformly to bottom */}
+        <div className="flex-1 min-h-[12px]" />
 
-        {/* Skills */}
-        {person.skills && person.skills.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2.5">
-            {person.skills.slice(0, 2).map((s) => (
-              <span
-                key={s}
-                className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.07] text-[10px] text-white/50"
-              >
-                {s}
-              </span>
-            ))}
-            {person.skills.length > 2 && (
-              <span className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.07] text-[10px] text-white/30">
-                +{person.skills.length - 2}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Location & Badges Row (Anchored Bottom) */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {location && (
+            <span className="flex items-center gap-1 text-[11px] text-white/40 font-medium tracking-wide">
+              <MapPin size={10} className="shrink-0" />
+              {location}
+            </span>
+          )}
+          {roots && (
+            <span className="text-[11px] text-[#b08d57]/70 font-medium">
+              Roots <span className="text-white/30 ml-0.5">{roots}</span>
+            </span>
+          )}
+          
+          {badges.length > 0 && (
+            <div className="flex items-center gap-1 pl-1">
+              {(() => {
+                const { urlParam, label, color } = badges[0];
+                return (
+                  <Link
+                    href={`/directory?${urlParam}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className={`inline-flex items-center rounded-sm px-1.5 py-[2px] text-[10px] font-semibold tracking-wide border-b ${color.replace('border-', 'border-b-')}`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
 
-        {/* Intent badges */}
-        {badges.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {(() => {
-              const { urlParam, label, Icon, color } = badges[0];
-              return (
-                <Link
-                  href={`/directory?${urlParam}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border ${color}`}
-                >
-                  <Icon size={10} /> {label}
-                </Link>
-              );
-            })()}
-            {badges.length > 1 && (
-              <span className="inline-flex items-center rounded-full bg-white/5 border border-white/10 px-2 py-0.5 text-[10px] font-bold text-white/50">
-                +{badges.length - 1}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Spacer */}
-        <div className="flex-1 min-h-3" />
-
-        {/* CTAs */}
+      {/* ── Zone 3: Main CTAs ──────────────────────────────────────────── */}
+      <div className="flex sm:flex-col items-center sm:items-end justify-center sm:self-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto shrink-0 z-10 pl-0 sm:pl-2">
         {person.username ? (
-          <div className="flex gap-1.5 mt-3">
-            <FollowButton followingType="person" followingId={person.id} size="sm" className="flex-1" />
+          <>
+            <FollowButton 
+              followingType="person" 
+              followingId={person.id} 
+              size="sm" 
+              className="h-[32px] w-[96px] justify-center !px-0 shrink-0 shadow-sm" 
+            />
             <Link
               href={profileHref}
-              className="flex-1 flex items-center justify-center py-1.5 px-3 rounded-full bg-[#b08d57] text-black text-xs font-bold hover:bg-[#9a7545] transition-colors"
+              className="h-[32px] w-[96px] flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/5 text-xs font-semibold text-white tracking-wide transition-colors shrink-0 shadow-sm"
             >
-              View
+              View Profile
             </Link>
-          </div>
+          </>
         ) : (
-          <div className="mt-3 h-8 rounded-full border border-white/[0.07] flex items-center justify-center text-[11px] text-white/25">
-            Profile pending
-          </div>
+          <span className="text-[11px] text-white/20 italic px-2">Pending</span>
         )}
       </div>
 
       {/* Toast */}
+      {/* ... (toast and modal unchanged) ... */}
       <div
-        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
+        className={`absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
           showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
         }`}
       >
         Link copied!
       </div>
 
-      {/* Avatar lightbox — rendered in body portal to avoid transform clipping */}
       {showAvatarModal && person.avatar_url && createPortal(
         <div
           className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer animate-in fade-in duration-150"

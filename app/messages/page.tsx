@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Edit, Settings, MoreHorizontal, CheckCircle2, Navigation, MessageSquarePlus } from "lucide-react";
+import { Search, Edit, Settings, MoreHorizontal, CheckCircle2, Navigation, Plus } from "lucide-react";
 import NewMessageSheet from "@/components/messages/NewMessageSheet";
 
 const mockConversations = [
@@ -42,6 +42,7 @@ const mockConversations = [
     time: "Tuesday",
     unread: 0,
     type: "direct",
+    isRequest: true,
   },
 ];
 
@@ -68,29 +69,23 @@ export default function MessagesInboxPage() {
               Messages
             </h1>
             <div className="flex items-center gap-1.5">
-               <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white/[0.03] border border-white/5 text-white/50 hover:text-white hover:bg-white/10 active:scale-95 transition-all" title="Settings">
+               <Link href="/messages/settings" className="w-9 h-9 flex items-center justify-center rounded-full bg-white/[0.03] border border-white/5 text-white/50 hover:text-white hover:bg-white/10 active:scale-95 transition-all" title="Settings">
                   <Settings size={17} strokeWidth={1.8} />
-               </button>
-               <button 
-                 onClick={() => setIsNewMessageOpen(true)}
-                 className="w-9 h-9 flex items-center justify-center rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57] hover:bg-[#b08d57] hover:text-black active:scale-95 transition-all shadow-sm" title="New Message">
-                  <MessageSquarePlus size={16} strokeWidth={2.2} />
-               </button>
+               </Link>
             </div>
           </div>
 
-          {/* Search Bar - Premium Glassmorphic */}
-          <div className="relative mb-5 group">
-            <div className={`absolute inset-0 bg-gradient-to-r from-[#b08d57]/20 to-transparent rounded-full blur-md opacity-0 transition-opacity duration-300 ${searchFocused ? "opacity-100" : ""}`} />
-            <div className={`relative flex items-center bg-[#151515] border rounded-full overflow-hidden transition-all duration-300 ${searchFocused ? "border-[#b08d57]/40 ring-1 ring-[#b08d57]/20" : "border-white/10 hover:border-white/25"}`}>
-              <div className="pl-4 pr-2 text-white/40 group-hover:text-white/60 transition-colors">
-                <Search size={16} strokeWidth={2} />
+          {/* Search Bar - Clean Premium Dark Pill */}
+          <div className="mb-5 group px-1">
+            <div className={`relative flex items-center bg-[#151515] rounded-full transition-all duration-300 ${searchFocused ? "border-[#b08d57]/30 border bg-[#1A1A1A] ring-1 ring-[#b08d57]/10" : "border border-white/[0.04] hover:bg-[#1A1A1A] hover:border-white/10"}`}>
+              <div className={`pl-4 pr-3 transition-colors ${searchFocused ? "text-[#b08d57]" : "text-white/30 group-hover:text-white/50"}`}>
+                <Search size={16} strokeWidth={2.5} />
               </div>
               <input 
                 id="messages-search"
                 type="text" 
                 placeholder="Search conversations..." 
-                className="w-full bg-transparent py-2.5 pr-4 text-[14px] text-white placeholder:text-white/30 outline-none"
+                className="w-full bg-transparent py-2.5 pr-4 text-[14.5px] font-medium text-white placeholder:text-white/30 outline-none"
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setSearchFocused(false)}
               />
@@ -108,9 +103,9 @@ export default function MessagesInboxPage() {
                 }`}
               >
                 {tab}
-                {tab === "requests" && (
+                {tab === "requests" && mockConversations.filter(c => c.isRequest).length > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full bg-[#b08d57]/20 text-[#b08d57] text-[10px] font-bold leading-none border border-[#b08d57]/30">
-                    1
+                    {mockConversations.filter(c => c.isRequest).length}
                   </span>
                 )}
                 {activeTab === tab && (
@@ -123,7 +118,12 @@ export default function MessagesInboxPage() {
 
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto wac-scrollbar pb-32 md:pb-6 px-2">
-          {mockConversations.map((chat) => {
+          {mockConversations.filter(chat => {
+             if (activeTab === "unread") return chat.unread > 0;
+             if (activeTab === "requests") return chat.isRequest;
+             if (activeTab === "all") return !chat.isRequest; // Assuming requests don't show in "All" inbox until accepted
+             return true;
+          }).map((chat) => {
             const isUnread = chat.unread > 0;
             return (
               <Link 
@@ -182,6 +182,21 @@ export default function MessagesInboxPage() {
               </Link>
             );
           })}
+
+          {mockConversations.filter(chat => {
+             if (activeTab === "unread") return chat.unread > 0;
+             if (activeTab === "requests") return chat.isRequest;
+             if (activeTab === "all") return !chat.isRequest;
+             return true;
+          }).length === 0 && (
+             <div className="flex flex-col items-center justify-center py-20 px-6 text-center animate-in fade-in">
+                <div className="w-16 h-16 bg-white/[0.02] border border-white/5 rounded-full flex items-center justify-center mb-4">
+                   <CheckCircle2 size={24} className="text-white/20" />
+                </div>
+                <h3 className="text-[17px] font-serif font-bold text-white mb-1.5">No {activeTab} messages</h3>
+                <p className="text-[14px] text-white/40">You're all caught up here.</p>
+             </div>
+          )}
         </div>
       </div>
 
@@ -206,8 +221,10 @@ export default function MessagesInboxPage() {
              Send secure messages, coordinate with organizations, and grow your presence on the World Albanian Congress.
            </p>
            
-           <button className="flex items-center gap-2.5 bg-white text-black hover:bg-gray-200 px-7 py-3.5 rounded-full text-[14px] font-bold transition-all shadow-lg active:scale-95">
-             <MessageSquarePlus size={18} strokeWidth={2} />
+           <button 
+             onClick={() => setIsNewMessageOpen(true)}
+             className="flex items-center gap-2.5 bg-white text-black hover:bg-gray-200 px-7 py-3.5 rounded-full text-[14px] font-bold transition-all shadow-lg active:scale-95">
+             <Plus size={18} strokeWidth={2.5} />
              Start a Conversation
            </button>
         </div>

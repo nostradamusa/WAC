@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, PenLine, X, SlidersHorizontal } from "lucide-react";
+import { Search, PenLine, X, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 // ── Scope config ──────────────────────────────────────────────────────────────
@@ -13,35 +13,6 @@ const SCOPES = [
 ] as const;
 
 type Scope = "all" | "people" | "businesses" | "organizations";
-
-// ── Result summary helper ─────────────────────────────────────────────────────
-
-function buildResultSummary(
-  scope: Scope,
-  total: number,
-  people: number,
-  businesses: number,
-  organizations: number,
-): string {
-  if (scope !== "all") {
-    const labels: Record<Scope, [string, string]> = {
-      all:           ["result",       "results"],
-      people:        ["person",       "people"],
-      businesses:    ["business",     "businesses"],
-      organizations: ["organization", "organizations"],
-    };
-    const [singular, plural] = labels[scope];
-    return `${total} ${total === 1 ? singular : plural}`;
-  }
-
-  const parts: string[] = [];
-  if (people        > 0) parts.push(`${people} ${people === 1 ? "person" : "people"}`);
-  if (businesses    > 0) parts.push(`${businesses} ${businesses === 1 ? "business" : "businesses"}`);
-  if (organizations > 0) parts.push(`${organizations} ${organizations === 1 ? "organization" : "organizations"}`);
-
-  if (parts.length === 0) return `${total} ${total === 1 ? "result" : "results"}`;
-  return `${total} ${total === 1 ? "result" : "results"} · ${parts.join(" · ")}`;
-}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -126,129 +97,138 @@ export default function DirectorySearchContext({
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const resultSummary = buildResultSummary(
-    scope, totalResults, peopleCount, businessCount, organizationsCount,
-  );
+  // Build the secondary text line parts
+  const subParts: string[] = [];
+  if (peopleCount > 0) subParts.push(`${peopleCount} ${peopleCount === 1 ? "person" : "people"}`);
+  if (businessCount > 0) subParts.push(`${businessCount} ${businessCount === 1 ? "business" : "businesses"}`);
+  if (organizationsCount > 0) subParts.push(`${organizationsCount} ${organizationsCount === 1 ? "organization" : "organizations"}`);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col gap-5">
 
-      {/* ── Zone 2: H1 ───────────────────────────────────────────────── */}
-      {query ? (
-        /* Search-results state: query in serif quotes + edit / clear */
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <h1 className="font-serif text-2xl md:text-3xl font-normal text-white leading-tight">
-            &ldquo;{query}&rdquo;
+      {/* ── Hierarchy 1: Page Title ────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        {query ? (
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h1 className="font-serif text-3xl md:text-4xl font-normal text-white leading-tight">
+              &ldquo;{query}&rdquo;
+            </h1>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleEditSearch}
+                title="Edit search"
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-[#b08d57]/10 hover:border-[#b08d57]/30 hover:text-[#b08d57] transition-colors"
+              >
+                <PenLine size={14} />
+              </button>
+              <a
+                href="/directory"
+                title="Clear search"
+                className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
+              >
+                <X size={14} />
+              </a>
+            </div>
+          </div>
+        ) : (
+          <h1 className="font-serif text-3xl md:text-4xl tracking-tight leading-tight">
+            <span className="italic font-light opacity-90 text-[#b08d57]">Directory</span>
           </h1>
-          <div className="flex items-center gap-1.5 translate-y-0.5">
-            <button
-              onClick={handleEditSearch}
-              title="Edit search"
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-[#b08d57]/10 hover:border-[#b08d57]/30 hover:text-[#b08d57] transition-colors"
-            >
-              <PenLine size={12} />
-            </button>
-            <a
-              href="/directory"
-              title="Clear search"
-              className="flex items-center justify-center w-7 h-7 rounded-full bg-white/[0.05] border border-white/10 text-white/40 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
-            >
-              <X size={12} />
-            </a>
-          </div>
-        </div>
-      ) : (
-        /* Browse state: italic serif headline */
-        <h1 className="font-serif text-3xl md:text-4xl tracking-tight leading-tight">
-          <span className="italic font-light opacity-90 text-[#b08d57]">Directory</span>
-        </h1>
-      )}
+        )}
+      </div>
 
-      {/* ── Zone 3: Result summary ────────────────────────────────────── */}
-      <p className="mt-1.5 text-sm text-white/40">{resultSummary}</p>
+      {/* ── Hierarchy 2: Result Summary ────────────────────────────────── */}
+      <div className="flex flex-col gap-1 border-l-2 border-[#b08d57]/40 pl-4 py-1">
+        <span className="text-sm font-bold text-white tracking-wide">
+          {totalResults} {totalResults === 1 ? "Result found" : "Results found"}
+        </span>
+        {subParts.length > 0 && (
+          <span className="text-[13px] font-medium text-white/40">
+            {subParts.join(" • ")}
+          </span>
+        )}
+      </div>
 
-      {/* ── Zone 4: Filter row ────────────────────────────────────────── */}
-      {/*
-        Scope tabs are filter chips (outlined pill style per standards).
-        They live here on their own line — never beside the H1.
-        FILTERS button is right-aligned with active-count badge.
-      */}
-      <div className="mt-4 flex items-center gap-2 min-w-0">
-
-        {/* Scope chip row — horizontally scrollable on mobile */}
-        <div className="relative flex-1 min-w-0">
-          <div
-            className="flex items-center gap-1.5 overflow-x-auto pb-1"
-            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
-          >
-            {SCOPES.map(({ value, label }) => {
-              const isActive = scope === value;
-              return (
-                <a
-                  key={value}
-                  href={buildScopeHref(value)}
-                  className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "border-[#b08d57]/30 bg-[#b08d57]/[0.08] text-[#b08d57]/90"
-                      : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
-                  }`}
-                >
-                  {label}
-                </a>
-              );
-            })}
-          </div>
-          {/* Right-fade mask signals chip overflow on small screens */}
-          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
-        </div>
-
-        {/* Filters button */}
+      {/* ── Hierarchy 3: Controls (Scopes + Filters) ───────────────────── */}
+      <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+        
+        {/* Filters Button (Now inside the scroll area to match rhythm) */}
         <button
           onClick={onFilterToggle}
-          className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
+          className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${
             isFiltersOpen || activeFilters.length > 0
-              ? "border-[#b08d57]/30 bg-[#b08d57]/[0.08] text-[#b08d57]/80"
-              : "border-white/[0.12] text-white/55 hover:text-white/80 hover:border-white/18"
+              ? "bg-[#b08d57]/10 text-[#b08d57] border border-[#b08d57]/20"
+              : "bg-white/5 text-white/60 border border-white/5 hover:bg-white/10 hover:text-white/90"
           }`}
         >
-          <SlidersHorizontal size={13} strokeWidth={2} />
-          <span>Filters</span>
+          <SlidersHorizontal size={14} />
+          Filters
           {activeFilters.length > 0 && (
-            <span className="flex items-center justify-center w-[18px] h-[18px] rounded-full bg-[#b08d57] text-black text-[9px] font-bold leading-none">
+            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[#b08d57] text-black text-[10px] font-bold">
               {activeFilters.length}
             </span>
           )}
         </button>
+
+        {/* Vertical Divider */}
+        <div className="w-px h-5 bg-white/10 shrink-0 mx-1" />
+
+        {/* Scope Pills */}
+        {SCOPES.map(({ value, label }) => {
+          const isActive = scope === value;
+          return (
+            <a
+              key={value}
+              href={buildScopeHref(value)}
+              className={`shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${
+                isActive
+                  ? "bg-[#b08d57]/10 text-[#b08d57] border border-[#b08d57]/30"
+                  : "bg-white/5 text-white/60 border border-white/5 hover:bg-white/10 hover:text-white/90"
+              }`}
+            >
+              {label}
+            </a>
+          );
+        })}
       </div>
 
-      {/* ── Active filter chips ───────────────────────────────────────── */}
+      {/* ── Active Filters ─────────────────────────────────────────────── */}
       {activeFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 mt-3">
-          <span className="text-[11px] font-semibold text-white/30 uppercase tracking-[0.12em]">
-            Active:
-          </span>
+        <div className="flex flex-wrap items-center gap-2 pt-2">
           {activeFilters.map((filter) => (
             <div
               key={filter.key}
-              className="flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.09] text-xs text-white/65"
+              className="flex items-center gap-1.5 pl-3 pr-1 py-1 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-xs font-semibold text-[#b08d57]"
             >
-              <span>{filter.label}</span>
+              {filter.label}
               <button
                 onClick={() => removeFilter(filter.key)}
-                className="p-0.5 rounded-full hover:bg-white/10 hover:text-red-400 transition-colors"
+                className="p-1 rounded-full hover:bg-[rgba(0,0,0,0.2)] transition-colors"
+                title={`Remove ${filter.label} filter`}
               >
-                <X size={11} />
+                <X size={12} />
               </button>
             </div>
           ))}
           <button
             onClick={clearAllFilters}
-            className="text-[11px] text-white/30 hover:text-white/55 transition-colors ml-0.5"
+            className="text-xs font-semibold text-white/30 hover:text-white hover:underline transition-colors ml-2"
           >
             Clear all
           </button>
         </div>
       )}
+
+      {/* ── Hierarchy 4: Light Discovery Suggestion (Optional but requested) ── */}
+      {!query && activeFilters.length === 0 && scope === "all" && (
+        <div className="mt-2 flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-900/10 to-transparent border border-emerald-500/10 rounded-2xl w-fit">
+          <Sparkles size={14} className="text-emerald-400" />
+          <span className="text-xs font-semibold text-emerald-400/80">
+            Suggested: Discover active hubs and verified mentors around you.
+          </span>
+        </div>
+      )}
+
     </div>
   );
 }

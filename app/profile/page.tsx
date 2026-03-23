@@ -343,7 +343,7 @@ export default function ProfilePage() {
   ]);
 
   return (
-    <div className="wac-page max-w-6xl mx-auto pt-16 md:pt-32 pb-32">
+    <div className="wac-page w-full overflow-x-hidden relative max-w-6xl mx-auto pt-16 md:pt-32 pb-32">
       <div className="flex items-start justify-between mb-6 md:mb-8 px-4 md:px-0">
          <div>
             <h1 className="text-3xl md:text-4xl font-serif tracking-tight mb-1 md:mb-2 text-white">

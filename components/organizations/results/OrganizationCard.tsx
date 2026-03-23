@@ -59,108 +59,123 @@ export default function OrganizationCard({ organization }: { organization: Organ
   }
 
   return (
-    <article className="wac-card group overflow-hidden p-0 flex flex-col relative hover:-translate-y-0.5 transition-transform">
+    <article className="wac-card group overflow-hidden p-5 flex flex-col sm:flex-row items-start sm:items-stretch gap-5 relative hover:-translate-y-0.5 transition-transform min-h-[140px]">
+      
+      {/* ── Ambient Glow (Entity Differentiation) ── */}
+      <div className="absolute top-0 left-0 w-[40%] h-[150%] bg-gradient-to-r from-emerald-500/[0.04] to-transparent pointer-events-none -translate-y-1/4" />
 
-      {/* ── Banner ──────────────────────────────────────────────────────── */}
-      <div className="relative h-16 shrink-0 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-800/45 to-slate-800/45" />
-
-        {/* Save / share — hover reveal */}
-        <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleSave}
-            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
-          >
-            <Bookmark size={10} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : "text-white"} />
-          </button>
-          <button
-            onClick={handleShare}
-            className="w-6 h-6 rounded-full bg-black/50 border border-white/10 flex items-center justify-center hover:bg-black/70 transition-colors"
-          >
-            <Share2 size={10} className="text-white" />
-          </button>
-        </div>
+      {/* ── Quiet Hover Utilities (Save/Share) ── */}
+      <div className="absolute top-4 right-4 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 z-20 bg-black/40 backdrop-blur-md rounded-full p-0.5 border border-white/5 shadow-xl">
+        <button
+          onClick={handleSave}
+          title={isSaved ? "Saved" : "Save"}
+          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Bookmark size={13} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : ""} />
+        </button>
+        <button
+          onClick={handleShare}
+          title="Share"
+          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <Share2 size={13} />
+        </button>
       </div>
 
-      {/* Logo / initials — anchored to article, bridges banner/body boundary */}
-      <div className="absolute left-4 top-10 z-20">
+      {/* ── Zone 1: Identity ────────────────────────────────────────────── */}
+      <div className="shrink-0 pt-0.5 relative z-10 w-16">
         {organization.logo_url ? (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAvatarModal(true); }}
-            className="block rounded-full hover:opacity-90 transition-opacity cursor-zoom-in"
+            className="block rounded-full hover:opacity-90 transition-transform hover:scale-105 cursor-zoom-in relative"
             aria-label="View logo"
           >
+            <div className="absolute inset-[-4px] rounded-full border border-emerald-500/30 opacity-60" />
             <img
               src={organization.logo_url}
               alt={displayName}
-              className="w-12 h-12 rounded-full border-2 border-[var(--card)] object-cover shadow-md ring-1 ring-white/[0.12]"
+              className="w-16 h-16 rounded-full border border-emerald-500/20 object-cover relative z-10"
             />
           </button>
         ) : (
-          <div className="w-12 h-12 rounded-full border-2 border-[var(--card)] bg-emerald-500/20 flex items-center justify-center shadow-md ring-1 ring-emerald-500/[0.15]">
-            {initials ? (
-              <span className="text-sm font-semibold uppercase text-emerald-300">{initials}</span>
-            ) : (
-              <Landmark size={18} className="text-emerald-300" strokeWidth={1.5} />
-            )}
+          <div className="w-16 h-16 rounded-full border border-emerald-500/20 bg-emerald-500/10 flex items-center justify-center text-lg font-semibold uppercase text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)] relative">
+            <div className="absolute inset-[-4px] rounded-full border border-emerald-500/30 opacity-60" />
+            {initials ? initials : <Landmark size={22} className="text-emerald-400" strokeWidth={1.5} />}
           </div>
         )}
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col px-4 pt-14 pb-4">
+      {/* ── Zone 2: Main Content ────────────────────────────────────────── */}
+      <div className="flex flex-col flex-1 min-w-0 self-stretch pr-2 relative z-10">
+        
+        {/* Entity Badge */}
+        <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400/80 block mb-1">
+          Organization
+        </span>
 
-        {/* Name + verified */}
-        <div className="flex items-center gap-1 min-w-0 mb-0.5">
-          <h2 className="text-sm font-semibold leading-tight truncate">{displayName}</h2>
-          {organization.is_verified && <VerifiedBadge size="sm" className="shrink-0 mt-px" />}
-        </div>
+        <Link href={profileHref} className="group/title w-fit max-w-full mb-0.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h2 className="text-lg font-bold text-white/95 leading-tight group-hover/title:text-emerald-400 transition-colors truncate">
+              {displayName}
+            </h2>
+            {organization.is_verified && <VerifiedBadge size="md" className="shrink-0 -mt-0.5" />}
+          </div>
+        </Link>
 
-        {/* Subtitle */}
+        {/* Type */}
         {subtitle && (
-          <p className="text-[11px] text-white/55 line-clamp-1 leading-snug">{subtitle}</p>
-        )}
-
-        {/* Location */}
-        {location && (
-          <span className="flex items-center gap-0.5 mt-0.5 text-[11px] text-white/35">
-            <MapPin size={9} className="shrink-0" />
-            {location}
-          </span>
-        )}
-
-        {/* Leader */}
-        {organization.leader_name && (
-          <p className="text-[11px] text-white/25 mt-0.5 truncate">
-            Led by {organization.leader_name}
+          <p className="text-[13px] font-medium text-white/60 line-clamp-1 mb-1">
+            {subtitle}
           </p>
         )}
 
-        {/* Description */}
+        {/* Description Snippet */}
         {organization.description && (
-          <p className="text-[11px] text-white/30 line-clamp-2 leading-snug mt-2">
+          <p className="text-xs text-white/40 line-clamp-1 leading-snug mb-2 pr-4">
             {organization.description}
           </p>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1 min-h-3" />
+        {/* Dynamic spacer pushes metadata uniformly to bottom */}
+        <div className="flex-1 min-h-[12px]" />
 
-        {/* CTAs */}
-        <div className="flex gap-1.5 mt-3">
-          <FollowButton followingType="organization" followingId={organization.id} size="sm" className="flex-1" />
-          <Link
-            href={profileHref}
-            className="flex-1 flex items-center justify-center py-1.5 px-3 rounded-full bg-[#b08d57] text-black text-xs font-bold hover:bg-[#9a7545] transition-colors"
-          >
-            View
-          </Link>
+        {/* Location & Leader Row */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-auto">
+          {location && (
+            <span className="flex items-center gap-1 text-[11px] text-white/40 font-medium tracking-wide">
+              <MapPin size={10} className="shrink-0" />
+              {location}
+            </span>
+          )}
+          
+          {organization.leader_name && (
+            <span className="text-[11px] text-[#b08d57]/70 font-medium">
+              Led by <span className="text-white/30 ml-0.5">{organization.leader_name}</span>
+            </span>
+          )}
         </div>
       </div>
 
+      {/* ── Zone 3: Main CTAs ──────────────────────────────────────────── */}
+      <div className="flex sm:flex-col items-center sm:items-end justify-center sm:self-center gap-2 mt-3 sm:mt-0 w-full sm:w-auto shrink-0 z-10 pl-0 sm:pl-2">
+        <FollowButton 
+          followingType="organization" 
+          followingId={organization.id} 
+          size="sm" 
+          className="h-[32px] w-[96px] justify-center !px-0 shrink-0 shadow-sm" 
+        />
+        <Link
+          href={profileHref}
+          className="h-[32px] w-[96px] flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/5 text-xs font-semibold text-white tracking-wide transition-colors shrink-0 shadow-sm"
+        >
+          Visit Hub
+        </Link>
+      </div>
+
       {/* Toast */}
+      {/* ... */}
       <div
-        className={`absolute bottom-5 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
+        className={`absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
           showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
         }`}
       >

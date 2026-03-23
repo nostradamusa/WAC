@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, Plus, MessageCircle, Compass, CalendarDays, Activity, Network, Telescope,
-  ChevronDown, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check, MessageSquarePlus,
+  ChevronDown, ChevronRight, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check, MessageSquarePlus,
 } from "lucide-react";
 import LanguageToggle from "./LanguageToggle";
 import { useActor } from "@/components/providers/ActorProvider";
@@ -16,7 +16,17 @@ import { useUnreadMessageCount } from "@/lib/hooks/useUnreadCounts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function profileUrl(actor: ActorIdentity | null): string {
+function getPublicProfileUrl(actor: ActorIdentity | null): string {
+  if (!actor) return "/profile";
+  if (actor.type === "person") {
+    return actor.slug ? `/people/${actor.slug}` : `/people/${actor.id}`;
+  }
+  if (actor.type === "business") return `/businesses/${actor.slug || actor.id}`;
+  if (actor.type === "organization") return `/organizations/${actor.slug || actor.id}`;
+  return `/${actor.type}s/${actor.slug || actor.id}`;
+}
+
+function getEditProfileUrl(actor: ActorIdentity | null): string {
   if (!actor) return "/profile";
   if (actor.type === "person") return "/profile";
   return `/profile/entities/${actor.id}`;
@@ -55,11 +65,34 @@ export default function Navbar() {
   const [showNetworkMenu, setShowNetworkMenu] = useState(false);
   const [lang,           setLang]           = useState<"en" | "sq">("en");
   const [showLangPicker, setShowLangPicker] = useState(false);
+
+  // Drag-to-dismiss state for mobile sheet
+  const [dragY, setDragY] = useState(0);
+  const touchStartY = useRef(0);
+
   const longPressRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const networkMenuRef  = useRef<HTMLDivElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router   = useRouter();
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const diff = e.touches[0].clientY - touchStartY.current;
+    if (diff > 0) setDragY(diff);
+  };
+
+  const handleTouchEnd = () => {
+    if (dragY > 100) {
+      setIsMenuOpen(false);
+      setTimeout(() => setDragY(0), 300);
+    } else {
+      setDragY(0);
+    }
+  };
 
   // Fires the context-aware create action for the current page
   const handleComposeTap = () => {
@@ -228,86 +261,130 @@ export default function Navbar() {
 
   const desktopDropdownContent = currentActor ? (
     <>
-      {/* Current identity */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/[0.07]">
-        <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-white/25 mb-2.5">Acting as</p>
-        <div className="flex items-center gap-3">
-          <Avatar actor={currentActor} size={38} />
+      {/* ── 0. Brand Header (Clickable to Vision) ────────────────────────── */}
+      <Link 
+        href="/vision"
+        onClick={() => setIsMenuOpen(false)}
+        className="px-4 py-3 border-b border-white/[0.07] flex items-center gap-3 transition-colors hover:bg-white/[0.03] group"
+      >
+        <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] shadow-[0_0_10px_rgba(176,141,87,0.15)] group-hover:shadow-[0_0_16px_rgba(176,141,87,0.3)] border-2 border-[#b08d57]/60 shrink-0 transition-shadow">
+          <img
+            src="/images/wac-logo.jpg"
+            alt="WAC"
+            className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-serif text-[14px] tracking-tight text-white leading-none mb-1 group-hover:text-white/90 transition-colors">
+            World{" "}
+            <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
+            Congress
+          </p>
+          <p className="text-[8.5px] tracking-[0.3em] text-[#b08d57]/50 uppercase group-hover:text-[#b08d57]/80 transition-colors">Our Vision &amp; Mission</p>
+        </div>
+        <ChevronRight size={14} strokeWidth={2} className="text-white/10 group-hover:text-[#b08d57]/60 transition-colors" />
+      </Link>
+
+      {/* ── 1. The Premium Identity Header ──────────────────────────────────────── */}
+      <div className="p-4 border-b border-white/[0.07] bg-white/[0.015]">
+        <div className="flex items-center gap-3.5 mb-4">
+          <div className="relative shrink-0">
+             <Avatar actor={currentActor} size={42} />
+             <span className="absolute bottom-0 right-[-2px] w-[11px] h-[11px] rounded-full bg-emerald-400 border-2 border-[#121212]" />
+          </div>
           <div className="min-w-0">
-            <p className="font-semibold text-white text-sm leading-tight truncate">{currentActor.name}</p>
-            <p className="text-[11px] text-white/40 capitalize mt-0.5">
-              {currentActor.type === "person" ? "Personal account" : currentActor.type}
+            <p className="font-bold text-white text-[15px] leading-tight truncate">{currentActor.name}</p>
+            <p className="text-[11.5px] font-semibold text-[#b08d57] capitalize mt-0.5">
+              {currentActor.type === "person" ? "Personal Account" : currentActor.type}
             </p>
           </div>
         </div>
+        <div className="flex gap-2">
+          <Link
+            href={getPublicProfileUrl(currentActor)}
+            onClick={() => setIsMenuOpen(false)}
+            className="flex-1 flex justify-center items-center py-1.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-lg text-[12px] font-bold text-white/90 transition-all shadow-sm active:scale-[0.98]"
+          >
+            View Profile
+          </Link>
+          <Link
+            href={getEditProfileUrl(currentActor)}
+            onClick={() => setIsMenuOpen(false)}
+            className="flex-1 flex justify-center items-center py-1.5 bg-transparent hover:bg-white/[0.04] border border-white/5 rounded-lg text-[12px] font-bold text-white/60 hover:text-white/90 transition-all active:scale-[0.98]"
+          >
+            Edit Profile
+          </Link>
+        </div>
       </div>
 
-      {/* Switch identity */}
+      {/* ── 2. Switch identity ────────────────────────────────────────────────── */}
       {ownedEntities.length > 1 && (
-        <div className="py-1.5 border-b border-white/[0.07]">
-          <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-white/25 px-4 pt-2 pb-1.5">Switch to</p>
+        <div className="py-2 border-b border-white/[0.07]">
+          <p className="text-[9.5px] font-bold uppercase tracking-wider text-white/30 px-4 pt-1 mb-1">Switch to</p>
           {ownedEntities
             .filter((e) => e.id !== currentActor.id)
             .map((entity) => (
               <button
                 key={entity.id}
                 onClick={() => { setCurrentActor(entity); setIsMenuOpen(false); }}
-                className="w-full text-left flex items-center gap-3 px-4 py-2.5 transition hover:bg-white/[0.04]"
+                className="w-full text-left flex items-center gap-3 px-4 py-2 transition hover:bg-white/[0.04] group"
               >
-                <Avatar actor={entity} size={28} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-white/75 truncate">{entity.name}</div>
-                  <div className="text-[10px] text-white/30 capitalize mt-0.5">
-                    {entity.type === "person" ? "Personal account" : entity.type}
-                  </div>
+                <div className="opacity-50 group-hover:opacity-100 transition-opacity">
+                   <Avatar actor={entity} size={28} />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold text-white/60 group-hover:text-white/90 truncate transition-colors">{entity.name}</div>
+                </div>
+                <ChevronRight size={14} strokeWidth={2} className="text-white/10 group-hover:text-white/40 shrink-0 transition-colors" />
               </button>
             ))}
         </div>
       )}
 
-      {/* Account destinations */}
-      <div className="py-1.5 border-b border-white/[0.07]">
-        <Link
-          href={profileUrl(currentActor)}
-          onClick={() => setIsMenuOpen(false)}
-          className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.04] transition"
-        >
-          <User size={14} strokeWidth={1.8} className="shrink-0 opacity-50" />
-          My Profile
-        </Link>
-        {managedEntities.map((entity) => (
-          <Link
-            key={entity.id}
-            href={`/profile/entities/${entity.id}`}
-            onClick={() => setIsMenuOpen(false)}
-            className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.04] transition"
-          >
-            <div className="w-[14px] h-[14px] rounded overflow-hidden shrink-0 bg-[var(--accent)]/10 flex items-center justify-center">
-              {entity.avatar_url
-                ? <img src={entity.avatar_url} alt="" className="w-full h-full object-cover" />
-                : <Building2 size={10} strokeWidth={1.8} className="text-white/50" />
-              }
-            </div>
-            <span className="truncate flex-1">{entity.name}</span>
-          </Link>
-        ))}
+      {/* ── 3. Entities ─────────────────────────────────────── */}
+      {(managedEntities.length > 0) && (
+        <div className="py-2 border-b border-white/[0.07]">
+          <p className="text-[9.5px] font-bold uppercase tracking-wider text-white/30 px-4 pt-1 mb-1">Entities</p>
+          {managedEntities.map((entity) => (
+             <Link
+               key={entity.id}
+               href={`/profile/entities/${entity.id}`}
+               onClick={() => setIsMenuOpen(false)}
+               className="flex items-center gap-3 px-4 py-2 text-[13px] font-medium text-white/60 hover:text-white hover:bg-white/[0.04] transition group"
+             >
+               <div className="w-[20px] h-[20px] rounded overflow-hidden shrink-0 bg-white/5 border border-white/10 flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity">
+                 {entity.avatar_url
+                   ? <img src={entity.avatar_url} alt="" className="w-full h-full object-cover" />
+                   : <Building2 size={11} strokeWidth={1.8} className="text-[#b08d57]/70" />
+                 }
+               </div>
+               <div className="flex flex-col min-w-0 flex-1">
+                 <span className="truncate text-[13px] leading-tight group-hover:text-white transition-colors">{entity.name}</span>
+                 <span className="text-[10px] text-white/40 capitalize leading-tight mt-0.5 group-hover:text-white/60 transition-colors">
+                   {entity.type === "business" ? "Business" : entity.type === "organization" ? "Organization" : "Entity"} • {entity.role || "Admin"}
+                 </span>
+               </div>
+               <span className="text-[10px] text-[#b08d57] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Manage</span>
+             </Link>
+          ))}
+        </div>
+      )}
+
+      {/* ── 4. Utilities & Sign Out ───────────────────────────────────────────── */}
+      <div className="py-2">
         <Link
           href="/settings"
           onClick={() => setIsMenuOpen(false)}
-          className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.04] transition"
+          className="flex items-center gap-3 px-4 py-2 text-[13px] font-medium text-white/40 hover:text-white/80 hover:bg-white/[0.03] transition group"
         >
-          <Settings size={14} strokeWidth={1.8} className="shrink-0 opacity-50" />
+          <Settings size={14} strokeWidth={1.8} className="shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
           Settings
         </Link>
-      </div>
-
-      <div className="py-1.5">
         <button
           onClick={signOut}
-          className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm text-white/40 hover:text-red-400 hover:bg-white/[0.03] transition"
+          className="w-full text-left flex items-center gap-3 px-4 py-2 text-[13px] font-medium text-white/30 hover:text-red-400 hover:bg-red-400/5 transition group"
         >
-          <LogOut size={14} strokeWidth={1.8} className="shrink-0 opacity-50" />
+          <LogOut size={14} strokeWidth={1.8} className="shrink-0 opacity-40 group-hover:text-red-400 group-hover:opacity-100 transition-colors" />
           Sign out
         </button>
       </div>
@@ -317,130 +394,138 @@ export default function Navbar() {
   // ── Mobile bottom sheet content ────────────────────────────────────────────
 
   const mobileSheetContent = currentActor ? (
-    <div className="pb-2">
-
-      {/* ── Brand header ──────────────────────────────────────────────────── */}
-      <div className="px-5 py-4 border-b border-white/[0.07] flex items-center gap-3.5">
-        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] shadow-[0_0_14px_rgba(176,141,87,0.3)] border-2 border-[#b08d57]/60 shrink-0">
+    <div className="pb-2 flex flex-col">
+    
+      {/* ── 0. Brand Header (Clickable to Vision) ────────────────────────── */}
+      <Link 
+        href="/vision"
+        onClick={() => setIsMenuOpen(false)}
+        className="px-5 py-4 border-b border-white/[0.07] flex items-center gap-3.5 transition-colors active:bg-white/[0.04] group"
+      >
+        <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] shadow-[0_0_14px_rgba(176,141,87,0.2)] border-2 border-[#b08d57]/60 shrink-0 transition-shadow">
           <img
             src="/images/wac-logo.jpg"
             alt="WAC"
             className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
           />
         </div>
-        <div>
-          <p className="font-serif text-[15px] tracking-tight text-white leading-none mb-1">
+        <div className="flex-1 min-w-0">
+          <p className="font-serif text-[17px] tracking-tight text-white leading-none mb-1">
             World{" "}
             <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
             Congress
           </p>
-          <p className="text-[8.5px] tracking-[0.3em] text-white/25 uppercase">Your Network</p>
+          <p className="text-[9px] tracking-[0.3em] text-[#b08d57]/50 uppercase">Our Vision &amp; Mission</p>
         </div>
-      </div>
+        <ChevronRight size={16} strokeWidth={2} className="text-white/10 shrink-0" />
+      </Link>
 
-      {/* ── Acting as ─────────────────────────────────────────────────────── */}
-      <div className="px-5 pt-4 pb-4 border-b border-white/[0.07]">
-        <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-white/25 mb-3">Acting as</p>
-        <div className="flex items-center gap-4">
+      {/* ── 1. The Premium Identity Header ──────────────────────────────────────── */}
+      <div className="px-5 py-5 border-b border-white/[0.07] bg-white/[0.015]">
+        <div className="flex items-center gap-4 mb-4">
           <div className="relative shrink-0">
-            <Avatar actor={currentActor} size={46} />
-            {/* Online/active indicator */}
-            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-400 border-2 border-[#0d0d0d]" />
+             <Avatar actor={currentActor} size={50} />
+             <span className="absolute bottom-[-1px] right-[-1px] w-[14px] h-[14px] rounded-full bg-emerald-400 border-[3px] border-[#121212]" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-white text-[15px] leading-tight truncate">{currentActor.name}</p>
-            <p className="text-[11px] text-white/40 capitalize mt-0.5">
-              {currentActor.type === "person" ? "Personal account" : currentActor.type}
+            <p className="font-bold text-white text-[17px] leading-tight truncate">{currentActor.name}</p>
+            <p className="text-[12.5px] font-semibold text-[#b08d57] capitalize mt-0.5">
+              {currentActor.type === "person" ? "Personal Account" : currentActor.type}
             </p>
           </div>
         </div>
+        <div className="flex gap-3">
+          <Link
+            href={getPublicProfileUrl(currentActor)}
+            onClick={() => setIsMenuOpen(false)}
+            className="flex-1 flex justify-center items-center py-2.5 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-xl text-[13px] font-bold text-white/90 transition-all shadow-sm active:scale-[0.98]"
+          >
+            View Profile
+          </Link>
+          <Link
+            href={getEditProfileUrl(currentActor)}
+            onClick={() => setIsMenuOpen(false)}
+            className="flex-1 flex justify-center items-center py-2.5 bg-transparent hover:bg-white/[0.05] border border-white/5 rounded-xl text-[13px] font-bold text-white/60 hover:text-white/90 transition-all active:scale-[0.98]"
+          >
+            Edit Profile
+          </Link>
+        </div>
       </div>
 
-      {/* ── Switch identity ────────────────────────────────────────────────── */}
+      {/* ── 2. Switch identity ────────────────────────────────────────────────── */}
       {ownedEntities.length > 1 && (
         <div className="py-2 border-b border-white/[0.07]">
-          <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-white/25 px-5 pt-2 pb-2">Switch to</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 px-5 pt-2 mb-1">Switch to</p>
           {ownedEntities
             .filter((e) => e.id !== currentActor.id)
             .map((entity) => (
               <button
                 key={entity.id}
                 onClick={() => { setCurrentActor(entity); setIsMenuOpen(false); }}
-                className="w-full text-left flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06]"
+                className="w-full text-left flex items-center gap-4 px-5 py-3 transition active:bg-white/[0.06]"
               >
-                <Avatar actor={entity} size={34} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-medium text-white/80 truncate">{entity.name}</div>
-                  <div className="text-[10px] text-white/30 capitalize mt-0.5">
-                    {entity.type === "person" ? "Personal account" : entity.type}
-                  </div>
+                <div className="opacity-50">
+                   <Avatar actor={entity} size={36} />
                 </div>
-                <ChevronDown size={14} strokeWidth={2} className="text-white/20 -rotate-90 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[15px] font-semibold text-white/60 truncate">{entity.name}</div>
+                </div>
+                <ChevronRight size={16} strokeWidth={2} className="text-white/10 shrink-0" />
               </button>
             ))}
         </div>
       )}
 
-      {/* ── Account destinations ──────────────────────────────────────────── */}
-      <div className="py-2 border-b border-white/[0.07]">
-        <p className="text-[9px] font-bold uppercase tracking-[0.13em] text-white/25 px-5 pt-2 pb-2">Account</p>
+      {/* ── 3. Entities ─────────────────────────────────────── */}
+      {(managedEntities.length > 0) && (
+        <div className="py-2 border-b border-white/[0.07]">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-white/30 px-5 pt-2 mb-1">Entities</p>
+          {managedEntities.map((entity) => (
+             <Link
+               key={entity.id}
+               href={`/profile/entities/${entity.id}`}
+               onClick={() => setIsMenuOpen(false)}
+               className="flex items-center gap-4 px-5 py-3 text-[14px] font-medium text-white/60 hover:bg-white/[0.04] active:bg-white/[0.06] transition"
+             >
+               <div className="w-[30px] h-[30px] rounded overflow-hidden shrink-0 bg-white/5 border border-white/10 flex items-center justify-center opacity-70">
+                 {entity.avatar_url
+                   ? <img src={entity.avatar_url} alt="" className="w-full h-full object-cover" />
+                   : <Building2 size={14} strokeWidth={1.8} className="text-[#b08d57]/70" />
+                 }
+               </div>
+               <div className="flex flex-col min-w-0 flex-1">
+                 <span className="truncate text-[15px] leading-tight text-white/80">{entity.name}</span>
+                 <span className="text-[12px] text-white/40 capitalize leading-tight mt-1">
+                   {entity.type === "business" ? "Business" : entity.type === "organization" ? "Organization" : "Entity"} • {entity.role || "Admin"}
+                 </span>
+               </div>
+               <ChevronRight size={16} strokeWidth={2} className="text-white/10 shrink-0" />
+             </Link>
+          ))}
+        </div>
+      )}
 
-        {/* My Profile */}
-        <Link
-          href="/profile"
-          onClick={() => setIsMenuOpen(false)}
-          className="flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06] group"
-        >
-          <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-            <User size={15} strokeWidth={1.8} className="text-white/50" />
-          </div>
-          <span className="text-sm font-medium text-white/70 group-hover:text-white transition">My Profile</span>
-        </Link>
-
-        {/* Managed Entities */}
-        {managedEntities.map((entity) => (
-          <Link
-            key={entity.id}
-            href={`/profile/entities/${entity.id}`}
-            onClick={() => setIsMenuOpen(false)}
-            className="flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06] group"
-          >
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-              {entity.avatar_url
-                ? <img src={entity.avatar_url} alt={entity.name} className="w-full h-full object-cover" />
-                : <Building2 size={15} strokeWidth={1.8} className="text-white/50" />
-              }
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium text-white/70 group-hover:text-white transition truncate block">
-                {entity.name}
-              </span>
-              <span className="text-[10px] text-white/30 capitalize">{entity.type}</span>
-            </div>
-          </Link>
-        ))}
-
+      {/* ── 4. Utilities & Sign Out ───────────────────────────────────────────── */}
+      <div className="py-2 pb-6">
         {/* Language */}
         <button
           onClick={() => setShowLangPicker((v) => !v)}
-          className="w-full text-left flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06] group"
+          className="w-full text-left flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06]"
         >
-          <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-            <Globe size={15} strokeWidth={1.8} className="text-white/50" />
-          </div>
-          <span className="text-sm font-medium text-white/70 group-hover:text-white transition flex-1">Language</span>
-          <span className="text-[11px] font-semibold text-white/30 uppercase tracking-wider mr-1">
-            {lang === "sq" ? "SQ" : "EN"}
-          </span>
-          <ChevronDown
-            size={12} strokeWidth={2}
-            className="text-white/20 transition-transform shrink-0"
-            style={{ transform: showLangPicker ? "rotate(180deg)" : "rotate(0deg)" }}
-          />
+           <Globe size={15} strokeWidth={1.8} className="text-white/40 shrink-0" />
+           <span className="text-[15px] font-medium text-white/50 flex-1">Language</span>
+           <span className="text-[11px] font-semibold text-[#b08d57]/70 uppercase tracking-wider mr-1">
+             {lang === "sq" ? "SQ" : "EN"}
+           </span>
+           <ChevronDown
+             size={14} strokeWidth={2}
+             className="text-white/20 transition-transform shrink-0"
+             style={{ transform: showLangPicker ? "rotate(180deg)" : "rotate(0deg)" }}
+           />
         </button>
 
         {showLangPicker && (
-          <div className="mx-5 mb-1 rounded-xl border border-white/[0.07] overflow-hidden">
+          <div className="mx-5 mb-1 rounded-xl border border-white/[0.07] overflow-hidden bg-white/[0.02]">
             {(["en", "sq"] as const).map((code) => {
               const label = code === "en" ? "English" : "Shqip";
               const active = lang === code;
@@ -448,7 +533,7 @@ export default function Navbar() {
                 <button
                   key={code}
                   onClick={() => switchLang(code)}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm transition-colors ${
+                  className={`w-full flex items-center justify-between px-4 py-3 text-[14px] font-medium transition-colors ${
                     active
                       ? "text-[#b08d57] bg-[#b08d57]/[0.06]"
                       : "text-white/55 hover:bg-white/[0.04] hover:text-white"
@@ -466,28 +551,19 @@ export default function Navbar() {
         <Link
           href="/settings"
           onClick={() => setIsMenuOpen(false)}
-          className="flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.04] active:bg-white/[0.06] group"
+          className="flex items-center gap-4 px-5 py-3 text-[15px] font-medium text-white/50 active:bg-white/[0.06] transition"
         >
-          <div className="w-9 h-9 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
-            <Settings size={15} strokeWidth={1.8} className="text-white/50" />
-          </div>
-          <span className="text-sm font-medium text-white/70 group-hover:text-white transition">Settings</span>
+          <Settings size={15} strokeWidth={1.8} className="text-white/40 shrink-0" />
+          Settings
         </Link>
-      </div>
-
-      {/* ── Sign out ──────────────────────────────────────────────────────── */}
-      <div className="py-2">
         <button
-          onClick={signOut}
-          className="w-full text-left flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.03] active:bg-white/[0.05] group"
+          onClick={() => { signOut(); setIsMenuOpen(false); }}
+          className="w-full text-left flex items-center gap-4 px-5 py-3 text-[15px] font-medium text-white/30 hover:text-red-400 hover:bg-red-400/5 active:bg-red-400/10 transition group"
         >
-          <div className="w-9 h-9 rounded-full bg-white/[0.04] border border-white/[0.05] flex items-center justify-center shrink-0">
-            <LogOut size={15} strokeWidth={1.8} className="text-white/35 group-hover:text-red-400 transition" />
-          </div>
-          <span className="text-sm text-white/35 group-hover:text-red-400 transition">Sign out</span>
+          <LogOut size={15} strokeWidth={1.8} className="text-white/20 group-hover:text-red-400 transition-colors shrink-0" />
+          Sign out
         </button>
       </div>
-
     </div>
   ) : null;
 
@@ -563,37 +639,34 @@ export default function Navbar() {
 
           {/* Right: actions + avatar */}
           <div className="flex items-center gap-2">
-            <div
-              ref={networkMenuRef}
-              className="relative"
-              onMouseEnter={() => setShowCreateTip(true)}
-              onMouseLeave={() => setShowCreateTip(false)}
-            >
-              <button
-                onClick={handleComposeTap}
-                className={`rounded-full bg-[var(--accent)] text-black p-1.5 transition-all duration-300 hover:bg-[#F3E5AB] shadow-md shadow-[var(--accent)]/20 flex items-center justify-center ${
-                  showNetworkMenu ? "ring-2 ring-[#b08d57]/40" : ""
-                }`}
-                aria-label={createLabel}
+            {!pathname.match(/^\/messages\/[a-zA-Z0-9_\-]+$/) && (
+              <div
+                ref={networkMenuRef}
+                className="relative"
+                onMouseEnter={() => setShowCreateTip(true)}
+                onMouseLeave={() => setShowCreateTip(false)}
               >
-                {pathname.startsWith("/messages") ? (
-                  <MessageSquarePlus className="w-4 h-4" strokeWidth={2.5} />
-                ) : (
+                <button
+                  onClick={handleComposeTap}
+                  className={`rounded-full bg-[var(--accent)] text-black p-1.5 transition-all duration-300 hover:bg-[#F3E5AB] shadow-md shadow-[var(--accent)]/20 flex items-center justify-center ${
+                    showNetworkMenu ? "ring-2 ring-[#b08d57]/40" : ""
+                  }`}
+                  aria-label={createLabel}
+                >
                   <Plus className="w-4 h-4" strokeWidth={2.5} />
-                )}
-              </button>
+                </button>
 
-              {/* Hover tooltip — hidden while menu is open */}
-              <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 pointer-events-none transition-all duration-150 ${
-                showCreateTip && !showNetworkMenu ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
-              }`}>
-                <div className="whitespace-nowrap px-2.5 py-1 rounded-full bg-[#1a1a1a] border border-white/[0.10] text-[10px] font-semibold text-white/70 tracking-[0.06em] shadow-lg">
-                  {createLabel}
+                {/* Hover tooltip — hidden while menu is open */}
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 pointer-events-none transition-all duration-150 ${
+                  showCreateTip && !showNetworkMenu ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
+                }`}>
+                  <div className="whitespace-nowrap px-2.5 py-1 rounded-full bg-[#1a1a1a] border border-white/[0.10] text-[10px] font-semibold text-white/70 tracking-[0.06em] shadow-lg">
+                    {createLabel}
+                  </div>
                 </div>
-              </div>
 
-              {/* Add to Network dropdown — desktop only */}
-              {showNetworkMenu && (
+                {/* Add to Network dropdown — desktop only */}
+                {showNetworkMenu && (
                 <div className="absolute right-0 top-full mt-2.5 w-64 rounded-2xl border border-white/[0.09] bg-[#0d0d0d] shadow-2xl overflow-hidden z-[100]">
                   <div className="px-4 pt-3.5 pb-2">
                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">Add to Network</p>
@@ -619,6 +692,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            )}
 
             <button
               onClick={() => setIsSearchOpen(true)}
@@ -700,41 +774,39 @@ export default function Navbar() {
           </div>
 
           {/* Right: create + messages */}
-          <div className="relative shrink-0">
-            <button
-              onClick={handleComposeTap}
-              aria-label={createLabel}
-              className={`flex items-center justify-center p-1.5 rounded-full bg-[var(--accent)] text-black hover:bg-[#F3E5AB] shadow-lg shadow-[var(--accent)]/20 transition-all duration-300 ${
-                showNetworkMenu ? "ring-2 ring-[#b08d57]/40" : ""
-              }`}
-              onTouchStart={() => {
-                if (pathname.startsWith("/directory")) return;
-                longPressRef.current = setTimeout(() => setShowCreateTip(true), 400);
-              }}
-              onTouchEnd={() => {
-                if (longPressRef.current) clearTimeout(longPressRef.current);
-                setTimeout(() => setShowCreateTip(false), 1200);
-              }}
-              onTouchCancel={() => {
-                if (longPressRef.current) clearTimeout(longPressRef.current);
-                setShowCreateTip(false);
-              }}
-            >
-              {pathname.startsWith("/messages") ? (
-                <MessageSquarePlus size={20} strokeWidth={2.5} />
-              ) : (
+          {!pathname.match(/^\/messages\/[a-zA-Z0-9_\-]+$/) && (
+            <div className="relative shrink-0">
+              <button
+                onClick={handleComposeTap}
+                aria-label={createLabel}
+                className={`flex items-center justify-center p-1.5 rounded-full bg-[var(--accent)] text-black hover:bg-[#F3E5AB] shadow-lg shadow-[var(--accent)]/20 transition-all duration-300 ${
+                  showNetworkMenu ? "ring-2 ring-[#b08d57]/40" : ""
+                }`}
+                onTouchStart={() => {
+                  if (pathname.startsWith("/directory")) return;
+                  longPressRef.current = setTimeout(() => setShowCreateTip(true), 400);
+                }}
+                onTouchEnd={() => {
+                  if (longPressRef.current) clearTimeout(longPressRef.current);
+                  setTimeout(() => setShowCreateTip(false), 1200);
+                }}
+                onTouchCancel={() => {
+                  if (longPressRef.current) clearTimeout(longPressRef.current);
+                  setShowCreateTip(false);
+                }}
+              >
                 <Plus size={20} strokeWidth={2.5} />
-              )}
-            </button>
-            {/* Long-press tooltip — not shown on Directory (menu opens instead) */}
-            <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 pointer-events-none transition-all duration-150 z-10 ${
-              showCreateTip && !showNetworkMenu ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
-            }`}>
-              <div className="whitespace-nowrap px-2.5 py-1 rounded-full bg-[#1a1a1a] border border-white/[0.10] text-[10px] font-semibold text-white/70 tracking-[0.06em] shadow-lg">
-                {createLabel}
+              </button>
+              {/* Long-press tooltip — not shown on Directory (menu opens instead) */}
+              <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 pointer-events-none transition-all duration-150 z-10 ${
+                showCreateTip && !showNetworkMenu ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"
+              }`}>
+                <div className="whitespace-nowrap px-2.5 py-1 rounded-full bg-[#1a1a1a] border border-white/[0.10] text-[10px] font-semibold text-white/70 tracking-[0.06em] shadow-lg">
+                  {createLabel}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <Link
             href="/messages"
@@ -752,21 +824,34 @@ export default function Navbar() {
 
       {/* ── Mobile bottom sheet ───────────────────────────────────────────────── */}
       {isMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-[200]">
+        <div className="md:hidden fixed inset-0 z-[200] flex flex-col justify-end">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setIsMenuOpen(false)}
+            style={{ opacity: Math.max(0, 1 - dragY / 300) }}
           />
           {/* Sheet panel */}
-          <div className="absolute bottom-0 left-0 right-0 bg-[#0d0d0d] rounded-t-2xl border-t border-white/[0.09] shadow-2xl max-h-[85vh] overflow-y-auto">
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-1 sticky top-0 bg-[#0d0d0d]">
-              <div className="w-9 h-1 rounded-full bg-white/15" />
+          <div 
+            className="relative w-full bg-[#0d0d0d] rounded-t-[1.5rem] border-t border-white/[0.09] shadow-2xl h-[calc(100dvh-16px)] flex flex-col overflow-hidden will-change-transform"
+            style={{ 
+              transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+              transition: dragY > 0 ? "none" : "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)"
+            }}
+          >
+            {/* Drag handle & close mechanism */}
+            <div 
+              className="shrink-0 flex justify-center pt-4 pb-4 bg-[#0d0d0d] z-10 cursor-grab active:cursor-grabbing"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div className="w-12 h-1.5 rounded-full bg-white/20" />
             </div>
-            {mobileSheetContent}
-            {/* iOS safe area */}
-            <div className="h-8" />
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto w-full pb-12">
+              {mobileSheetContent}
+            </div>
           </div>
         </div>
       )}

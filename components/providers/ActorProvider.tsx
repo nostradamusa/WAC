@@ -9,6 +9,7 @@ export type ActorIdentity = {
   name: string;
   slug?: string;
   avatar_url?: string;
+  role?: string;
 };
 
 type ActorContextType = {
@@ -96,12 +97,14 @@ export function ActorProvider({ children }: { children: React.ReactNode }) {
           entities.push(...businessesRes.data.map((b) => ({
             id: b.id, type: "business" as const,
             name: b.name, slug: b.slug, avatar_url: b.logo_url || undefined,
+            role: roles.find(r => r.entity_id === b.id)?.role || "member"
           })));
         }
         if (orgsRes.data) {
           entities.push(...orgsRes.data.map((o) => ({
             id: o.id, type: "organization" as const,
             name: o.name, slug: o.slug, avatar_url: o.logo_url || undefined,
+            role: roles.find(r => r.entity_id === o.id)?.role || "member"
           })));
         }
       } else if (!roleMigrationReady) {
@@ -116,12 +119,14 @@ export function ActorProvider({ children }: { children: React.ReactNode }) {
           entities.push(...businessesRes.data.map((b) => ({
             id: b.id, type: "business" as const,
             name: b.name, slug: b.slug, avatar_url: b.logo_url || undefined,
+            role: "owner"
           })));
         }
         if (orgsRes.data) {
           entities.push(...orgsRes.data.map((o) => ({
             id: o.id, type: "organization" as const,
             name: o.name, slug: o.slug, avatar_url: o.logo_url || undefined,
+            role: "owner"
           })));
         }
       }

@@ -51,6 +51,7 @@ export default function ActiveChatPage({
   const [reactingTo, setReactingTo] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fullScreenMedia, setFullScreenMedia] = useState<{url: string, type: 'image' | 'video'} | null>(null);
+  const [playingVideos, setPlayingVideos] = useState<Record<string, boolean>>({});
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -125,7 +126,16 @@ export default function ActiveChatPage({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      
+      // 100 MB Limit
+      if (file.size > 100 * 1024 * 1024) {
+        alert("File size exceeds the 100MB limit. Please choose a smaller file.");
+        e.target.value = ""; // Reset the input
+        return;
+      }
+      
+      setSelectedFile(file);
     }
   };
 
@@ -205,17 +215,45 @@ export default function ActiveChatPage({
                     {/* Media Attachment */}
                     {msg.mediaUrl && (
                        <div 
-                          className="relative rounded-xl overflow-hidden cursor-zoom-in group/media max-h-[250px] bg-black/40 border border-white/5"
+                          className="relative rounded-xl overflow-hidden cursor-zoom-in group/media flex justify-center bg-transparent border border-white/5"
                           onClick={(e) => {
                              e.stopPropagation();
-                             setFullScreenMedia({ url: msg.mediaUrl!, type: msg.mediaType || 'image' });
+                             const video = e.currentTarget.querySelector('video');
+                             if (video && !video.paused) {
+                                video.pause();
+                             } else {
+                                setFullScreenMedia({ url: msg.mediaUrl!, type: msg.mediaType || 'image' });
+                             }
                           }}
                        >
                          <div className="absolute inset-0 bg-black/0 group-hover/media:bg-black/20 transition-colors pointer-events-none z-10" />
                          {msg.mediaType === 'video' ? (
-                            <video src={msg.mediaUrl} className="w-full h-full object-cover" />
+                            <>
+                              <video 
+                                src={msg.mediaUrl} 
+                                className="max-h-[350px] w-auto max-w-full object-contain rounded-xl" 
+                                muted playsInline preload="metadata" 
+                                onPlay={() => setPlayingVideos(prev => ({ ...prev, [msg.id]: true }))}
+                                onPause={() => setPlayingVideos(prev => ({ ...prev, [msg.id]: false }))}
+                                onEnded={() => setPlayingVideos(prev => ({ ...prev, [msg.id]: false }))}
+                              />
+                              {!playingVideos[msg.id] && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // prevent full screen on play
+                                    // play the previous sibling video
+                                    const videoElement = e.currentTarget.previousElementSibling as HTMLVideoElement;
+                                    if (videoElement && videoElement.play) videoElement.play();
+                                  }}
+                                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-black/60 shadow-2xl backdrop-blur-md flex items-center justify-center text-white/90 pb-[2px] pl-[4px] border border-white/25 hover:bg-black/80 hover:scale-105 transition-all z-20 hover:text-white"
+                                >
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                                </button>
+                              )}
+                            </>
                          ) : (
-                            <img src={msg.mediaUrl} alt="Attachment" className="w-full h-full object-cover" />
+                            <img src={msg.mediaUrl} alt="Attachment" className="max-h-[350px] w-auto max-w-full object-contain rounded-xl" />
                          )}
                        </div>
                     )}
@@ -235,7 +273,7 @@ export default function ActiveChatPage({
                   </div>
 
                   {/* Hover Actions (Desktop) or active state (Mobile) */}
-                  <div className={`opacity-0 md:group-hover:opacity-100 ${reactingTo === msg.id ? "opacity-100" : ""} transition-opacity flex items-center gap-1 relative z-20`}>
+                  <div className={`transition-opacity flex items-center gap-1 relative z-20 ${reactingTo === msg.id ? "opacity-100" : "opacity-40 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"}`}>
                      <button 
                        onClick={() => setReactingTo(reactingTo === msg.id ? null : msg.id)} 
                        className={`p-1.5 rounded-full transition-colors ${reactingTo === msg.id ? "text-white bg-white/10" : "text-white/40 hover:text-white hover:bg-white/10"}`}
@@ -261,16 +299,12 @@ export default function ActiveChatPage({
                 </div>
                 
                 {/* Time & Read Receipts Below */}
-                <span className={`text-[10px] mt-1.5 font-medium px-1 flex items-center gap-1 ${isMe ? "justify-end text-white/50" : "justify-start text-white/40"}`}>
-                  {msg.time}
-                  {isMe && msg.status && (
-                    <span className="flex items-center ml-0.5">
-                      {msg.status === 'sent' && <Check size={12} className="text-white/30" />}
-                      {msg.status === 'delivered' && <CheckCheck size={12} className="text-white/40" />}
-                      {msg.status === 'read' && <CheckCheck size={12} className="text-[#0ea5e9]" />}
-                    </span>
-                  )}
-                </span>
+                <div className={`text-[10px] mt-1.5 font-semibold px-1 flex items-center gap-1.5 tracking-wide ${isMe ? "justify-end text-white/40" : "justify-start text-white/30"}`}>
+                  {isMe && msg.status === 'read' && <span className="text-white/60">READ</span>}
+                  {isMe && msg.status === 'delivered' && <span className="text-white/50">DELIVERED</span>}
+                  {isMe && msg.status === 'sent' && <span className="text-white/50">SENT</span>}
+                  <span>{msg.time}</span>
+                </div>
               </div>
             );
           })}
@@ -278,15 +312,65 @@ export default function ActiveChatPage({
       </div>
 
       {/* ── Input Area ───────────────────────────────────────────────────────── */}
-      <div className="px-3 pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-5 pt-3 shrink-0 bg-[#0A0A0A]/95 backdrop-blur-md relative z-10 transition-all border-t border-white/[0.03]">
+      <div className="px-3 pb-4 md:pb-6 pt-2.5 shrink-0 bg-[#0A0A0A]/95 backdrop-blur-md relative z-10 transition-all border-t border-white/[0.03]">
          
          <div className="max-w-4xl mx-auto">
-
+         
+            {/* Media Preview Thumbnail */}
+            {selectedFile && (
+               <div className="mb-2.5 ml-11 md:ml-[3.25rem] relative inline-flex group animate-in slide-in-from-bottom-2 fade-in duration-200">
+                  <button 
+                     onClick={() => {
+                       setSelectedFile(null);
+                     }}
+                     className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center bg-[#252525] hover:bg-[#333] text-white rounded-full border border-white/10 z-20 shadow-xl opacity-100 transition-colors"
+                  >
+                     <X size={12} strokeWidth={3} />
+                  </button>
+                  <div 
+                     className="h-[96px] w-auto min-w-[64px] max-w-[140px] rounded-xl border border-white/10 bg-[#151515] overflow-hidden shadow-sm relative flex cursor-pointer"
+                     onClick={(e) => {
+                        const video = e.currentTarget.querySelector('video');
+                        if (video && !video.paused) video.pause();
+                     }}
+                  >
+                    {selectedFile.type.startsWith('video/') ? (
+                      <>
+                        <video 
+                           src={URL.createObjectURL(selectedFile)} 
+                           className="h-full w-auto object-cover" 
+                           preload="metadata" 
+                           loop muted playsInline 
+                           onPlay={() => setPlayingVideos(prev => ({ ...prev, 'preview': true }))}
+                           onPause={() => setPlayingVideos(prev => ({ ...prev, 'preview': false }))}
+                        />
+                        {!playingVideos['preview'] && (
+                           <button 
+                              type="button"
+                              onClick={(e) => {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 const video = e.currentTarget.previousElementSibling as HTMLVideoElement;
+                                 if (video && video.play) video.play();
+                              }}
+                              className="absolute inset-0 m-auto w-9 h-9 rounded-full bg-black/50 shadow-lg flex items-center justify-center text-white/90 pb-[1.5px] pl-[2px] backdrop-blur-sm border border-white/10 hover:bg-black/70 hover:scale-110 transition-all z-20 cursor-pointer"
+                           >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                           </button>
+                        )}
+                      </>
+                    ) : (
+                      <img src={URL.createObjectURL(selectedFile)} className="h-full w-auto object-cover" />
+                    )}
+                  </div>
+               </div>
+            )}
+            
             {/* Main Input Row */}
             <div className="flex items-end gap-2.5">
                {/* Paperclip */}
-               <label className="p-2.5 mb-1 text-white/40 hover:text-white cursor-pointer transition shrink-0 relative hover:bg-white/5 rounded-full">
-                  <input type="file" className="hidden" onChange={handleFileChange} />
+               <label className="p-2 mb-0.5 text-white/40 hover:text-white cursor-pointer transition shrink-0 relative hover:bg-white/5 rounded-full">
+                  <input type="file" accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
                   <Paperclip size={20} strokeWidth={2} />
                   {selectedFile && (
                     <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#b08d57] rounded-full border-2 border-[#0A0A0A]" />
@@ -300,7 +384,7 @@ export default function ActiveChatPage({
                      value={inputText}
                      onChange={(e) => setInputText(e.target.value)}
                      placeholder="Message..."
-                     className="w-full bg-transparent py-3 pl-4 pr-[44px] text-[14.5px] outline-none resize-none max-h-[120px] min-h-[44px] wac-scrollbar placeholder:text-white/30"
+                     className="w-full bg-transparent py-2.5 pl-4 pr-[44px] text-[14.5px] outline-none resize-none max-h-[120px] min-h-[40px] wac-scrollbar placeholder:text-white/30"
                      style={{ fieldSizing: "content" } as any}
                      onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -341,11 +425,11 @@ export default function ActiveChatPage({
                <button 
                   onClick={() => handleSend()}
                   disabled={!inputText.trim() && !selectedFile}
-                  className={`w-11 h-11 rounded-[18px] mb-0.5 shrink-0 flex items-center justify-center transition-all shadow-sm ${
+                  className={`w-10 h-10 rounded-[14px] mb-0.5 shrink-0 flex items-center justify-center transition-all shadow-sm ${
                      (inputText.trim() || selectedFile) ? "bg-[#b08d57] text-[#151311] hover:bg-[#9a7545] hover:scale-105" : "bg-[#1A1A1A] text-white/20 cursor-not-allowed border border-white/5"
                   }`}
                >
-                  <Send size={18} strokeWidth={2.5} className="ml-0.5" />
+                  <Send size={16} strokeWidth={2.5} className="ml-0.5" />
                </button>
             </div>
          </div>
@@ -362,7 +446,7 @@ export default function ActiveChatPage({
             </button>
             <div className="relative max-w-5xl max-h-[90vh] w-full h-full flex items-center justify-center pointer-events-auto" onClick={(e) => e.stopPropagation()}>
                {fullScreenMedia.type === 'video' ? (
-                  <video src={fullScreenMedia.url} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" controls autoPlay />
+                  <video src={fullScreenMedia.url} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" controls autoPlay playsInline preload="metadata" />
                ) : (
                   <img src={fullScreenMedia.url} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" alt="Full screen media" />
                )}

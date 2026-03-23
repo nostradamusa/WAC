@@ -23,7 +23,7 @@ const KIND_CONFIG: Record<
     avatarBg: "bg-white/[0.10]",
     avatarText: "text-white/60",
     bannerGradient: "from-slate-700/60 to-slate-800/50",
-    followColor: "border-[#b08d57]/40 text-[#b08d57] hover:bg-[#b08d57]/[0.08]",
+    followColor: "border-[#b08d57]/40 text-[#b08d57] hover:bg-[#b08d57]/10",
   },
   business: {
     Icon: Briefcase,
@@ -56,9 +56,7 @@ export type DirectoryCompactCardProps = {
   avatarUrl?: string | null;
   initials: string;
   entityKind: DirectoryRowKind;
-  /** Subtitle: role, profession, entity type */
   line2?: string;
-  /** Location or short descriptor */
   line3?: string;
   isVerified?: boolean;
 };
@@ -80,71 +78,72 @@ const DirectoryCompactCard = memo(function DirectoryCompactCard({
   return (
     <Link
       href={href}
-      className="wac-card group overflow-hidden p-0 flex flex-col relative active:scale-[0.98] transition-transform"
+      className="wac-card group overflow-hidden p-0 flex flex-col relative active:scale-[0.98] transition-transform min-h-[180px]"
     >
-      {/* ── Banner ─────────────────────────────────────────────────────── */}
-      <div className={`h-8 shrink-0 bg-gradient-to-br ${bannerGradient}`} />
+      {/* ── Taller Banner ──────────────────────────────────────────────── */}
+      <div className={`h-12 shrink-0 bg-gradient-to-br ${bannerGradient}`} />
 
-      {/* ── Avatar — bridges banner / body ─────────────────────────────── */}
-      <div className="absolute left-2.5 top-4 z-10">
+      {/* ── Larger Avatar ──────────────────────────────────────────────── */}
+      <div className="absolute left-3 top-6 z-10">
         {avatarUrl ? (
           <img
             src={avatarUrl}
             alt={name}
             loading="lazy"
-            className="w-9 h-9 rounded-full border-2 border-[var(--card)] object-cover shadow ring-1 ring-white/[0.10]"
+            className="w-11 h-11 rounded-full border-[2.5px] border-[var(--card)] object-cover shadow-md ring-1 ring-white/[0.08]"
           />
         ) : (
           <div
-            className={`w-9 h-9 rounded-full border-2 border-[var(--card)] ${avatarBg} flex items-center justify-center shadow ring-1 ring-white/[0.08]`}
+            className={`w-11 h-11 rounded-full border-[2.5px] border-[var(--card)] ${avatarBg} flex items-center justify-center shadow-md ring-1 ring-white/[0.08]`}
           >
             {initials ? (
-              <span className={`text-[10px] font-bold uppercase leading-none ${avatarText}`}>
+              <span className={`text-[11px] font-bold uppercase tracking-wider ${avatarText}`}>
                 {initials}
               </span>
             ) : (
-              <Icon size={13} className={avatarText} strokeWidth={1.5} />
+              <Icon size={14} className={avatarText} strokeWidth={2} />
             )}
           </div>
         )}
       </div>
 
-      {/* ── Body ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col px-2.5 pt-6 pb-2.5">
+      {/* ── Spaced Body ────────────────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col px-3 pt-7 pb-3.5">
 
-        {/* Name + verified */}
-        <div className="flex items-center gap-0.5 min-w-0 mb-px">
-          <span className="text-[11px] font-semibold text-white leading-tight truncate group-hover:text-white/90">
+        {/* Name + verified wraps smoothly instead of truncating immediately */}
+        <div className="flex items-start gap-1 justify-between min-w-0 mb-1.5">
+          <span className="text-xs font-bold text-white/90 leading-snug line-clamp-2 group-hover:text-white transition-colors">
             {name}
           </span>
-          {isVerified && <VerifiedBadge size="xs" className="shrink-0" />}
+          {isVerified && <VerifiedBadge size="sm" className="shrink-0 mt-[1px]" />}
         </div>
 
-        {/* Subtitle */}
+        {/* Subtitle / Role (Allowed to breathe 2 lines) */}
         {line2 && (
-          <p className="text-[10px] text-white/45 truncate leading-snug">{line2}</p>
+          <p className="text-[11px] font-medium text-white/50 line-clamp-2 leading-relaxed">
+            {line2}
+          </p>
         )}
 
-        {/* Location */}
+        <div className="flex-1 min-h-[12px]" />
+
+        {/* Location anchoring */}
         {line3 && (
-          <div className="flex items-center gap-0.5 mt-0.5">
-            <MapPin size={8} className="text-white/25 shrink-0" />
-            <p className="text-[10px] text-white/30 truncate leading-snug">{line3}</p>
+          <div className="flex items-center gap-1 mb-3">
+            <MapPin size={10} className="text-white/30 shrink-0" />
+            <p className="text-[10px] text-white/40 truncate font-medium">{line3}</p>
           </div>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1 min-h-2" />
-
-        {/* Follow button */}
+        {/* Chunkier Follow CTA */}
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          className={`mt-2 w-full flex items-center justify-center gap-1 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wide transition-colors ${followColor}`}
+          className={`mt-auto w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-widest transition-colors ${followColor}`}
         >
-          <UserPlus size={9} strokeWidth={2.5} />
+          <UserPlus size={12} strokeWidth={2.5} />
           Follow
         </button>
       </div>

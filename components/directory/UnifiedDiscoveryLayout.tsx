@@ -96,7 +96,7 @@ export default function UnifiedDiscoveryLayout({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 pb-32 md:pb-6 overscroll-contain">
               {filtersConfig}
             </div>
           </aside>

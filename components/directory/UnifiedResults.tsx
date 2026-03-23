@@ -198,7 +198,7 @@ export default function UnifiedResults({
       <div className="md:hidden">
         <CompactGrid items={people.map(personCompact)} />
       </div>
-      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
         {people.map((p) => <PersonCard key={p.id} person={p} />)}
       </div>
     </>
@@ -209,7 +209,7 @@ export default function UnifiedResults({
       <div className="md:hidden">
         <CompactGrid items={businesses.map(bizCompact)} />
       </div>
-      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
         {businesses.map((b) => <BusinessCard key={b.id} business={b} />)}
       </div>
     </>
@@ -220,7 +220,7 @@ export default function UnifiedResults({
       <div className="md:hidden">
         <CompactGrid items={organizations.map(orgCompact)} />
       </div>
-      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
         {organizations.map((o) => <OrganizationCard key={o.id} organization={o} />)}
       </div>
     </>
@@ -260,7 +260,7 @@ export default function UnifiedResults({
             ]} />
           </div>
           {/* Desktop: full entity cards */}
-          <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
             {topPeople.map((p) => <PersonCard key={p.id} person={p} />)}
             {topBiz.map((b)    => <BusinessCard key={b.id} business={b} />)}
             {topOrgs.map((o)   => <OrganizationCard key={o.id} organization={o} />)}
@@ -283,7 +283,7 @@ export default function UnifiedResults({
           <div className="md:hidden">
             <CompactGrid items={restPeople.map(personCompact)} />
           </div>
-          <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
             {restPeople.map((p) => <PersonCard key={p.id} person={p} />)}
           </div>
         </section>
@@ -300,7 +300,7 @@ export default function UnifiedResults({
           <div className="md:hidden">
             <CompactGrid items={restBiz.map(bizCompact)} />
           </div>
-          <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
             {restBiz.map((b) => <BusinessCard key={b.id} business={b} />)}
           </div>
         </section>
@@ -317,7 +317,7 @@ export default function UnifiedResults({
           <div className="md:hidden">
             <CompactGrid items={restOrgs.map(orgCompact)} />
           </div>
-          <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="hidden md:grid gap-5 md:grid-cols-1 lg:grid-cols-2">
             {restOrgs.map((o) => <OrganizationCard key={o.id} organization={o} />)}
           </div>
         </section>
