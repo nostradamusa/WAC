@@ -155,12 +155,12 @@ export default function PremiumSelect({
             className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] border border-white/10 bg-[#0d0b0a]/98 p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+          <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] border border-white/10 bg-[#0d0b0a]/98 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl">
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-white/12" />
             <div className="mb-3 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/35">
               Select an option
             </div>
-            <div id={panelId} role="listbox" className="max-h-[50vh] space-y-2 overflow-y-auto pb-3">
+            <div id={panelId} role="listbox" className="max-h-[50vh] space-y-2 overflow-y-auto pb-4">
               {options.map((option) => {
                 const active = option.value === value;
                 return (

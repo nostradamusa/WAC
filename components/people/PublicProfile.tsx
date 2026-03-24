@@ -223,8 +223,8 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
                      <Activity size={18} className="text-rose-400" strokeWidth={2} />
                    </div>
                    <div>
-                      <h2 className="font-serif text-[17px] font-normal text-white leading-none mb-1">
-                        The <span className="italic text-rose-400">Pulse</span>
+                      <h2 className="font-serif text-[22px] font-normal text-white leading-none mb-1">
+                        <span className="italic text-rose-400">Pulse</span>
                       </h2>
                       <p className="text-[12px] text-white/50 leading-none">
                          Recent social activity
@@ -430,7 +430,7 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
 
       {/* ── BOOKING MODAL (PRESERVED) ───────────────────────────────────────────── */}
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-sm p-4 pt-24 sm:pt-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/80 backdrop-blur-xl p-4 pt-24 sm:pt-4 animate-in fade-in duration-200">
           <div className="bg-[#111] border border-white/10 rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative">
             <button
               onClick={() => setIsBookingModalOpen(false)}

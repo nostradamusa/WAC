@@ -4,8 +4,6 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  Bookmark,
-  Share2,
   MapPin,
   Briefcase,
   UserPlus,
@@ -81,8 +79,6 @@ const BADGE_CONFIG = [
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function PersonCard({ person }: { person: DirectoryPerson }) {
-  const [isSaved,          setIsSaved]          = useState(false);
-  const [showToast,        setShowToast]        = useState(false);
   const [showAvatarModal,  setShowAvatarModal]  = useState(false);
 
   const displayName  = person.full_name || person.username || "Member";
@@ -93,43 +89,11 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
   const roots        = buildRoots(person);
   const badges       = BADGE_CONFIG.filter((b) => Boolean(person[b.key]));
 
-  function handleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsSaved((v) => !v);
-  }
-
-  function handleShare(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    navigator.clipboard.writeText(`${window.location.origin}${profileHref}`);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
-  }
-
   return (
     <article className="wac-card group overflow-hidden p-5 flex flex-col sm:flex-row items-start sm:items-stretch gap-5 relative hover:-translate-y-0.5 transition-transform min-h-[140px]">
       
       {/* ── Ambient Glow (Entity Differentiation) ── */}
       <div className="absolute top-0 left-0 w-[40%] h-[150%] bg-gradient-to-r from-[#b08d57]/[0.03] to-transparent pointer-events-none -translate-y-1/4" />
-
-      {/* ── Quiet Hover Utilities (Save/Share) ── */}
-      <div className="absolute top-4 right-4 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 z-20 bg-black/40 backdrop-blur-md rounded-full p-0.5 border border-white/5 shadow-xl">
-        <button
-          onClick={handleSave}
-          title={isSaved ? "Saved" : "Save"}
-          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <Bookmark size={13} className={isSaved ? "fill-[#b08d57] text-[#b08d57]" : ""} />
-        </button>
-        <button
-          onClick={handleShare}
-          title="Share"
-          className="p-1.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          <Share2 size={13} />
-        </button>
-      </div>
 
       {/* ── Zone 1: Identity ────────────────────────────────────────────── */}
       <div className="shrink-0 pt-0.5 relative z-10 w-16">
@@ -221,11 +185,11 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
               followingType="person" 
               followingId={person.id} 
               size="sm" 
-              className="h-[32px] w-[96px] justify-center !px-0 shrink-0 shadow-sm" 
+              className="min-w-[124px] h-[34px] justify-center !px-4 shrink-0 shadow-sm !text-[11px] !font-medium tracking-wide" 
             />
             <Link
               href={profileHref}
-              className="h-[32px] w-[96px] flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/5 text-xs font-semibold text-white tracking-wide transition-colors shrink-0 shadow-sm"
+              className="min-w-[124px] h-[34px] flex items-center justify-center rounded-full bg-white/[0.04] hover:bg-white/10 border border-white/5 text-[11px] font-medium text-white tracking-wide transition-colors shrink-0 shadow-sm px-4"
             >
               View Profile
             </Link>
@@ -235,19 +199,11 @@ export default function PersonCard({ person }: { person: DirectoryPerson }) {
         )}
       </div>
 
-      {/* Toast */}
-      {/* ... (toast and modal unchanged) ... */}
-      <div
-        className={`absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#b08d57] text-black px-4 py-1.5 rounded-full font-bold text-xs shadow-lg transition-all duration-300 z-30 ${
-          showToast ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"
-        }`}
-      >
-        Link copied!
-      </div>
+      {/* Toast removed */}
 
       {showAvatarModal && person.avatar_url && createPortal(
         <div
-          className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 cursor-pointer animate-in fade-in duration-150"
+          className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-xl flex items-center justify-center p-8 cursor-pointer animate-in fade-in duration-150"
           onClick={() => setShowAvatarModal(false)}
         >
           <div className="relative max-w-[280px] w-full space-y-3" onClick={(e) => e.stopPropagation()}>

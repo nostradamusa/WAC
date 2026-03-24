@@ -7,42 +7,26 @@ export const metadata: Metadata = {
   description: "What the Albanian world is talking about.",
 };
 
-export default function CommunityPage() {
+export default function PulsePage() {
   return (
-    /*
-      Mobile: no pt-14 here — navbar clearance is handled inside
-      CommunityHub's scroll content (pt-14 on the inner wrapper).
-      This prevents any layout shift when the navbar hides/shows,
-      because nothing about this outer container needs to change.
+    <div className="w-full min-h-screen bg-[var(--background)]">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
+        
+        {/* ── Page Shell Header ────────────────────────────────────────────── */}
+        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
+          <span className="italic font-light opacity-90 text-rose-400">Pulse</span>
+        </h1>
+        
+        <p className="mt-2 text-sm text-white/50">
+          What the Albanian world is talking about
+        </p>
 
-      Desktop: pt-14 stays, so the sticky Pulse header can sit at top-14.
-    */
-    <main className="min-h-screen flex flex-col pt-14 bg-[var(--background)]">
-
-      {/*
-        Sticky page identity header — desktop only.
-        Height ~76px (py-5 + content). CommunityHub accounts for this
-        in its desktop height calc: h-[calc(100vh-8.25rem)].
-      */}
-      <div className="hidden md:block sticky top-14 z-40 bg-[var(--background)]/95 backdrop-blur-md border-b border-white/[0.07]">
-        <div className="max-w-[80rem] mx-auto px-4 sm:px-6 py-5 flex items-center gap-3">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-rose-500/[0.08] border border-rose-500/[0.15] shrink-0">
-            <Activity size={16} className="text-rose-400" strokeWidth={2} />
-          </div>
-          <div>
-            <h1 className="font-serif text-[15px] font-normal text-white leading-none mb-0.5">
-              The{" "}
-              <span className="italic text-rose-400">Pulse</span>
-            </h1>
-            <p className="text-[10px] text-white/35 leading-none">
-              What the Albanian world is talking about
-            </p>
-          </div>
+        {/* ── Page Content ─────────────────────────────────────────────────── */}
+        <div className="mt-4">
+          <CommunityHub />
         </div>
+        
       </div>
-
-      <CommunityHub />
-
-    </main>
+    </div>
   );
 }

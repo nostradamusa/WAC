@@ -148,7 +148,7 @@ export default function OrgSearchCombobox({ value, onChange }: OrgSearchCombobox
         {/* Right slot: spinner or clear */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           {loading ? (
-            <div className="w-3.5 h-3.5 border border-white/20 border-t-white/50 rounded-full animate-spin" />
+            <div className="w-3.5 h-3.5 border border-[var(--accent)]/20 border-t-transparent rounded-full animate-spin" />
           ) : query ? (
             <button
               type="button"

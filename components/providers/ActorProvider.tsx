@@ -149,11 +149,14 @@ export function ActorProvider({ children }: { children: React.ReactNode }) {
           const match = all.find((e) => e.id === savedActorId);
           if (match) {
             setCurrentActor(match);
+            localStorage.setItem("wac_active_actor", JSON.stringify(match));
           } else {
             setCurrentActor(personActor);
+            localStorage.setItem("wac_active_actor", JSON.stringify(personActor));
           }
         } else {
           setCurrentActor(personActor);
+          localStorage.setItem("wac_active_actor", JSON.stringify(personActor));
         }
         setIsLoading(false);
       }
@@ -170,20 +173,42 @@ export function ActorProvider({ children }: { children: React.ReactNode }) {
         setCurrentActor(null);
         setAllIdentities([]);
         localStorage.removeItem("wac_active_actor_id");
+        localStorage.removeItem("wac_active_actor");
       } else if (event === "SIGNED_IN") {
         loadIdentity();
       }
     });
 
+    // Cross-tab synchronization
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "wac_active_actor_id" && e.newValue) {
+        setAllIdentities(prev => {
+          const match = prev.find(actor => actor.id === e.newValue);
+          if (match) {
+            setCurrentActor(match);
+            // We do NOT write to localStorage here to avoid loops
+          }
+          return prev;
+        });
+      } else if (e.key === "wac_active_actor" && !e.newValue) {
+        // Logged out in another tab
+        setCurrentActor(null);
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
   const handleSetActor = (actor: ActorIdentity) => {
     setCurrentActor(actor);
     localStorage.setItem("wac_active_actor_id", actor.id);
+    localStorage.setItem("wac_active_actor", JSON.stringify(actor));
   };
 
   return (

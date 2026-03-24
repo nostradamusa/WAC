@@ -78,7 +78,7 @@ export default function NewMessageFAB() {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-200">
           <div className="bg-[#1a1a1a] border border-[var(--border)] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 h-[600px] max-h-[90vh]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
               <h2 className="text-xl font-bold font-serif tracking-tight">New Message</h2>
@@ -103,7 +103,7 @@ export default function NewMessageFAB() {
 
             <div className="flex-1 overflow-y-auto wac-scrollbar">
                {isSearching ? (
-                 <div className="p-8 flex justify-center"><Loader2 className="animate-spin opacity-50" size={24} /></div>
+                 <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-[var(--accent)] opacity-50" size={24} /></div>
                ) : searchQuery.length < 2 ? (
                  <div className="p-8 text-center text-white/50 text-sm">
                    Type at least 2 characters to search...

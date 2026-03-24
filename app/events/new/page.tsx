@@ -12,6 +12,7 @@ import {
   Globe,
   Clock,
   Link2,
+  Loader2,
   RotateCcw,
   UserPlus,
   ChevronDown,
@@ -23,8 +24,11 @@ import {
   Calendar,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { toast } from "react-hot-toast";
 import { useActor } from "@/components/providers/ActorProvider";
 import PremiumSelect from "@/components/ui/PremiumSelect";
+import WacDatePicker from "@/components/ui/WacDatePicker";
+import WacTimePicker from "@/components/ui/WacTimePicker";
 import { getEntitiesDirectory, getPeopleDirectory } from "@/lib/services/searchService";
 import type { EventEntitySnapshot, EventHostingMetadata, EventPersonSnapshot } from "@/lib/events/hosting";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
@@ -288,6 +292,29 @@ function CoverImageArea({
 }: {
   value: string | null; onChange: (v: string | null) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const ext  = file.name.split(".").pop() ?? "jpg";
+      const path = `event-covers/${user?.id ?? "anon"}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("feed_media").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from("feed_media").getPublicUrl(path);
+      onChange(urlData.publicUrl);
+    } catch (err) {
+      console.error("Cover upload failed:", err);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
   if (value) {
     return (
       <div className="relative w-full rounded-2xl overflow-hidden" style={{ height: 200 }}>
@@ -301,19 +328,35 @@ function CoverImageArea({
       </div>
     );
   }
+
   return (
-    <div
-      className="w-full rounded-2xl border border-white/[0.07] flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-teal-400/15 hover:bg-white/[0.015] transition-colors group"
-      style={{ height: 160 }}
-    >
-      <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:bg-teal-500/[0.08] group-hover:border-teal-400/15 transition-colors">
-        <Camera size={16} className="text-white/25 group-hover:text-teal-400/50 transition-colors" />
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFile}
+      />
+      <div
+        onClick={() => !uploading && inputRef.current?.click()}
+        className="w-full rounded-2xl border border-white/[0.07] flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-teal-400/15 hover:bg-white/[0.015] transition-colors group"
+        style={{ height: 160 }}
+      >
+        <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center group-hover:bg-teal-500/[0.08] group-hover:border-teal-400/15 transition-colors">
+          {uploading
+            ? <Loader2 size={16} className="text-[var(--accent)] animate-spin" />
+            : <Camera size={16} className="text-white/25 group-hover:text-teal-400/50 transition-colors" />
+          }
+        </div>
+        <div className="text-center">
+          <div className="text-xs font-medium text-white/30 group-hover:text-white/45 transition-colors">
+            {uploading ? "Uploading…" : "Add cover photo"}
+          </div>
+          {!uploading && <div className="text-[10px] text-white/18 mt-0.5">Recommended: 1600 × 900px</div>}
+        </div>
       </div>
-      <div className="text-center">
-        <div className="text-xs font-medium text-white/30 group-hover:text-white/45 transition-colors">Add cover photo</div>
-        <div className="text-[10px] text-white/18 mt-0.5">Recommended: 1600 × 900px</div>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -532,7 +575,7 @@ function PersonDirectorySinglePicker({
             placeholder={placeholder}
             className="w-full rounded-xl border border-white/[0.09] bg-white/[0.04] px-3.5 py-2.5 text-sm text-white/65 outline-none transition-colors placeholder:text-white/22 focus:border-teal-400/25"
           />
-          {loading ? <div className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-white/20 border-t-white/50 animate-spin" /> : null}
+          {loading ? <div className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-[var(--accent)]/20 border-t-transparent animate-spin" /> : null}
           {open ? (
             <div className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-white/[0.10] bg-[#161616] shadow-2xl">
               {results.length === 0 ? (
@@ -657,7 +700,7 @@ function PersonDirectoryMultiPicker({
             placeholder={placeholder}
             className="w-full rounded-xl border border-white/[0.09] bg-white/[0.04] px-3.5 py-2.5 text-sm text-white/65 outline-none transition-colors placeholder:text-white/22 focus:border-teal-400/25"
           />
-          {loading ? <div className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-white/20 border-t-white/50 animate-spin" /> : null}
+          {loading ? <div className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border border-[var(--accent)]/20 border-t-transparent animate-spin" /> : null}
           {open ? (
             <div className="absolute left-0 right-0 top-full z-40 mt-1.5 overflow-hidden rounded-xl border border-white/[0.10] bg-[#161616] shadow-2xl">
               {results.length === 0 ? (
@@ -1217,8 +1260,10 @@ export default function CreateEventPage() {
   const [eventReminder,   setEventReminder]   = useState("1hr");
   const [postEventFollowup, setPostEventFollowup] = useState(false);
   const [isSubmitting,    setIsSubmitting]    = useState(false);
-  const [notice,          setNotice]          = useState<string | null>(null);
   const [error,           setError]           = useState<string | null>(null);
+  const [notice,          setNotice]          = useState<string | null>(null);
+  
+  
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1558,17 +1603,17 @@ export default function CreateEventPage() {
 
   async function handlePublish() {
     if (!title.trim()) {
-      setError("An event title is required.");
+      toast.error("An event title is required.");
       return;
     }
 
     if (hostAs !== "me" && !selectedHostEntity) {
-      setError("Choose the organization, business, or group that is hosting this event.");
+      toast.error("Choose the organization, business, or group that is hosting this event.");
       return;
     }
 
     if (hostAs !== "me" && !selectedHostRepresentative) {
-      setError("Choose the WAC person who represents the hosting entity.");
+      toast.error("Choose the WAC person who represents the hosting entity.");
       return;
     }
 
@@ -1577,13 +1622,13 @@ export default function CreateEventPage() {
       selectedHostEntity &&
       !managedEntityOptions.some((entity) => entity.id === selectedHostEntity.id && entity.type === selectedHostEntity.type)
     ) {
-      setError("You can only host as an organization or business when you have a role above Member on WAC.");
+      toast.error("You can only host as an organization or business when you have a role above Member on WAC.");
       return;
     }
 
     const start = new Date(`${startDate}T${allDay ? "00:00" : startTime}:00`);
     if (Number.isNaN(start.getTime())) {
-      setError("Please choose a valid start date and time.");
+      toast.error("Please choose a valid start date and time.");
       return;
     }
 
@@ -1707,7 +1752,7 @@ export default function CreateEventPage() {
       router.push("/events");
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to publish event.");
+      toast.error(err instanceof Error ? err.message : "Failed to publish event.");
       setIsSubmitting(false);
     }
   }
@@ -1826,35 +1871,17 @@ export default function CreateEventPage() {
                   <FieldLabel>Start</FieldLabel>
                   <div className="mb-4 flex w-full max-w-[46rem] flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      {isMobileViewport ? (
-                        <MobileDateField
-                          label="Start"
-                          value={startDate}
-                          onChange={setStartDate}
-                        />
-                      ) : (
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className={dateInputCls}
-                        />
-                      )}
+                      <WacDatePicker
+                        value={startDate}
+                        onChange={setStartDate}
+                      />
                     </div>
                     {!allDay && (
-                      <div className="flex shrink-0 items-center">
-                        {isMobileViewport ? (
-                          <MobileTimeField
-                            label="Start"
-                            value={startTime}
-                            onChange={setStartTime}
-                          />
-                        ) : (
-                          <TimePicker
-                            value={startTime}
-                            onChange={setStartTime}
-                          />
-                        )}
+                      <div className="flex shrink-0 items-center w-full sm:w-auto sm:min-w-[140px]">
+                        <WacTimePicker
+                          value={startTime}
+                          onChange={setStartTime}
+                        />
                       </div>
                     )}
                   </div>
@@ -1862,35 +1889,17 @@ export default function CreateEventPage() {
                   <FieldLabel>End</FieldLabel>
                   <div className="mb-4 flex w-full max-w-[46rem] flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="min-w-0 flex-1">
-                      {isMobileViewport ? (
-                        <MobileDateField
-                          label="End"
-                          value={endDate}
-                          onChange={setEndDate}
-                        />
-                      ) : (
-                        <input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className={dateInputCls}
-                        />
-                      )}
+                      <WacDatePicker
+                        value={endDate}
+                        onChange={setEndDate}
+                      />
                     </div>
                     {!allDay && (
-                      <div className="flex shrink-0 items-center">
-                        {isMobileViewport ? (
-                          <MobileTimeField
-                            label="End"
-                            value={endTime}
-                            onChange={setEndTime}
-                          />
-                        ) : (
-                          <TimePicker
-                            value={endTime}
-                            onChange={setEndTime}
-                          />
-                        )}
+                      <div className="flex shrink-0 items-center w-full sm:w-auto sm:min-w-[140px]">
+                        <WacTimePicker
+                          value={endTime}
+                          onChange={setEndTime}
+                        />
                       </div>
                     )}
                   </div>

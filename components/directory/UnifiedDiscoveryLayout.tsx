@@ -75,7 +75,7 @@ export default function UnifiedDiscoveryLayout({
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] animate-in fade-in duration-300"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xl z-[100] animate-in fade-in duration-300"
             onClick={() => setIsFiltersOpen(false)}
           />
 

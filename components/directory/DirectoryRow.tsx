@@ -97,8 +97,8 @@ const DirectoryRow = memo(function DirectoryRow({
 
       {/* Text block */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1 min-w-0">
-          <span className="text-sm font-semibold text-white leading-tight truncate group-hover:text-white/90">
+        <div className="flex items-center justify-start gap-1.5 min-w-0">
+          <span className="text-sm font-semibold text-white leading-tight truncate group-hover:text-white/90" title={name}>
             {name}
           </span>
           {isVerified && <VerifiedBadge size="xs" className="shrink-0" />}

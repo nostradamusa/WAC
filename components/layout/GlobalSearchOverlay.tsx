@@ -252,7 +252,7 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 flex items-start justify-center pt-0 md:pt-[72px] p-0 md:px-4">
+    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xl animate-in fade-in duration-200 flex items-start justify-center pt-0 md:pt-[72px] p-0 md:px-4">
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* ─── MOBILE: full-screen sheet ─── */}
@@ -288,7 +288,20 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                   </div>
                 </button>
               )) : (
-                <div className="p-8 text-center text-white/50 text-sm">No results found for &quot;{query}&quot;</div>
+                <div className="flex flex-col items-center justify-center py-16 text-center space-y-4">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute inset-0 bg-[#b08d57]/20 blur-lg rounded-full" />
+                    <div className="relative w-14 h-14 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-sm backdrop-blur-xl">
+                      <Search className="w-6 h-6 text-[#b08d57]/70" strokeWidth={1.5} />
+                    </div>
+                  </div>
+                  <div className="space-y-1 max-w-[240px] px-4">
+                    <h4 className="text-white/90 font-medium text-[14px] tracking-wide">No results found</h4>
+                    <p className="text-[12px] text-white/40 leading-relaxed text-balance">
+                      No matches for <span className="text-white/70 font-medium">&quot;{query}&quot;</span>.
+                    </p>
+                  </div>
+                </div>
               )}
               <button onClick={() => submitSearch()} className="p-4 text-center text-[var(--accent)] font-semibold text-sm hover:bg-white/5 transition">
                 See all results for &quot;{query}&quot;
@@ -441,7 +454,20 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
                   </div>
                 </button>
               )) : (
-                <div className="py-12 text-center text-white/40 text-sm">No results for &quot;{query}&quot;</div>
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-5">
+                  <div className="relative flex items-center justify-center">
+                    <div className="absolute inset-0 bg-[#b08d57]/20 blur-xl rounded-full" />
+                    <div className="relative w-16 h-16 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-lg backdrop-blur-xl">
+                      <Search className="w-7 h-7 text-[#b08d57]/70" strokeWidth={1.5} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 max-w-[280px]">
+                    <h4 className="text-white/90 font-medium text-[15px] tracking-wide">No results found</h4>
+                    <p className="text-[13px] text-white/40 leading-relaxed text-balance">
+                      We couldn&apos;t find anything matching <span className="text-white/70 font-medium">&quot;{query}&quot;</span>. Try adjusting your search terms or exploring the directory.
+                    </p>
+                  </div>
+                </div>
               )}
               <div className="px-5 py-3 border-t border-white/[0.06] mt-1">
                 <button onClick={() => submitSearch()} className="text-[#b08d57] text-sm font-medium hover:underline">

@@ -71,7 +71,7 @@ export function ReactionIcon({ type, size = 16, className = "", active = false, 
       {/* LinkedIn-style Gorgeous Tooltip */}
       {showTooltip && (
         <div 
-          className="absolute -top-[1.75rem] left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md border border-white/10 text-white text-[10px] font-bold px-2 py-1 rounded-full opacity-0 group-hover/reaction:opacity-100 transition-all duration-200 delay-100 scale-75 group-hover/reaction:scale-100 whitespace-nowrap pointer-events-none shadow-xl z-50 flex items-center justify-center pt-1.5"
+          className="absolute -top-[1.75rem] left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-xl border border-white/10 text-white text-[10px] font-bold px-2 py-1 rounded-full opacity-0 group-hover/reaction:opacity-100 transition-all duration-200 delay-100 scale-75 group-hover/reaction:scale-100 whitespace-nowrap pointer-events-none shadow-xl z-50 flex items-center justify-center pt-1.5"
           style={{ fontSize: '0.6rem' }}
         >
            {title || label}

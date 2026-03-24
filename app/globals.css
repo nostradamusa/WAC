@@ -575,3 +575,19 @@ body {
 .wac-btn-sm { padding: 0.375rem 1rem;   } /* px-4 py-1.5 */
 .wac-btn-md { padding: 0.5rem 1.25rem;  } /* px-5 py-2   */
 .wac-btn-lg { padding: 0.625rem 1.5rem; } /* px-6 py-2.5 */
+
+.wac-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.wac-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+.wac-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(176, 141, 87, 0.25);
+  border-radius: 10px;
+}
+.wac-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(176, 141, 87, 0.5);
+}

@@ -190,7 +190,7 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
           {/* Close */}
           <button
             onClick={onClose}
-            className="ml-auto w-9 h-9 rounded-full bg-black/40 border border-white/10 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition"
+            className="ml-auto w-9 h-9 rounded-full bg-black/40 border border-white/10 backdrop-blur-xl flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition"
           >
             <X size={16} />
           </button>
@@ -256,13 +256,13 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
                     onClose();
                     router.push(path);
                   }}
-                  className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold shadow-lg shrink-0 pointer-events-auto hover:bg-white/30 hover:scale-105 active:scale-95 transition-all"
+                  className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-xl border border-white/30 text-white text-xs font-semibold shadow-lg shrink-0 pointer-events-auto hover:bg-white/30 hover:scale-105 active:scale-95 transition-all"
                 >
                   @{m.name}
                 </button>
               ))}
               {current.location && (
-                <div className="px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white text-xs font-medium shadow-lg shrink-0 pointer-events-auto cursor-pointer hover:bg-black/60 transition flex items-center gap-1.5">
+                <div className="px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-xl border border-white/20 text-white text-xs font-medium shadow-lg shrink-0 pointer-events-auto cursor-pointer hover:bg-black/60 transition flex items-center gap-1.5">
                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                   {current.location}
                 </div>
@@ -277,7 +277,7 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
           {/* Expanded viewer list (Author only) */}
           {isAuthor && showViewers && (
             <div
-              className="bg-[#111]/96 backdrop-blur-md border-t border-white/[0.08] px-5 pt-4 pb-6 max-h-[52%] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200"
+              className="bg-[#111]/96 backdrop-blur-xl border-t border-white/[0.08] px-5 pt-4 pb-6 max-h-[52%] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
@@ -332,7 +332,7 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={(e) => e.stopPropagation()}
-                className="flex items-center gap-2 bg-black/45 backdrop-blur-sm border border-white/[0.12] px-3.5 py-2 rounded-full hover:bg-black/60 transition"
+                className="flex items-center gap-2 bg-black/45 backdrop-blur-xl border border-white/[0.12] px-3.5 py-2 rounded-full hover:bg-black/60 transition"
               >
                 {totalViews > 0 && (
                   <div className="flex -space-x-1.5 shrink-0">

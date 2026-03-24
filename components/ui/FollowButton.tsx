@@ -60,11 +60,11 @@ export default function FollowButton({ followingType, followingId, size = "md", 
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all disabled:opacity-50 ${
           isFollowing
             ? "bg-[var(--accent)]/10 border-[var(--accent)]/30 text-[var(--accent)]"
-            : "border-white/20 text-white/55 hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
+            : "border-[var(--accent)]/20 text-white/55 hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
         } ${className ?? ""}`}
       >
         {isLoading
-          ? <Loader2 size={11} className="animate-spin" />
+          ? <Loader2 size={11} className="animate-spin text-[var(--accent)]" />
           : isFollowing
             ? <UserCheck size={11} />
             : <UserPlus size={11} />
@@ -81,11 +81,11 @@ export default function FollowButton({ followingType, followingId, size = "md", 
       className={`inline-flex items-center justify-center gap-2 w-full min-h-11 rounded-full px-5 py-3 text-sm font-semibold border transition-all disabled:opacity-50 ${
         isFollowing
           ? "bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--accent)]"
-          : "border-white/20 text-white/55 hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-white/5"
+          : "border-[var(--accent)]/20 text-white/55 hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-white/5"
       } ${className ?? ""}`}
     >
       {isLoading
-        ? <Loader2 size={15} className="animate-spin" />
+        ? <Loader2 size={15} className="animate-spin text-[var(--accent)]" />
         : isFollowing
           ? <UserCheck size={15} />
           : <UserPlus size={15} />

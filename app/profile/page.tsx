@@ -9,6 +9,8 @@ import ProfileSkillsSection from "@/components/profile/ProfileSkillsSection";
 import ProfileCard from "@/components/profile/ProfileCard";
 import ManagedEntitiesTab from "@/components/profile/ManagedEntitiesTab";
 import WacSelect from "@/components/ui/WacSelect";
+import WacToggle from "@/components/ui/WacToggle";
+import WacDatePicker from "@/components/ui/WacDatePicker";
 import Link from "next/link";
 import { MapPin, Briefcase, Calendar, Shield, Save, CheckCircle, ExternalLink, User, UserCircle, Target, Award, Activity } from "lucide-react";
 import { useScrollDirection } from "@/lib/hooks/useScrollDirection";
@@ -79,6 +81,7 @@ export default function ProfilePage() {
 
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [currentCompany, setCurrentCompany] = useState("");
   const [currentTitle, setCurrentTitle] = useState("");
@@ -116,7 +119,7 @@ export default function ProfilePage() {
           .select(`
             full_name, username, headline, tagline, avatar_url, country, state, city, ancestry_city,
             street_address, address_line_2, zip_code, map_visibility, date_of_birth, gender, birthday_visibility,
-            bio, industry_id, profession_id, specialty_id, open_to_work, open_to_hire, open_to_mentor, open_to_invest, open_to_collaborate
+            bio, industry_id, profession_id, specialty_id, open_to_work, open_to_hire, open_to_mentor, open_to_invest, open_to_collaborate, is_admin
           `)
           .eq("id", uid)
           .single(),
@@ -167,6 +170,8 @@ export default function ProfilePage() {
         setOpenToMentor(p.open_to_mentor ?? false);
         setOpenToInvest(p.open_to_invest ?? false);
         setOpenToCollaborate(p.open_to_collaborate ?? false);
+        
+        setIsAdmin(p.is_admin ?? false);
       }
 
       if (!profileSkillsRes.error) setSelectedSkillIds((profileSkillsRes.data ?? []).map((r) => r.skill_id));
@@ -579,7 +584,10 @@ export default function ProfilePage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div id="profile-field-dateOfBirth">
                            <label className="block text-sm font-bold text-white/90 mb-2.5">Date of Birth</label>
-                           <input id="date-of-birth" name="date-of-birth" type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm focus:border-[var(--accent)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--accent)] [color-scheme:dark]" />
+                           <WacDatePicker
+                              value={dateOfBirth}
+                              onChange={setDateOfBirth}
+                           />
                            
                            <div id="profile-field-birthdayVisibility" className="mt-6">
                               <label className="block text-xs font-bold text-white/60 mb-2 uppercase tracking-wide">Birthday Privacy</label>
@@ -627,11 +635,8 @@ export default function ProfilePage() {
                         { id: "openToCollaborate", label: "Collaborating", state: openToCollaborate, set: setOpenToCollaborate },
                      ].map((intent) => (
                         <label key={intent.id} className="flex items-center gap-3 p-4 rounded-xl border border-white/10 bg-white/5 cursor-pointer hover:bg-white/10 transition">
-                           <div className={`w-11 h-6 shrink-0 rounded-full flex items-center p-1 transition-colors ${intent.state ? 'bg-emerald-500' : 'bg-white/20'}`}>
-                              <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${intent.state ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                           </div>
+                           <WacToggle checked={intent.state} onChange={intent.set} />
                            <span className="font-bold text-sm select-none">{intent.label}</span>
-                           <input id={`intent-${intent.id}`} name={`intent-${intent.id}`} type="checkbox" checked={intent.state} onChange={(e) => intent.set(e.target.checked)} className="hidden" />
                         </label>
                      ))}
                   </div>
@@ -690,8 +695,29 @@ export default function ProfilePage() {
       {activeTab === "entities" && <ManagedEntitiesTab userId={userId!} />}
       
       {activeTab === "settings" && (
-        <div className="wac-card p-6 md:p-8 flex items-center justify-center text-center opacity-70 min-h-[300px]">
-           Account Settings coming soon...
+        <div className="grid gap-6">
+          {isAdmin && (
+            <div className="wac-card p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-rose-500/20 bg-rose-500/5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none"></div>
+              <div className="flex items-center gap-4 relative z-10 w-full md:w-auto">
+                <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0">
+                  <Shield size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-1">Admin Operations Hub</h3>
+                  <p className="text-sm text-white/50">Private Beta tracking, metric analytics, and active support issues.</p>
+                </div>
+              </div>
+              <Link href="/admin" className="relative z-10 w-full sm:w-auto px-6 py-2.5 bg-rose-500 text-white font-bold rounded-xl text-sm transition hover:bg-rose-400 whitespace-nowrap text-center shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:shadow-[0_0_30px_rgba(244,63,94,0.5)]">
+                Launch Operations
+              </Link>
+            </div>
+          )}
+
+          <div className="wac-card p-6 md:p-8 flex flex-col items-center justify-center text-center opacity-70 min-h-[250px]">
+             <p className="text-white/80 font-bold mb-2">Standard Account Settings</p>
+             <p className="text-white/40 text-sm max-w-sm">Manage notifications, billing, and linked accounts. Coming soon in future updates.</p>
+          </div>
         </div>
       )}
     </div>

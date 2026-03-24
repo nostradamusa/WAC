@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Bell, EyeOff, UserX, SwitchCamera } from "lucide-react";
+import { ArrowLeft, Bell, EyeOff, UserX, SwitchCamera, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import WacToggle from "@/components/ui/WacToggle";
 
 export default function MessageSettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -66,18 +67,46 @@ export default function MessageSettingsPage() {
   return (
     <div className="h-full w-full overflow-y-auto wac-scrollbar bg-[#050505] text-white selection:bg-[#b08d57]/30">
       
-      {/* ── HEADER ───────────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-4 py-3 sticky top-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-xl border-b border-white/[0.05]">
+      {/* ── HEADER (Mobile Only) ───────────────────────────────────────────────────────────── */}
+      <div className="flex md:hidden items-center gap-3 px-4 py-3 sticky top-0 z-[60] bg-[#050505]/90 backdrop-blur-xl border-b border-white/[0.05]">
         <Link 
           href="/messages"
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all -ml-2"
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-95 transition-all -ml-2"
         >
-          <ArrowLeft size={22} strokeWidth={2.5} />
+          <ArrowLeft size={20} strokeWidth={2.5} />
         </Link>
-        <h1 className="text-[20px] font-serif font-black tracking-tight">Messaging Settings</h1>
+        <h1 className="text-[18px] font-serif font-bold tracking-tight">Settings</h1>
       </div>
 
-      <div className="max-w-3xl mx-auto pb-24 px-4 pt-6 flex flex-col gap-8 animate-in fade-in duration-500">
+      <div className="max-w-6xl mx-auto pb-24 px-4 pt-6 md:pt-16 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16 animate-in fade-in duration-500">
+        
+        {/* LEFT COLUMN: Header & Context */}
+        <div className="md:col-span-5 lg:col-span-4 flex flex-col gap-5">
+           <div className="hidden md:block mb-2">
+              <Link href="/messages" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 text-sm text-white/70 hover:text-white transition-all">
+                 <ArrowLeft size={16} />
+                 Back to Messages
+              </Link>
+           </div>
+          <div>
+            <h1 className="hidden md:block text-3xl font-serif font-black tracking-tight text-white mb-3">Messaging Settings</h1>
+            <p className="text-[14px] text-white/50 leading-relaxed">
+              Manage your message requests, read receipts, and notification preferences to control your inbox experience.
+            </p>
+          </div>
+          <div className="hidden md:block bg-white/[0.02] border border-white/[0.05] rounded-2xl p-5 mt-4">
+            <div className="flex items-center gap-3 mb-3 text-[#b08d57]">
+               <Shield size={18} />
+               <h3 className="text-[13px] uppercase tracking-widest font-bold">Privacy First</h3>
+            </div>
+            <p className="text-[13px] text-white/40 leading-relaxed">
+               For your safety, WAC prevents unsolicited messages from spam accounts. Customize who can send you requests here.
+            </p>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Settings Panels */}
+        <div className="md:col-span-7 lg:col-span-8 flex flex-col gap-8">
         
         {/* PRIVACY SECTION */}
         <section>
@@ -95,15 +124,10 @@ export default function MessageSettingsPage() {
                   <p className="text-[13px] text-white/40 leading-relaxed pr-6">Let others know when you have read their messages. If turned off, you won't be able to see read receipts from others.</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 self-end sm:self-auto">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.readReceipts}
-                  onChange={(e) => updateSetting("readReceipts", e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#b08d57]"></div>
-              </label>
+              <WacToggle 
+                checked={settings.readReceipts}
+                onChange={() => updateSetting("readReceipts", !settings.readReceipts)}
+              />
             </div>
 
             {/* Online Status Toggle */}
@@ -117,15 +141,10 @@ export default function MessageSettingsPage() {
                   <p className="text-[13px] text-white/40 leading-relaxed pr-6">Allow accounts you follow and anyone you message to see when you were last active on WAC components.</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 self-end sm:self-auto">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.onlineStatus}
-                  onChange={(e) => updateSetting("onlineStatus", e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#b08d57]"></div>
-              </label>
+              <WacToggle 
+                checked={settings.onlineStatus}
+                onChange={() => updateSetting("onlineStatus", !settings.onlineStatus)}
+              />
             </div>
             
             {/* Blocked Accounts Link */}
@@ -188,19 +207,15 @@ export default function MessageSettingsPage() {
                 </div>
                 <h3 className="text-[15px] font-bold text-white">Push Notifications</h3>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={settings.notifications}
-                  onChange={(e) => updateSetting("notifications", e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#b08d57]"></div>
-              </label>
+              <WacToggle 
+                checked={settings.notifications}
+                onChange={() => updateSetting("notifications", !settings.notifications)}
+              />
             </div>
           </div>
         </section>
 
+        </div>
       </div>
     </div>
   );

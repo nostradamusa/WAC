@@ -35,9 +35,13 @@ export const viewport: Viewport = {
 
 import Navbar from "@/components/layout/Navbar";
 import { ActorProvider } from "@/components/providers/ActorProvider";
+import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import FloatingMessagingIcon from "@/components/layout/FloatingMessagingIcon";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import ConditionalFooter from "@/components/layout/ConditionalFooter";
+import { Analytics } from "@vercel/analytics/react";
+import { BetaFeedback } from "@/components/ui/BetaFeedback";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({
   children,
@@ -70,14 +74,31 @@ export default function RootLayout({
         </Script>
 
         <ActorProvider>
-          <div className="flex min-h-screen flex-col overflow-x-hidden">
-            <Navbar />
-            <main className="flex-1 pb-[72px] md:pb-0">{children}</main>
-            <FloatingMessagingIcon />
-            <MobileBottomNav />
-            <ConditionalFooter />
-          </div>
+          <OnboardingGate>
+            <div className="flex min-h-screen flex-col overflow-x-hidden">
+              <Navbar />
+              <main className="flex-1 pb-[72px] md:pb-0">{children}</main>
+              <FloatingMessagingIcon />
+              <MobileBottomNav />
+              <ConditionalFooter />
+            </div>
+            <BetaFeedback />
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                style: {
+                  background: '#1A1A1A',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                },
+              }}
+            />
+          </OnboardingGate>
         </ActorProvider>
+        <Analytics />
       </body>
     </html>
   );

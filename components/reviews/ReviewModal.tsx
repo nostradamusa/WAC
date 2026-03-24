@@ -40,7 +40,7 @@ export default function ReviewModal({ isOpen, onClose, entityName, entityId, ent
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xl animate-in fade-in duration-200">
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl relative animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
         
         <button 

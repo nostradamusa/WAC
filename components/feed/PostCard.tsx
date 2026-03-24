@@ -117,7 +117,7 @@ function PostMediaGallery({
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-          <div className="relative z-10 w-[56px] h-[56px] rounded-full bg-black/55 border border-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/75 group-hover:scale-105 group-active:scale-95 transition-all duration-200">
+          <div className="relative z-10 w-[56px] h-[56px] rounded-full bg-black/55 border border-white/20 backdrop-blur-xl flex items-center justify-center group-hover:bg-black/75 group-hover:scale-105 group-active:scale-95 transition-all duration-200">
             <Play size={22} fill="white" strokeWidth={0} className="ml-0.5 text-white" />
           </div>
           {/* Tap-to-play label */}
@@ -506,6 +506,18 @@ export default function PostCard({ post }: { post: NetworkPost }) {
     }
   };
 
+  const handleReport = async () => {
+    if (!confirm("Are you sure you want to report this post?")) return;
+    showToast("Post reported to Trust & Safety");
+    if (currentUserId) {
+      await supabase.from("reported_content").insert({
+        reporter_id: currentUserId,
+        content_type: "post",
+        content_id: post.id,
+      });
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm("Delete this post?")) return;
 
@@ -762,20 +774,24 @@ export default function PostCard({ post }: { post: NetworkPost }) {
               )}
             </Link>
 
-            {isOwner && (
-              <div className="relative shrink-0 ml-2" ref={optionsRef}>
-                <button onClick={() => setShowOptions(!showOptions)} className="opacity-35 hover:opacity-90 hover:text-[var(--accent)] transition p-1">
-                  <MoreHorizontal size={16} />
-                </button>
-                {showOptions && (
-                  <div className="absolute right-0 top-full mt-1 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20">
-                    <button onClick={() => { setIsEditing(true); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">Edit</button>
-                    <div className="h-px bg-white/5" />
-                    <button onClick={() => { handleDelete(); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition">Delete</button>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="relative shrink-0 ml-2" ref={optionsRef}>
+              <button onClick={() => setShowOptions(!showOptions)} className="opacity-35 hover:opacity-90 hover:text-[var(--accent)] transition p-1">
+                <MoreHorizontal size={16} />
+              </button>
+              {showOptions && (
+                <div className="absolute right-0 top-full mt-1 w-36 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20">
+                  {isOwner ? (
+                    <>
+                      <button onClick={() => { setIsEditing(true); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">Edit</button>
+                      <div className="h-px bg-white/5" />
+                      <button onClick={() => { handleDelete(); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition">Delete</button>
+                    </>
+                  ) : (
+                    <button onClick={() => { handleReport(); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/10 transition">Report Post</button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Intent badge */}
@@ -1020,7 +1036,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
             <div
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-full shadow-2xl border border-white/10 ${toastMessage.type === "error"
                   ? "bg-red-500/90 text-white"
-                  : "bg-[#1a1a1a]/95 text-white backdrop-blur-md"
+                  : "bg-[#1a1a1a]/95 text-white backdrop-blur-xl"
                 }`}
             >
               {toastMessage.type === "success" && (
@@ -1037,7 +1053,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
         typeof document !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[300] flex items-end md:items-center justify-center">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowRepostModal(false)} />
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setShowRepostModal(false)} />
             <div className="relative w-full max-w-lg bg-[#111] rounded-t-2xl md:rounded-2xl border border-white/10 shadow-2xl p-5 z-10">
               <h3 className="text-sm font-semibold text-white mb-3">Repost with thoughts</h3>
               <textarea
@@ -1070,7 +1086,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
         typeof document !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[300] flex items-end md:items-center justify-center">
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowReactionsModal(false)} />
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={() => setShowReactionsModal(false)} />
             <div className="relative w-full max-w-md bg-[#111] rounded-t-2xl md:rounded-2xl border border-white/10 shadow-2xl z-10 max-h-[60vh] flex flex-col">
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.07] shrink-0">
                 <h3 className="text-sm font-semibold text-white">Reactions</h3>

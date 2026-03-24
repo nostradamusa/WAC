@@ -202,7 +202,7 @@ export default function GroupSettingsPage() {
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <Loader2 size={20} className="animate-spin text-white/30" />
+        <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
       </div>
     );
   }
@@ -222,27 +222,35 @@ export default function GroupSettingsPage() {
 
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-20 md:pt-24 pb-24 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-16">
+        
+        {/* LEFT COLUMN: Header & Navigation */}
+        <div className="md:col-span-5 lg:col-span-4 flex flex-col items-start gap-4">
+          <Link
+            href={`/groups/${slug}`}
+            className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mb-2 md:mb-6"
+          >
+            <ChevronLeft size={15} strokeWidth={2} />
+            Back to group
+          </Link>
 
-        {/* Back */}
-        <Link
-          href={`/groups/${slug}`}
-          className="inline-flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mb-8"
-        >
-          <ChevronLeft size={15} strokeWidth={2} />
-          Back to group
-        </Link>
-
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <Network size={13} className="text-white/30" strokeWidth={2} />
-          <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">Group Settings</span>
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Network size={13} className="text-white/30" strokeWidth={2} />
+              <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">Group Settings</span>
+            </div>
+            <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-white leading-tight mb-3">
+              Manage <br className="hidden md:block" />
+              <span className="italic font-light opacity-90 text-[#b08d57]">{group?.name}</span>
+            </h1>
+            <p className="text-sm text-white/50 leading-relaxed md:pr-6">
+              Control your group's public details, community policies, and privacy boundaries.
+            </p>
+          </div>
         </div>
-        <h1 className="font-serif text-2xl md:text-3xl tracking-tight text-white leading-tight mb-2">
-          Manage{" "}
-          <span className="italic font-light opacity-90 text-[#b08d57]">{group?.name}</span>
-        </h1>
-        <p className="text-sm text-white/50 mb-10">Edit your group's details, privacy, and access settings.</p>
+
+        {/* RIGHT COLUMN: Configuration Form */}
+        <div className="md:col-span-7 lg:col-span-8">
 
         <form onSubmit={handleSave} className="space-y-0">
 
@@ -264,7 +272,7 @@ export default function GroupSettingsPage() {
               )}
               <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/banner:opacity-100 transition-opacity cursor-pointer">
                 {uploadingBanner ? (
-                  <Loader2 size={18} className="animate-spin text-white" />
+                  <Loader2 size={18} className="animate-spin text-[var(--accent)]" />
                 ) : (
                   <span className="flex items-center gap-1.5 text-white text-xs font-semibold bg-black/50 px-3 py-1.5 rounded-full">
                     <Camera size={13} /> Change banner
@@ -289,7 +297,7 @@ export default function GroupSettingsPage() {
                 )}
                 <label className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer">
                   {uploadingAvatar ? (
-                    <Loader2 size={14} className="animate-spin text-white" />
+                    <Loader2 size={14} className="animate-spin text-[var(--accent)]" />
                   ) : (
                     <Camera size={14} className="text-white" />
                   )}
@@ -506,7 +514,7 @@ export default function GroupSettingsPage() {
               }`}
             >
               {saving ? (
-                <><Loader2 size={15} className="animate-spin" /> Saving…</>
+                <><Loader2 size={15} className="animate-spin text-[var(--accent)]" /> Saving…</>
               ) : (
                 <><Save size={15} /> Save Changes</>
               )}
@@ -514,6 +522,7 @@ export default function GroupSettingsPage() {
           </div>
 
         </form>
+        </div>
       </div>
     </div>
   );

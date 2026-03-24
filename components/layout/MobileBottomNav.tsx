@@ -9,11 +9,11 @@ import { useNotificationCount } from "@/lib/hooks/useUnreadCounts";
 import { supabase } from "@/lib/supabase";
 
 const NAV_ITEMS = [
-  { name: "Directory", href: "/directory",     icon: Compass,      isPulse: false, isAlerts: false },
-  { name: "Events",    href: "/events",         icon: CalendarDays, isPulse: false, isAlerts: false },
-  { name: "Pulse",     href: "/community",     icon: Activity,     isPulse: true,  isAlerts: false },
-  { name: "Groups",    href: "/groups",         icon: Network,      isPulse: false, isAlerts: false },
-  { name: "Alerts",    href: "/notifications",  icon: Bell,         isPulse: false, isAlerts: true  },
+  { name: "Directory", href: "/directory", icon: Compass,      isPulse: false, isAlerts: false },
+  { name: "Events",    href: "/events",    icon: CalendarDays, isPulse: false, isAlerts: false },
+  { name: "Pulse",     href: "/community", icon: Activity,     isPulse: true,  isAlerts: false },
+  { name: "Groups",    href: "/groups",    icon: Network,      isPulse: false, isAlerts: false },
+  { name: "Alerts",    href: "/notifications", icon: Bell,     isPulse: false, isAlerts: true },
 ];
 
 function isRouteActive(pathname: string, href: string): boolean {
@@ -38,7 +38,7 @@ export default function MobileBottomNav() {
 
   const notifCount = useNotificationCount(userId, userEmail);
 
-  if (pathname === "/post" || pathname === "/stories/new") return null;
+  if (pathname === "/post" || pathname === "/stories/new" || pathname === "/welcome") return null;
 
   const isMessaging = pathname.startsWith("/messages");
   const hideNav = !isMessaging && scrollDirection === "down";
@@ -67,15 +67,15 @@ export default function MobileBottomNav() {
                   window.dispatchEvent(new CustomEvent("wac-refresh-feed"));
                 }
               }}
-              className={`group relative flex items-center justify-center transition-all duration-200 ${
-                isPulse ? "w-14 h-14" : "w-12 h-12"
+              className={`group relative flex flex-col items-center justify-center transition-all duration-200 ${
+                isPulse ? "w-[3.25rem] h-[3.25rem]" : "w-10 h-10 sm:w-11 sm:h-11"
               } ${
                 isActive && !isPulse ? "text-[var(--accent)]" : !isPulse ? "text-white/45 hover:text-white/75" : ""
               }`}
             >
               {isPulse ? (
                 // ── Pulse: circular container — live/real-time identity ─────────
-                <div className={`flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 ${
+                <div className={`flex items-center justify-center w-[3.25rem] h-[3.25rem] rounded-full transition-all duration-300 ${
                   isActive
                     ? "bg-rose-500/[0.13] ring-1 ring-rose-500/35 drop-shadow-[0_0_20px_rgba(244,63,94,0.45)]"
                     : "bg-white/[0.05] ring-1 ring-white/[0.07] group-hover:bg-rose-500/[0.07] group-hover:ring-rose-500/20"
@@ -90,12 +90,12 @@ export default function MobileBottomNav() {
                 </div>
               ) : (
                 // ── Standard items ────────────────────────────────────────────
-                <div className={`relative flex items-center justify-center w-12 h-12 transition-all duration-200 ${
+                <div className={`relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 transition-all duration-200 ${
                   isActive
                     ? "drop-shadow-[0_0_10px_rgba(176,141,87,0.75)]"
                     : "group-hover:drop-shadow-[0_0_10px_rgba(176,141,87,0.5)]"
                 }`}>
-                  <Icon size={24} strokeWidth={isActive ? 2.1 : 1.6} />
+                  <Icon size={24} strokeWidth={isActive ? 2.2 : 1.6} />
 
                   {/* Active dot */}
                   {isActive && (

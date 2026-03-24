@@ -37,7 +37,7 @@ export default function NewMessageSheet({ isOpen, onClose }: NewMessageSheetProp
   const businesses = results.filter(r => r.type === "business");
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-center items-end sm:items-center bg-black/60 backdrop-blur-sm transition-all" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] flex justify-center items-end sm:items-center bg-black/60 backdrop-blur-xl transition-all" onClick={onClose}>
       <div 
         className="w-full sm:max-w-lg bg-[#0A0A0A] sm:rounded-2xl sm:border border-white/5 h-[90dvh] sm:h-[650px] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300"
         onClick={e => e.stopPropagation()}

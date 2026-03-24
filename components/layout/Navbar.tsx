@@ -179,9 +179,10 @@ export default function Navbar() {
   }, []);
 
   async function signInWithGoogle() {
+    const nextPath = window.location.pathname + window.location.search;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
     });
   }
 
@@ -191,7 +192,7 @@ export default function Navbar() {
     setIsMenuOpen(false);
   }
 
-  if (pathname === "/post" || pathname === "/stories/new") return null;
+  if (pathname === "/post" || pathname === "/stories/new" || pathname === "/welcome") return null;
 
   // ── Derived create label (context-aware) ─────────────────────────────────
   const createLabel = pathname.startsWith("/directory") ? "Add to Network"
@@ -204,7 +205,6 @@ export default function Navbar() {
   const NETWORK_ITEMS = [
     { label: "Add Business",     sub: "Register your business",          href: "/profile/entities/new?type=business",     Icon: Briefcase,    accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50" },
     { label: "Add Organization", sub: "Create an org or association",    href: "/profile/entities/new?type=organization", Icon: Landmark,     accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50" },
-    { label: "Create Group",     sub: "Start a community",               href: "/groups/new",                             Icon: Network,      accent: "text-amber-400",  ring: "border-amber-400/20 group-hover:border-amber-400/40" },
     { label: "Create Event",     sub: "Host an event for your network",  href: "/events/new",                             Icon: CalendarDays, accent: "text-teal-400",   ring: "border-teal-400/20  group-hover:border-teal-400/40"  },
   ] as const;
 
@@ -578,7 +578,7 @@ export default function Navbar() {
         Uses translateY so it slides up off-screen; the fixed position means
         the layout below is unaffected — CommunityHub expands into the gap.
       */}
-      <header className="fixed left-0 right-0 top-0 z-[60] bg-[var(--background)]/90 backdrop-blur-md border-b border-white/5">
+      <header className="fixed left-0 right-0 top-0 z-[60] bg-[var(--background)]/90 backdrop-blur-xl border-b border-white/5">
 
         {/* ── DESKTOP ──────────────────────────────────────────────────────── */}
         <div className="hidden md:flex items-center justify-between px-4 lg:px-10 h-14">
@@ -623,13 +623,13 @@ export default function Navbar() {
                         window.dispatchEvent(new CustomEvent("wac-refresh-feed"));
                       }
                     }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all duration-200 ${
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all duration-200 ${
                       isActive
                         ? "bg-[#b08d57]/10 border-[#b08d57]/30 text-[#b08d57] drop-shadow-[0_0_10px_rgba(176,141,87,0.3)]"
                         : "border-transparent text-white/60 hover:bg-[#b08d57]/5 hover:border-[#b08d57]/20 hover:text-[#b08d57]"
                     }`}
                   >
-                    <Icon size={13} strokeWidth={isActive ? 2.5 : 1.8} className="shrink-0" />
+                    <Icon size={16} strokeWidth={isActive ? 2.2 : 1.6} className="shrink-0" />
                     <span>{label}</span>
                   </Link>
                 );
@@ -827,7 +827,7 @@ export default function Navbar() {
         <div className="md:hidden fixed inset-0 z-[200] flex flex-col justify-end">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-black/60 backdrop-blur-xl transition-opacity"
             onClick={() => setIsMenuOpen(false)}
             style={{ opacity: Math.max(0, 1 - dragY / 300) }}
           />
@@ -860,7 +860,7 @@ export default function Navbar() {
       {showNetworkMenu && (
         <div className="md:hidden fixed inset-0 z-[200]">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-xl"
             onClick={() => setShowNetworkMenu(false)}
           />
           <div className="absolute bottom-0 left-0 right-0 bg-[#0d0d0d] rounded-t-2xl border-t border-white/[0.09] shadow-2xl overflow-hidden">

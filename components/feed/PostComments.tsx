@@ -576,7 +576,7 @@ export default function PostComments({ postId }: { postId: string }) {
                   className="shrink-0 w-[32px] h-[32px] md:w-[26px] md:h-[26px] m-[2px] rounded-[9px] bg-[var(--accent)] text-black flex items-center justify-center disabled:opacity-25 hover:bg-[#F2D06B] transition-colors"
                 >
                   {isSubmitting
-                    ? <Loader2 size={11} className="animate-spin" />
+                    ? <Loader2 size={11} className="animate-spin text-[var(--accent)]" />
                     : <Send size={11} className="translate-x-[1px]" />
                   }
                 </button>
@@ -601,7 +601,7 @@ export default function PostComments({ postId }: { postId: string }) {
 
       {/* Comments list */}
       {isLoading ? (
-        <div className="flex justify-center p-4"><Loader2 className="animate-spin opacity-50" size={20} /></div>
+        <div className="flex justify-center p-4"><Loader2 className="animate-spin text-[var(--accent)] opacity-50" size={20} /></div>
       ) : comments.length > 0 ? (
         <div className="space-y-3 mb-3">
           {topLevelComments.map((comment) => renderCommentThread(comment))}
@@ -697,7 +697,7 @@ export default function PostComments({ postId }: { postId: string }) {
               disabled={!newContent.trim() || isSubmitting}
               className="shrink-0 w-[36px] h-[36px] md:w-[30px] md:h-[30px] m-[4px] bg-[var(--accent)] text-black rounded-[10px] flex items-center justify-center hover:bg-[#F2D06B] transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} className="translate-x-[1px]" />}
+              {isSubmitting ? <Loader2 className="animate-spin text-[var(--accent)]" size={13} /> : <Send size={13} className="translate-x-[1px]" />}
             </button>
           </div>
         </form>
@@ -707,7 +707,7 @@ export default function PostComments({ postId }: { postId: string }) {
     {/* Reactions Modal */}
     {reactionsModal && typeof document !== "undefined" && createPortal(
       <div
-        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-xl p-0 sm:p-4 animate-in fade-in duration-200"
         onClick={() => setReactionsModal(null)}
       >
         <div
@@ -762,7 +762,7 @@ export default function PostComments({ postId }: { postId: string }) {
 
           <div className="flex-1 overflow-y-auto py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
             {reactionsModal!.loading ? (
-              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-white/20" size={20} /></div>
+              <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[var(--accent)]" size={20} /></div>
             ) : (() => {
               const filtered = reactionsModal!.tab === 'all'
                 ? reactionsModal!.breakdown

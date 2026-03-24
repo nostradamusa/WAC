@@ -193,7 +193,7 @@ export default function Hero() {
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="group relative w-full flex items-center gap-5 rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-7 pr-7 shadow-2xl backdrop-blur-md outline-none transition hover:border-[var(--accent)]/60 hover:bg-[rgba(0,0,0,0.55)] cursor-pointer"
+              className="group relative w-full flex items-center gap-5 rounded-full border border-[var(--border)] bg-[rgba(0,0,0,0.4)] py-5 pl-7 pr-7 shadow-2xl backdrop-blur-xl outline-none transition hover:border-[var(--accent)]/60 hover:bg-[rgba(0,0,0,0.55)] cursor-pointer"
             >
               <span className="relative flex h-2.5 w-2.5 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#b08d57] opacity-50" />

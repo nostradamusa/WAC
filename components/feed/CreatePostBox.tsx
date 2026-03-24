@@ -508,7 +508,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
         onChange={handleStoryMediaSelect} className="hidden" />
 
       {/* ── Stories row ─────────────────────────────────────────────────────── */}
-      <div className="pt-5 pb-1">
+      <div className="pt-2 pb-1">
         <div
           className="flex gap-4 overflow-x-auto pt-1 pb-3 px-0.5"
           style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
@@ -589,7 +589,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
       {/* ── Compose sheet ─────────────────────────────────────────────────────── */}
       {isSheetOpen && (
         <div className="fixed inset-0 z-[200]">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeSheet} />
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={closeSheet} />
 
           <div
             className="absolute left-0 right-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center md:pointer-events-none"
@@ -714,7 +714,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                       </button>
                       <button type="submit" disabled={!canSubmit}
                         className="flex items-center gap-2 bg-[#b08d57] text-black hover:bg-[#9a7545] py-2 px-6 rounded-full text-sm font-bold transition disabled:opacity-35 disabled:cursor-not-allowed">
-                        {isSubmitting && <Loader2 size={13} className="animate-spin" />}
+                        {isSubmitting && <Loader2 size={13} className="animate-spin text-[var(--accent)]" />}
                         {isSubmitting ? "Posting…" : "Post"}
                       </button>
                     </div>
@@ -814,7 +814,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                                     setTextLayers(prev => prev.filter(l => l.id !== layer.id));
                                     setActiveLayerId(null);
                                   }}
-                                  className="absolute -top-4 -right-4 w-6 h-6 bg-black/75 rounded-full flex items-center justify-center border border-white/20 z-10"
+                                  className="absolute -top-4 -right-4 w-6 h-6 bg-black/75 rounded-full flex items-center justify-center border border-[var(--accent)]/20 z-10"
                                   style={{ touchAction: "none" }}
                                 >
                                   <X size={10} className="text-white" strokeWidth={2.5} />
@@ -826,7 +826,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                           {/* Clear / back button */}
                           <button
                             onClick={(e) => { e.stopPropagation(); clearStory(); }}
-                            className="absolute top-2.5 left-2.5 w-8 h-8 bg-black/55 hover:bg-black/75 rounded-full flex items-center justify-center transition backdrop-blur-sm border border-white/[0.12]"
+                            className="absolute top-2.5 left-2.5 w-8 h-8 bg-black/55 hover:bg-black/75 rounded-full flex items-center justify-center transition backdrop-blur-xl border border-white/[0.12]"
                             aria-label="Remove media"
                           >
                             <X size={13} className="text-white" strokeWidth={2} />
@@ -924,7 +924,7 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                             disabled={isPostingStory}
                             className="w-full bg-[#b08d57] text-black hover:bg-[#9a7545] py-3 rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 transition"
                           >
-                            {isPostingStory && <Loader2 size={14} className="animate-spin" />}
+                            {isPostingStory && <Loader2 size={14} className="animate-spin text-[var(--accent)]" />}
                             {isPostingStory ? "Posting…" : "Post Story"}
                           </button>
                         </div>

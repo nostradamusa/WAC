@@ -110,12 +110,16 @@ const DirectoryCompactCard = memo(function DirectoryCompactCard({
       {/* ── Spaced Body ────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col px-3 pt-7 pb-3.5">
 
-        {/* Name + verified wraps smoothly instead of truncating immediately */}
-        <div className="flex items-start gap-1 justify-between min-w-0 mb-1.5">
-          <span className="text-xs font-bold text-white/90 leading-snug line-clamp-2 group-hover:text-white transition-colors">
+        {/* Identity row - Badge seamlessly flows inline with the multi-line text */}
+        <div className="mb-1.5 min-w-0 pr-1">
+          <span className="text-xs font-bold text-white/90 leading-snug line-clamp-2 group-hover:text-white transition-colors" title={name}>
             {name}
+            {isVerified && (
+              <span className="inline-flex align-middle ml-1.5 mt-[-2px]">
+                <VerifiedBadge size="sm" />
+              </span>
+            )}
           </span>
-          {isVerified && <VerifiedBadge size="sm" className="shrink-0 mt-[1px]" />}
         </div>
 
         {/* Subtitle / Role (Allowed to breathe 2 lines) */}
@@ -135,15 +139,15 @@ const DirectoryCompactCard = memo(function DirectoryCompactCard({
           </div>
         )}
 
-        {/* Chunkier Follow CTA */}
+        {/* Follow CTA */}
         <button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          className={`mt-auto w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-widest transition-colors ${followColor}`}
+          className={`mt-auto w-full flex items-center justify-center gap-1 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wide transition-colors ${followColor}`}
         >
-          <UserPlus size={12} strokeWidth={2.5} />
+          <UserPlus size={10} strokeWidth={2.5} />
           Follow
         </button>
       </div>

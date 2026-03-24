@@ -586,12 +586,12 @@ export default function EditEntityPage({
       <div className="fixed bottom-0 left-0 right-0 p-4 pointer-events-none z-50">
         <div className="mx-auto max-w-sm">
           {saveStatus === "saving" && (
-            <div className="backdrop-blur-md bg-black/60 border border-white/10 text-white/70 px-4 py-3 rounded-full flex items-center justify-center gap-2 shadow-xl shadow-black/40 text-sm font-semibold animate-in fade-in slide-in-from-bottom-4">
-              <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin" /> Saving changes...
+            <div className="backdrop-blur-xl bg-black/60 border border-white/10 text-white/70 px-4 py-3 rounded-full flex items-center justify-center gap-2 shadow-xl shadow-black/40 text-sm font-semibold animate-in fade-in slide-in-from-bottom-4">
+              <div className="w-4 h-4 rounded-full border-2 border-[var(--accent)]/20 border-t-[var(--accent)] animate-spin" /> Saving changes...
             </div>
           )}
           {saveStatus === "saved" && (
-            <div className="backdrop-blur-md bg-emerald-900/60 border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-full flex items-center justify-center gap-2 shadow-xl shadow-black/40 text-sm font-semibold animate-in fade-in slide-in-from-bottom-4">
+            <div className="backdrop-blur-xl bg-emerald-900/60 border border-emerald-500/30 text-emerald-400 px-4 py-3 rounded-full flex items-center justify-center gap-2 shadow-xl shadow-black/40 text-sm font-semibold animate-in fade-in slide-in-from-bottom-4">
               <CheckCircle size={16} /> All changes saved
             </div>
           )}

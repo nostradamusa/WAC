@@ -63,7 +63,7 @@ export default function TravelGuideWrapper() {
       <TravelHero />
 
       {/* Sticky Sub-Nav */}
-      <div className="sticky top-16 z-40 bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--foreground)]/10">
+      <div className="sticky top-16 z-40 bg-[var(--background)]/90 backdrop-blur-xl border-b border-[var(--foreground)]/10">
         <div
           className="max-w-[75rem] mx-auto px-4 flex items-center overflow-x-auto py-2 gap-2"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

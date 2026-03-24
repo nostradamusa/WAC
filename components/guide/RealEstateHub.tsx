@@ -54,14 +54,14 @@ export default function RealEstateHub() {
           
           <div className="hidden lg:grid grid-cols-2 gap-4 relative z-10 w-full max-w-md">
              {/* Decorative UI elements hinting at properties */}
-             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm -rotate-2 transform translate-y-4">
+             <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-xl -rotate-2 transform translate-y-4">
                  <div className="h-32 bg-white/10 rounded-xl overflow-hidden relative">
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 text-[10px] font-bold tracking-wider rounded">TIRANA, AL</div>
                  </div>
                  <h4 className="font-bold text-sm">Modern City Center Apt</h4>
                  <div className="text-[var(--accent)] font-serif text-lg">€145,000</div>
              </div>
-             <div className="bg-white/5 border border-[var(--accent)]/30 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm rotate-3 shadow-[0_0_30px_rgba(176,141,87,0.1)]">
+             <div className="bg-white/5 border border-[var(--accent)]/30 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-xl rotate-3 shadow-[0_0_30px_rgba(176,141,87,0.1)]">
                  <div className="h-32 bg-white/10 rounded-xl overflow-hidden relative">
                     <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 text-[10px] font-bold tracking-wider rounded">PRISHTINA, KS</div>
                  </div>
@@ -122,7 +122,7 @@ export default function RealEstateHub() {
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Link href={`/guide/real-estate/${i}`} key={i} className="wac-card group block overflow-hidden cursor-pointer hover:-translate-y-1 transition-all duration-300">
                     <div className="h-48 bg-white/5 relative">
-                       <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 text-xs font-bold rounded flex items-center gap-1">
+                       <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xl px-2 py-1 text-xs font-bold rounded flex items-center gap-1">
                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> For Sale
                        </div>
                        <div className="absolute top-3 right-3 bg-[var(--accent)] text-black px-2 py-1 text-xs font-bold rounded flex items-center gap-1">

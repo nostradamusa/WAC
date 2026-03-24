@@ -1,10 +1,15 @@
 "use client";
 
 import { supabase } from "@/lib/supabase";
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function LoginInner() {
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/";
+  const redirectUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [email, setEmail] = useState("");
@@ -16,7 +21,7 @@ export default function LoginPage() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: redirectUrl,
       },
     });
   }
@@ -31,7 +36,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: redirectUrl,
       },
     });
 
@@ -86,7 +91,7 @@ export default function LoginPage() {
               className="w-full flex items-center justify-center gap-3 bg-white text-black font-semibold py-3 px-4 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 mb-6"
             >
               {isLoadingGoogle ? (
-                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <svg
                   viewBox="0 0 24 24"
@@ -146,7 +151,7 @@ export default function LoginPage() {
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3 text-sm font-bold text-black transition hover:opacity-90 disabled:opacity-50"
               >
                 {isLoadingEmail ? (
-                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
                 ) : null}
                 Send Magic Link
               </button>
@@ -175,5 +180,17 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-24">
+        <div className="w-12 h-12 border-4 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <LoginInner />
+    </Suspense>
   );
 }

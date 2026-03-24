@@ -80,14 +80,14 @@ function MediaStage({ items, fallbackUrl }: { items?: PostMediaItem[]; fallbackU
           <button
             onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
             disabled={currentIndex === 0}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 border border-white/10 backdrop-blur-sm flex items-center justify-center text-white disabled:opacity-20 hover:bg-black/75 transition"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 border border-white/10 backdrop-blur-xl flex items-center justify-center text-white disabled:opacity-20 hover:bg-black/75 transition"
           >
             <ChevronLeft size={16} />
           </button>
           <button
             onClick={() => setCurrentIndex((i) => Math.min(displayItems.length - 1, i + 1))}
             disabled={currentIndex === displayItems.length - 1}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 border border-white/10 backdrop-blur-sm flex items-center justify-center text-white disabled:opacity-20 hover:bg-black/75 transition"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/55 border border-white/10 backdrop-blur-xl flex items-center justify-center text-white disabled:opacity-20 hover:bg-black/75 transition"
           >
             <ChevronRight size={16} />
           </button>
@@ -247,7 +247,7 @@ function ViewerInner({ post, onClose }: Props) {
           {/* Close button — always on top-left */}
           <button
             onClick={onClose}
-            className="absolute top-3 left-3 z-30 w-9 h-9 rounded-full bg-black/55 border border-white/[0.12] backdrop-blur-sm flex items-center justify-center text-white/65 hover:text-white hover:bg-black/75 transition"
+            className="absolute top-3 left-3 z-30 w-9 h-9 rounded-full bg-black/55 border border-white/[0.12] backdrop-blur-xl flex items-center justify-center text-white/65 hover:text-white hover:bg-black/75 transition"
           >
             <X size={15} />
           </button>
@@ -455,7 +455,7 @@ function ViewerInner({ post, onClose }: Props) {
         typeof document !== "undefined" &&
         createPortal(
           <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none animate-in slide-in-from-top-5 fade-in duration-300">
-            <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full shadow-2xl border border-white/10 bg-[#1a1a1a]/95 text-white backdrop-blur-md">
+            <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full shadow-2xl border border-white/10 bg-[#1a1a1a]/95 text-white backdrop-blur-xl">
               <CheckCircle2 size={15} className="text-[#b08d57]" strokeWidth={2.5} />
               <span className="text-sm font-semibold whitespace-nowrap">{toast}</span>
             </div>

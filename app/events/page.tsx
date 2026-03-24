@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EventsResults from "@/components/events/EventsResults";
 import PremiumSelect from "@/components/ui/PremiumSelect";
+import WacDatePicker from "@/components/ui/WacDatePicker";
+import WacTimePicker from "@/components/ui/WacTimePicker";
 import { supabase } from "@/lib/supabase";
 import SectionLabel from "@/components/ui/SectionLabel";
 import {
@@ -529,7 +531,7 @@ function CreateEventModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-xl" onClick={onClose} />
       <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[84vh]">
 
         <div className="flex justify-center pt-3 sm:hidden shrink-0">
@@ -572,8 +574,8 @@ function CreateEventModal({
               <div>
                 <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1.5">Due date</label>
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
-                  <input type="time" value={draft.startTime} onChange={(e) => set({ startTime: e.target.value })} className={timeInputCls} />
+                  <WacDatePicker value={draft.startDate} onChange={(v) => set({ startDate: v })} />
+                  <WacTimePicker value={draft.startTime} onChange={(v) => set({ startTime: v })} />
                 </div>
               </div>
               <div className="border-t border-white/[0.06]" />
@@ -589,9 +591,9 @@ function CreateEventModal({
                 <div>
                   <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">Start</label>
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    <input type="date" value={draft.startDate} onChange={(e) => handleStartDateChange(e.target.value)} className={dateInputCls} />
+                    <WacDatePicker value={draft.startDate} onChange={handleStartDateChange} />
                     {!draft.allDay && (
-                      <input type="time" value={draft.startTime} onChange={(e) => handleStartTimeChange(e.target.value)} className={timeInputCls} />
+                      <WacTimePicker value={draft.startTime} onChange={handleStartTimeChange} />
                     )}
                   </div>
                 </div>
@@ -631,9 +633,9 @@ function CreateEventModal({
                 <div>
                   <label className="text-[9px] text-white/25 uppercase tracking-wider block mb-1">End</label>
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
+                    <WacDatePicker value={draft.endDate} onChange={(v) => set({ endDate: v })} />
                     {!draft.allDay && (
-                      <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />
+                      <WacTimePicker value={draft.endTime} onChange={(v) => set({ endTime: v })} />
                     )}
                   </div>
                 </div>
@@ -696,7 +698,7 @@ function CreateEventModal({
               {saved
                 ? <><CheckCircle2 size={11} />Saved!</>
                 : isSaving
-                  ? <><Loader2 size={11} className="animate-spin" />{isTask ? "Saving…" : "Creating…"}</>
+                  ? <><Loader2 size={11} className="animate-spin text-[var(--accent)]" />{isTask ? "Saving…" : "Creating…"}</>
                   : isTask ? "Save Task" : "Create"
               }
             </button>
@@ -820,7 +822,7 @@ function FullEventEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
 
       <div className="relative z-10 w-full sm:max-w-xl bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[96vh] sm:max-h-[88vh]">
 
@@ -890,8 +892,8 @@ function FullEventEditorModal({
                   <div className="space-y-1.5 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
                     <span className="text-[10px] text-white/30 w-8 shrink-0">Start</span>
                     <div className="grid gap-1.5 flex-1 sm:grid-cols-2">
-                      <input type="date" value={draft.startDate} onChange={(e) => set({ startDate: e.target.value })} className={dateInputCls} />
-                      {!draft.allDay && <input type="time" value={draft.startTime} onChange={(e) => handleEditorStartTimeChange(e.target.value)} className={timeInputCls} />}
+                      <WacDatePicker value={draft.startDate} onChange={(v) => set({ startDate: v })} />
+                      {!draft.allDay && <WacTimePicker value={draft.startTime} onChange={handleEditorStartTimeChange} />}
                     </div>
                   </div>
 
@@ -927,8 +929,8 @@ function FullEventEditorModal({
                   <div className="space-y-1.5 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
                     <span className="text-[10px] text-white/30 w-8 shrink-0">End</span>
                     <div className="grid gap-1.5 flex-1 sm:grid-cols-2">
-                      <input type="date" value={draft.endDate} onChange={(e) => set({ endDate: e.target.value })} className={dateInputCls} />
-                      {!draft.allDay && <input type="time" value={draft.endTime} onChange={(e) => set({ endTime: e.target.value })} className={timeInputCls} />}
+                      <WacDatePicker value={draft.endDate} onChange={(v) => set({ endDate: v })} />
+                      {!draft.allDay && <WacTimePicker value={draft.endTime} onChange={(v) => set({ endTime: v })} />}
                     </div>
                   </div>
                   <div className="flex flex-col items-start gap-3 pt-0.5 sm:flex-row sm:items-center sm:justify-between">
@@ -1152,7 +1154,7 @@ function FullEventEditorModal({
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {["Dietary restrictions", "Profession / Company", "Guest note"].map((preset) => (
                     <button key={preset} onClick={() => addPresetQuestion(preset)}
-                      className="px-2.5 py-1 rounded-full border border-white/[0.1] text-[10px] text-white/40 hover:text-white/65 hover:border-white/20 transition-colors">
+                      className="px-2.5 py-1 rounded-full border border-white/[0.1] text-[10px] text-white/40 hover:text-white/65 hover:border-[var(--accent)]/20 transition-colors">
                       + {preset}
                     </button>
                   ))}
@@ -1274,7 +1276,7 @@ function FullEventEditorModal({
               {saved
                 ? <><CheckCircle2 size={12} />Saved!</>
                 : isSaving
-                  ? <><Loader2 size={12} className="animate-spin" />Saving…</>
+                  ? <><Loader2 size={12} className="animate-spin text-[var(--accent)]" />Saving…</>
                   : "Save Event"
               }
             </button>
@@ -1364,7 +1366,7 @@ function CalEventDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
       <div className="relative z-10 flex max-h-[calc(100vh-10px)] w-full flex-col overflow-hidden rounded-t-[28px] border border-white/[0.09] bg-[#0e0e0e] shadow-2xl sm:max-h-[85vh] sm:max-w-md sm:rounded-2xl">
 
         {/* Mobile drag handle */}
@@ -1488,7 +1490,7 @@ function CalEventDetailModal({
           <div className="mb-3 min-w-0 sm:mb-0 sm:flex-1">
             <button onClick={handleDelete} disabled={isDeleting}
               className="text-[11px] font-medium text-red-400/45 hover:text-red-400 transition-colors disabled:opacity-40 flex items-center gap-1.5">
-              {isDeleting && <Loader2 size={10} className="animate-spin" />}
+              {isDeleting && <Loader2 size={10} className="animate-spin text-[var(--accent)]" />}
               {isDeleting ? "Deleting…" : "Delete event"}
             </button>
             {deleteError && <p className="text-[10px] text-red-400 mt-0.5">{deleteError}</p>}
@@ -1614,7 +1616,7 @@ function ImportCalendarModal({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
       <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.10] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
@@ -1958,11 +1960,11 @@ function CalendarModeView() {
     setCalRefreshKey((k) => k + 1);
   }
 
+  const [agendaDay, setAgendaDay] = useState<number | null>(null);
+
   function handleDayClick(day: number) {
-    const date = new Date(navDate.getFullYear(), navDate.getMonth(), day);
     setSelectedDay(day);
-    setModalDraft(makeDraft(date));
-    setShowFullEditor(false);
+    setAgendaDay((prev) => (prev === day ? null : day));
   }
 
   function handleSlotMouseDown(dayIdx: number, hour: number, e: React.MouseEvent) {
@@ -2017,17 +2019,23 @@ function CalendarModeView() {
     [weekStart]
   );
 
+  // Filter events by active calendar sources so toggles actually hide events
+  const filteredCalEvents = useMemo(
+    () => calEvents.filter((ev) => activeSources.has(ev.source)),
+    [calEvents, activeSources]
+  );
+
   // Map "YYYY-MM-DD" (local) → CalEvent[] for O(1) lookup in month + week cells
   // Uses localDateKey() so events at e.g. 11 PM in UTC-5 still land on the correct local date
   const eventsMap = useMemo(() => {
     const map = new Map<string, CalEvent[]>();
-    for (const ev of calEvents) {
+    for (const ev of filteredCalEvents) {
       const dk = localDateKey(ev.start_time);
       if (!map.has(dk)) map.set(dk, []);
       map.get(dk)!.push(ev);
     }
     return map;
-  }, [calEvents]);
+  }, [filteredCalEvents]);
 
   const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 
@@ -2074,11 +2082,11 @@ function CalendarModeView() {
                   <ChevronRight size={15} />
                 </button>
               </div>
-              {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0 xl:hidden" />}
+              {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 xl:hidden" />}
             </div>
 
             <div className="flex items-center gap-2">
-              {eventsLoading && <Loader2 size={12} className="animate-spin text-white/20 shrink-0 hidden xl:block" />}
+              {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 hidden xl:block" />}
               {/* Mobile source filter — sidebar is hidden on mobile */}
               <button
                 onClick={() => setShowSourceSheet(true)}
@@ -2110,7 +2118,7 @@ function CalendarModeView() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
+            <div className="hidden sm:flex items-center justify-between gap-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/28">
                 {activeSourceCount}/{availableSourceIds.length} calendars visible
               </span>
@@ -2236,13 +2244,70 @@ function CalendarModeView() {
               </div>
             </div>
             <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
-              <p className="text-xs text-white/28">Click any day to create an event. RSVP to events or follow groups to populate your calendar.</p>
+              <p className="text-xs text-white/28">Click a day to see its agenda. Click + drag in week view to create an event.</p>
             </div>
+
+            {/* Day Agenda Sheet — slides up when a day is tapped */}
+            {agendaDay !== null && (() => {
+              const dateKey = `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, "0")}-${String(agendaDay).padStart(2, "0")}`;
+              const dayEvs  = filteredCalEvents.filter((ev) => localDateKey(ev.start_time) === dateKey);
+              const date    = new Date(navDate.getFullYear(), navDate.getMonth(), agendaDay);
+              const dateLabel = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+              return (
+                <div className="mt-3 rounded-2xl border border-white/[0.09] bg-[#111]/90 backdrop-blur-xl p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{dateLabel}</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const d = new Date(navDate.getFullYear(), navDate.getMonth(), agendaDay);
+                          setModalDraft(makeDraft(d));
+                          setShowFullEditor(false);
+                          setAgendaDay(null);
+                        }}
+                        className="flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/45 hover:text-white/75 transition-colors"
+                      >
+                        <Plus size={10} />
+                        Add event
+                      </button>
+                      <button
+                        onClick={() => { setAgendaDay(null); setSelectedDay(null); }}
+                        className="flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.05] text-white/35 hover:text-white/65 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  {dayEvs.length === 0 ? (
+                    <p className="py-4 text-center text-[12px] text-white/28">No events on this day.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto [scrollbar-width:none]">
+                      {dayEvs.map((ev) => {
+                        const c = eventColors(ev.source);
+                        const timeLabel = new Date(ev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        return (
+                          <button key={ev.id}
+                            onClick={() => { openEventDetail(ev); setAgendaDay(null); setSelectedDay(null); }}
+                            className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2.5 text-left transition-colors hover:border-white/[0.12]"
+                          >
+                            <div className={`h-8 w-1 shrink-0 rounded-full ${c.rule}`} />
+                            <div className="min-w-0">
+                              <p className={`truncate text-[13px] font-medium leading-snug ${c.text}`}>{ev.title}</p>
+                              <p className="text-[10px] text-white/35">{timeLabel}{ev.location ? ` · ${ev.location}` : ""}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Mobile: compact event summary strip */}
             <MobileEventStrip
               label={MONTH_NAMES[navDate.getMonth()]}
-              events={calEvents}
+              events={filteredCalEvents}
               loading={eventsLoading}
               onOpen={openEventDetail}
             />
@@ -2322,7 +2387,7 @@ function CalendarModeView() {
             {/* Mobile: compact event summary strip */}
             <MobileEventStrip
               label="This Week"
-              events={calEvents}
+              events={filteredCalEvents}
               loading={eventsLoading}
               onOpen={openEventDetail}
             />
@@ -2333,13 +2398,13 @@ function CalendarModeView() {
         {calView === "agenda" && (() => {
           if (eventsLoading) return (
             <div className="wac-card p-14 flex items-center justify-center">
-              <Loader2 size={20} className="animate-spin text-white/20" />
+              <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
             </div>
           );
 
           // Group events by local date key, preserving chronological order
           const dayGroups = new Map<string, CalEvent[]>();
-          for (const ev of calEvents) {
+          for (const ev of filteredCalEvents) {
             const dk = localDateKey(ev.start_time);
             if (!dayGroups.has(dk)) dayGroups.set(dk, []);
             dayGroups.get(dk)!.push(ev);
@@ -2564,7 +2629,7 @@ function CalendarModeView() {
       {/* Mobile: Sources filter bottom sheet */}
       {showSourceSheet && (
         <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSourceSheet(false)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setShowSourceSheet(false)} />
           <div className="relative z-10 w-full bg-[#0e0e0e] border-t border-white/[0.09] rounded-t-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom,0px),20px)]">
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
@@ -2704,10 +2769,19 @@ export default function EventsPage() {
 
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
-      <div className={`max-w-screen-xl mx-auto px-4 sm:px-6 pb-24 ${isCalendar ? "pt-14 md:pt-20" : "pt-20 md:pt-24"}`}>
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pb-24 pt-20 md:pt-24">
 
-        {/* Page header — hidden in calendar workspace mode */}
-        {!isCalendar && (
+        {/* Page header */}
+        {isCalendar ? (
+          <>
+            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
+              <span className="italic font-light opacity-90 text-teal-400">Calendar</span>
+            </h1>
+            <p className="mt-2 text-sm text-white/45">
+              Your personal events and network gatherings, all in one place.
+            </p>
+          </>
+        ) : (
           <>
             <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
               <span className="italic font-light opacity-90 text-teal-400">Events</span>
@@ -2722,12 +2796,12 @@ export default function EventsPage() {
         <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${isCalendar ? "mt-5" : "mt-5"}`}>
           <div className="flex items-center gap-3">
             {/* Lens tabs */}
-            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-fit">
+            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-full sm:w-fit">
               {LENSES.map(({ id, label, icon: Icon }) => {
                 const active = activeLens === id;
                 return (
                   <button key={id} onClick={() => setActiveLens(id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
+                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
                       active ? "bg-white/[0.08] text-white/80" : "text-white/40 hover:text-white/65"
                     }`}>
                     <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />

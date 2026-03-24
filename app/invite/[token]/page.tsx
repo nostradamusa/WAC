@@ -109,7 +109,7 @@ export default function AcceptInvitePage() {
           You need to be signed in to accept this invitation. After signing in you will be redirected back here.
         </p>
         <Link
-          href={`/login?redirect=/invite/${token}`}
+          href={`/login?next=/invite/${token}`}
           className="px-8 py-2.5 rounded-full bg-[var(--accent)] text-black font-bold text-sm hover:bg-[var(--accent)]/90 transition-colors"
         >
           Sign In
@@ -166,7 +166,7 @@ export default function AcceptInvitePage() {
         </Link>
         <Link
           href="/profile"
-          className="px-8 py-2.5 rounded-full border border-white/20 text-white/70 font-bold text-sm hover:bg-white/5 transition-colors"
+          className="px-8 py-2.5 rounded-full border border-[var(--accent)]/20 text-white/70 font-bold text-sm hover:bg-white/5 transition-colors"
         >
           My Profile
         </Link>

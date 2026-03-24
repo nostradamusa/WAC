@@ -152,26 +152,26 @@ export default function DirectorySearchContext({
       {/* ── Hierarchy 3: Controls (Scopes + Filters) ───────────────────── */}
       <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
         
-        {/* Filters Button (Now inside the scroll area to match rhythm) */}
+        {/* Filters Button — intentionally smaller/secondary */}
         <button
           onClick={onFilterToggle}
-          className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${
+          className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
             isFiltersOpen || activeFilters.length > 0
               ? "bg-[#b08d57]/10 text-[#b08d57] border border-[#b08d57]/20"
-              : "bg-white/5 text-white/60 border border-white/5 hover:bg-white/10 hover:text-white/90"
+              : "bg-white/5 text-white/50 border border-white/[0.08] hover:bg-white/10 hover:text-white/80"
           }`}
         >
-          <SlidersHorizontal size={14} />
+          <SlidersHorizontal size={10} />
           Filters
           {activeFilters.length > 0 && (
-            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-[#b08d57] text-black text-[10px] font-bold">
+            <span className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#b08d57] text-black text-[9px] font-bold">
               {activeFilters.length}
             </span>
           )}
         </button>
 
         {/* Vertical Divider */}
-        <div className="w-px h-5 bg-white/10 shrink-0 mx-1" />
+        <div className="w-px h-5 bg-white/10 shrink-0 mx-0.5" />
 
         {/* Scope Pills */}
         {SCOPES.map(({ value, label }) => {
@@ -183,7 +183,7 @@ export default function DirectorySearchContext({
               className={`shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold transition-colors ${
                 isActive
                   ? "bg-[#b08d57]/10 text-[#b08d57] border border-[#b08d57]/30"
-                  : "bg-white/5 text-white/60 border border-white/5 hover:bg-white/10 hover:text-white/90"
+                  : "bg-white/5 text-white/60 border border-white/[0.08] hover:bg-white/10 hover:text-white/90"
               }`}
             >
               {label}

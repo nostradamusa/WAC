@@ -244,7 +244,7 @@ export default function ComposePostPage() {
             onClick={() => handleSubmit(false)}
             className="py-1.5 px-5 text-sm font-bold rounded-full flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-all bg-[var(--accent)] text-black hover:bg-[#F3E5AB] shadow-lg shadow-[var(--accent)]/10"
           >
-            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+            {isSubmitting && <Loader2 size={14} className="animate-spin text-[var(--accent)]" />}
             Post
           </button>
         </div>
@@ -367,13 +367,13 @@ export default function ComposePostPage() {
                 />
                 {isUploadingMedia && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                    <Loader2 size={20} className="animate-spin text-white" />
+                    <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={removeMedia}
-                  className="absolute -top-2 -right-2 w-5 h-5 bg-[#1a1a1a] border border-white/20 rounded-full flex items-center justify-center text-white/70 hover:text-white transition"
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-[#1a1a1a] border border-[var(--accent)]/20 rounded-full flex items-center justify-center text-white/70 hover:text-white transition"
                 >
                   <X size={10} strokeWidth={2.5} />
                 </button>

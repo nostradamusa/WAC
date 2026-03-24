@@ -76,7 +76,7 @@ export default function PropertyDetails({ params }: { params: Promise<{ id: stri
             />
             {/* Status Badges */}
             <div className="absolute top-4 left-4 flex gap-2">
-              <span className="bg-black/70 backdrop-blur-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded flex items-center gap-2 border border-white/10">
+              <span className="bg-black/70 backdrop-blur-xl px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded flex items-center gap-2 border border-white/10">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> {property.status}
               </span>
               {property.verified && (
@@ -87,15 +87,15 @@ export default function PropertyDetails({ params }: { params: Promise<{ id: stri
             </div>
             
             {/* Gallery Controls */}
-            <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm">
+            <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-xl">
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm">
+            <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-all backdrop-blur-xl">
               <ChevronRight className="w-6 h-6" />
             </button>
 
             {/* Thumbnails */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-md p-2 rounded-xl">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/50 backdrop-blur-xl p-2 rounded-xl">
               {property.images.map((img, idx) => (
                 <button
                   key={idx}

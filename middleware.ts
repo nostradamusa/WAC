@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export function middleware() {
+export function middleware(request: NextRequest) {
+  // 1. Enforce First-Time Welcome Routing at the Edge
+  if (request.nextUrl.pathname === "/") {
+    const hasSeenWelcome = request.cookies.has("wac_welcome_seen");
+    if (!hasSeenWelcome) {
+      return NextResponse.redirect(new URL("/welcome", request.url));
+    }
+  }
   const isDev = process.env.NODE_ENV === "development";
 
   // Build the CSP directives.

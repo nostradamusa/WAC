@@ -194,7 +194,7 @@ function CreateEntityPageContent() {
               >
                 {loading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
                     Creating…
                   </>
                 ) : (

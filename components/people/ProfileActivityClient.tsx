@@ -81,8 +81,8 @@ export default function ProfileActivityClient({ profile }: { profile: EnrichedDi
              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-rose-500/[0.08] border border-rose-500/[0.15]">
                <Activity size={16} className="text-rose-400" strokeWidth={2.5} />
              </div>
-             <h1 className="font-serif text-[18.5px] font-normal text-white leading-none">
-                The <span className="italic text-rose-400">Pulse</span>
+             <h1 className="font-serif text-[24px] font-normal text-white leading-none">
+                <span className="italic text-rose-400">Pulse</span>
              </h1>
            </div>
         </div>

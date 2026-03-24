@@ -150,17 +150,11 @@ export default function CreateGroupPage() {
         </Link>
 
         {/* Page header */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <Network size={13} className="text-white/30" strokeWidth={2} />
-          <span className="text-xs font-semibold tracking-[0.15em] uppercase text-white/40">
-            Groups
-          </span>
-        </div>
-        <h1 className="font-serif text-4xl md:text-5xl tracking-tight text-white leading-[1.1] mb-2">
+        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
           Create a{" "}
-          <span className="italic font-light opacity-90 text-[#b08d57]">Group</span>
+          <span className="italic font-light opacity-90 text-amber-400">Group</span>
         </h1>
-        <p className="text-sm text-white/50 mb-10">
+        <p className="mt-2 text-sm text-white/50 mb-10">
           Start a community around any shared interest, profession, or identity.
         </p>
 
@@ -169,14 +163,14 @@ export default function CreateGroupPage() {
           {/* ── 01 IDENTITY ─────────────────────────────────────────────── */}
           <div className="pb-10 border-b border-white/[0.07]">
             <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#b08d57]/60 uppercase">01</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-amber-400/60 uppercase">01</span>
               <h2 className="text-sm font-bold tracking-widest uppercase text-white/70">Identity</h2>
             </div>
 
             <div className="space-y-5">
               <div>
                 <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
-                  Group Name <span className="text-[#b08d57]/60">*</span>
+                  Group Name <span className="text-amber-400/60">*</span>
                 </label>
                 <input
                   name="name"
@@ -227,14 +221,14 @@ export default function CreateGroupPage() {
           {/* ── 02 COMMUNITY TYPE ───────────────────────────────────────── */}
           <div className="py-10 border-b border-white/[0.07]">
             <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#b08d57]/60 uppercase">02</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-amber-400/60 uppercase">02</span>
               <h2 className="text-sm font-bold tracking-widest uppercase text-white/70">Community Type</h2>
             </div>
 
             <div className="space-y-5">
               <div>
                 <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
-                  Category <span className="text-[#b08d57]/60">*</span>
+                  Category <span className="text-amber-400/60">*</span>
                 </label>
                 <PremiumSelect
                   name="category"
@@ -278,7 +272,7 @@ export default function CreateGroupPage() {
           {/* ── 03 VISIBILITY & ACCESS ──────────────────────────────────── */}
           <div className="py-10 border-b border-white/[0.07]">
             <div className="flex items-baseline gap-3 mb-6">
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#b08d57]/60 uppercase">03</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-amber-400/60 uppercase">03</span>
               <h2 className="text-sm font-bold tracking-widest uppercase text-white/70">Visibility &amp; Access</h2>
             </div>
 
@@ -295,22 +289,22 @@ export default function CreateGroupPage() {
                     onClick={() => setPrivacy(value)}
                     className={`relative text-left flex flex-col gap-2.5 p-4 rounded-xl border transition-all ${
                       privacy === value
-                        ? "border-[#b08d57]/40 bg-[#b08d57]/[0.04]"
+                        ? "border-amber-400/40 bg-amber-500/[0.04]"
                         : "border-white/[0.08] bg-white/[0.01] hover:border-white/15"
                     }`}
                   >
                     {recommended && (
-                      <span className="absolute top-2.5 right-2.5 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#b08d57]/15 text-[#b08d57] border border-[#b08d57]/20">
+                      <span className="absolute top-2.5 right-2.5 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-400/20">
                         Recommended
                       </span>
                     )}
                     <Icon
                       size={16}
-                      className={privacy === value ? "text-[#b08d57]" : "text-white/35"}
+                      className={privacy === value ? "text-amber-400" : "text-white/35"}
                       strokeWidth={1.8}
                     />
                     <div>
-                      <p className={`text-sm font-semibold mb-0.5 ${privacy === value ? "text-[#b08d57]" : "text-white/65"}`}>
+                      <p className={`text-sm font-semibold mb-0.5 ${privacy === value ? "text-amber-400" : "text-white/65"}`}>
                         {label}
                       </p>
                       <p className="text-[11px] text-white/35 leading-relaxed">{description}</p>
@@ -333,22 +327,22 @@ export default function CreateGroupPage() {
                     onClick={() => setJoinPolicy(value)}
                     className={`relative text-left flex flex-col gap-2.5 p-4 rounded-xl border transition-all ${
                       joinPolicy === value
-                        ? "border-[#b08d57]/40 bg-[#b08d57]/[0.04]"
+                        ? "border-amber-400/40 bg-amber-500/[0.04]"
                         : "border-white/[0.08] bg-white/[0.01] hover:border-white/15"
                     }`}
                   >
                     {recommended && (
-                      <span className="absolute top-2.5 right-2.5 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#b08d57]/15 text-[#b08d57] border border-[#b08d57]/20">
+                      <span className="absolute top-2.5 right-2.5 text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-400/20">
                         Recommended
                       </span>
                     )}
                     <Icon
                       size={16}
-                      className={joinPolicy === value ? "text-[#b08d57]" : "text-white/35"}
+                      className={joinPolicy === value ? "text-amber-400" : "text-white/35"}
                       strokeWidth={1.8}
                     />
                     <div>
-                      <p className={`text-sm font-semibold mb-0.5 ${joinPolicy === value ? "text-[#b08d57]" : "text-white/65"}`}>
+                      <p className={`text-sm font-semibold mb-0.5 ${joinPolicy === value ? "text-amber-400" : "text-white/65"}`}>
                         {label}
                       </p>
                       <p className="text-[11px] text-white/35 leading-relaxed">{description}</p>
@@ -362,7 +356,7 @@ export default function CreateGroupPage() {
           {/* ── 04 LINKED ORGANIZATION ──────────────────────────────────── */}
           <div className="py-10 border-b border-white/[0.07]">
             <div className="flex items-baseline gap-3 mb-2">
-              <span className="text-[10px] font-bold tracking-[0.2em] text-[#b08d57]/60 uppercase">04</span>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-amber-400/60 uppercase">04</span>
               <h2 className="text-sm font-bold tracking-widest uppercase text-white/70">Linked Organization</h2>
               <span className="text-[10px] text-white/30 uppercase tracking-wide">(Optional)</span>
             </div>
@@ -396,13 +390,13 @@ export default function CreateGroupPage() {
               disabled={submitting}
               className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-full font-bold text-sm transition-colors ${
                 submitting
-                  ? "bg-[#b08d57]/50 text-black/50 cursor-not-allowed"
-                  : "bg-[#b08d57] text-black hover:bg-[#9a7545]"
+                  ? "bg-amber-500/50 text-black/50 cursor-not-allowed"
+                  : "bg-amber-500 text-black hover:bg-[#9a7545]"
               }`}
             >
               {submitting ? (
                 <>
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={15} className="animate-spin text-[var(--accent)]" />
                   Creating Group...
                 </>
               ) : (

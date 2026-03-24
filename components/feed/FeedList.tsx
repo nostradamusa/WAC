@@ -187,7 +187,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
 
       {/* ── Feed Tab Bar ── */}
       <div className="relative z-10 bg-[var(--background)]">
-        <div className="border-b border-white/[0.08] py-3 mb-4 flex items-center justify-between">
+        <div className="border-b border-white/[0.08] py-2 mb-3 flex items-center justify-between">
 
           <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full">
             <button
@@ -218,7 +218,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
             <button
               onClick={() => setShowSortOptions((v) => !v)}
               aria-label="Sort feed"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-colors ${
                 showSortOptions
                   ? "border-[#b08d57]/30 bg-[#b08d57]/[0.08] text-[#b08d57]/80"
                   : "border-white/[0.10] text-white/40 hover:text-white/60 hover:border-white/[0.15]"
@@ -302,18 +302,25 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
           </button>
         </div>
       ) : posts.length === 0 ? (
-        <div className="wac-card py-12 px-6 text-center">
-          <Activity size={28} className="mx-auto text-white/15 mb-4" strokeWidth={1.5} />
-          <h3 className="text-sm font-semibold text-white/50 mb-1.5">
-            {activeTab === "foryou"
-              ? "The feed is quiet right now."
-              : "Nothing from your following yet."}
-          </h3>
-          <p className="text-xs text-white/30 max-w-xs mx-auto leading-relaxed">
-            {activeTab === "foryou"
-              ? "Posts from across the network will appear here as people and organizations publish."
-              : "Follow people, businesses, or organizations to see their updates here."}
-          </p>
+        <div className="wac-card py-20 px-6 flex flex-col items-center justify-center text-center space-y-6">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 bg-[#b08d57]/15 blur-xl rounded-full" />
+            <div className="relative w-16 h-16 rounded-3xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center shadow-lg backdrop-blur-xl">
+              <Activity className="w-7 h-7 text-[#b08d57]/70" strokeWidth={1.5} />
+            </div>
+          </div>
+          <div className="space-y-1.5 max-w-[320px]">
+            <h3 className="text-[17px] font-medium text-white/90 tracking-wide text-balance">
+              {activeTab === "foryou"
+                ? "The feed is quiet right now"
+                : "Nothing from your following yet"}
+            </h3>
+            <p className="text-[13px] text-white/40 leading-relaxed text-balance">
+              {activeTab === "foryou"
+                ? "Posts from across the network will appear here as people and organizations publish."
+                : "Follow people, businesses, or organizations to see their updates here."}
+            </p>
+          </div>
         </div>
       ) : (
         <div>

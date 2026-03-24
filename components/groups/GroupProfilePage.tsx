@@ -302,7 +302,7 @@ function GroupTabNav({
   onTabChange: (t: TabId) => void;
 }) {
   return (
-    <div className="sticky top-[65px] z-30 bg-[var(--background)]/95 backdrop-blur-sm border-b border-white/[0.06]">
+    <div className="sticky top-[65px] z-30 bg-[var(--background)]/95 backdrop-blur-xl border-b border-white/[0.06]">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div
           className="flex items-center gap-1 overflow-x-auto"

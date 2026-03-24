@@ -56,7 +56,8 @@ export function useUnreadMessageCount(actorId: string | null | undefined, userId
 }
 
 // ─── Notification count ────────────────────────────────────────────────────────
-// Counts pending connection requests sent to the user + pending entity invites.
+// Counts pending connection requests sent to the user, pending entity invites,
+// and unread notifications.
 
 export function useNotificationCount(userId: string | null | undefined, userEmail: string | null | undefined) {
   const [count, setCount] = useState(0);
@@ -68,7 +69,7 @@ export function useNotificationCount(userId: string | null | undefined, userEmai
         return;
       }
 
-      const [connectionRes, inviteRes] = await Promise.all([
+      const [connectionRes, inviteRes, notifRes] = await Promise.all([
         supabase
           .from("connection_requests")
           .select("id", { count: "exact", head: true })
@@ -81,9 +82,14 @@ export function useNotificationCount(userId: string | null | undefined, userEmai
               .eq("email", userEmail)
               .eq("status", "pending")
           : Promise.resolve({ count: 0, error: null }),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_id", userId)
+          .eq("is_read", false),
       ]);
 
-      setCount((connectionRes.count ?? 0) + (inviteRes.count ?? 0));
+      setCount((connectionRes.count ?? 0) + (inviteRes.count ?? 0) + (notifRes.count ?? 0));
     }
 
     fetch();
@@ -92,6 +98,7 @@ export function useNotificationCount(userId: string | null | undefined, userEmai
       .channel(`notification_count_${userId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "connection_requests" }, fetch)
       .on("postgres_changes", { event: "*", schema: "public", table: "entity_invites" }, fetch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, fetch)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

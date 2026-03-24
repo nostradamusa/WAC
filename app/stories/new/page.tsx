@@ -443,7 +443,7 @@ export default function StoriesNewPage() {
         onClick={(e) => { e.stopPropagation(); onClick(); }}
         className={`
           w-10 h-10 rounded-full flex flex-col items-center justify-center gap-[3px]
-          backdrop-blur-md border transition-all
+          backdrop-blur-xl border transition-all
           ${active
             ? "bg-[#b08d57]/25 border-[#b08d57]/45 text-[#b08d57]"
             : "bg-white/[0.13] border-white/[0.20] text-white/75 hover:bg-white/[0.20] hover:border-white/[0.30]"
@@ -492,7 +492,7 @@ export default function StoriesNewPage() {
             style={{ left: `${chip.x}%`, top: `${chip.y}%`, transform: "translate(-50%, -50%)", touchAction: "none" }}
             onPointerDown={(e) => onElementPointerDown(e, "mention", chip.id, chip.x, chip.y)}
           >
-            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-sm font-semibold backdrop-blur-sm whitespace-nowrap select-none ${
+            <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-sm font-semibold backdrop-blur-xl whitespace-nowrap select-none ${
               activeMentionId === chip.id
                 ? "border-[#b08d57]/55 bg-[#b08d57]/20 text-[#b08d57]"
                 : "border-white/22 bg-black/45 text-white"
@@ -523,7 +523,7 @@ export default function StoriesNewPage() {
     if (!locationTag) return null;
     return (
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[15]">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 border border-white/15 backdrop-blur-sm whitespace-nowrap select-none">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 border border-white/15 backdrop-blur-xl whitespace-nowrap select-none">
           <MapPin size={11} strokeWidth={2} className="text-[#b08d57] shrink-0" />
           <span className="text-white/80 text-xs font-medium">{locationTag}</span>
           <button
@@ -543,7 +543,7 @@ export default function StoriesNewPage() {
     if (!showMentionPicker) return null;
     return (
       <div className="absolute inset-0 z-50 flex flex-col justify-end">
-        <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setShowMentionPicker(false)} />
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-xl" onClick={() => setShowMentionPicker(false)} />
         <div className="relative bg-[#111] rounded-t-[28px] border-t border-white/[0.08] pb-8 flex flex-col" style={{ maxHeight: "72%" }}>
           <div className="w-8 h-1 rounded-full bg-white/15 mx-auto mt-4 mb-3 shrink-0" />
           <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[0.16em] px-5 mb-3 shrink-0">Mention Someone</p>
@@ -562,7 +562,7 @@ export default function StoriesNewPage() {
           </div>
           <div className="overflow-y-auto flex-1 px-2">
             {mentionLoading && (
-              <div className="flex justify-center py-8"><Loader2 size={16} className="text-white/25 animate-spin" /></div>
+              <div className="flex justify-center py-8"><Loader2 size={16} className="text-[var(--accent)] animate-spin" /></div>
             )}
             {!mentionLoading && mentionQuery.length >= 2 && mentionResults.length === 0 && (
               <p className="text-center text-xs text-white/25 py-8">No results for &quot;{mentionQuery}&quot;</p>
@@ -598,7 +598,7 @@ export default function StoriesNewPage() {
     if (!showLocationSheet) return null;
     return (
       <div className="absolute inset-0 z-50 flex flex-col justify-end">
-        <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setShowLocationSheet(false)} />
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-xl" onClick={() => setShowLocationSheet(false)} />
         <div className="relative bg-[#111] rounded-t-[28px] border-t border-white/[0.08] px-5 pt-4 pb-10">
           <div className="w-8 h-1 rounded-full bg-white/15 mx-auto mb-4" />
           <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[0.16em] mb-4">Add Location</p>
@@ -631,7 +631,7 @@ export default function StoriesNewPage() {
     if (!showSettings) return null;
     return (
       <div className="absolute inset-0 z-50 flex flex-col justify-end">
-        <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-xl" onClick={() => setShowSettings(false)} />
         <div className="relative bg-[#111111] rounded-t-[28px] border-t border-white/[0.08] px-5 pt-4 pb-10">
           <div className="w-8 h-1 rounded-full bg-white/15 mx-auto mb-5" />
           <p className="text-[10px] font-semibold text-white/30 uppercase tracking-[0.16em] mb-5">Story Settings</p>
@@ -776,11 +776,11 @@ export default function StoriesNewPage() {
               {/* Top bar */}
               <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 pt-5 pb-3">
                 <button onClick={exitTextMode}
-                  className="px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/[0.12] text-white/60 text-sm font-medium hover:text-white/80 transition">
+                  className="px-3 py-1.5 rounded-full bg-black/30 backdrop-blur-xl border border-white/[0.12] text-white/60 text-sm font-medium hover:text-white/80 transition">
                   Cancel
                 </button>
                 {currentActor && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/35 border border-white/[0.10] backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/35 border border-white/[0.10] backdrop-blur-xl">
                     <div className="w-3.5 h-3.5 rounded-full bg-[#b08d57]/30 flex items-center justify-center shrink-0">
                       <span className="text-[6px] font-bold text-[#b08d57]/80">{currentActor.name[0]}</span>
                     </div>
@@ -789,7 +789,7 @@ export default function StoriesNewPage() {
                 )}
                 <button onClick={handlePostTextStory} disabled={!mainText.trim() || isPosting}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#b08d57] text-black text-sm font-bold disabled:opacity-40 hover:bg-[#9a7545] transition">
-                  {isPosting && <Loader2 size={13} className="animate-spin" />}
+                  {isPosting && <Loader2 size={13} className="animate-spin text-[var(--accent)]" />}
                   {isPosting ? "Posting…" : "Post"}
                 </button>
               </div>
@@ -834,7 +834,7 @@ export default function StoriesNewPage() {
             </div>
 
             {/* Bottom toolbar — font family + bg + size slider */}
-            <div className="shrink-0 bg-black/60 backdrop-blur-md border-t border-white/[0.06]">
+            <div className="shrink-0 bg-black/60 backdrop-blur-xl border-t border-white/[0.06]">
 
               {/* Row 1: Font family picker */}
               <div className="flex items-center gap-2 px-4 pt-3 pb-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
@@ -925,7 +925,7 @@ export default function StoriesNewPage() {
               {/* Back button — top-left */}
               <button
                 onClick={(e) => { e.stopPropagation(); clearMedia(); }}
-                className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md bg-white/[0.13] border border-white/[0.20] text-white/75 hover:bg-white/[0.20] transition"
+                className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-xl bg-white/[0.13] border border-white/[0.20] text-white/75 hover:bg-white/[0.20] transition"
               >
                 <X size={14} strokeWidth={2} />
               </button>
@@ -967,7 +967,7 @@ export default function StoriesNewPage() {
                           setTextLayers(prev => prev.filter(l => l.id !== layer.id));
                           setActiveLayerId(null);
                         }}
-                        className="absolute -top-5 -right-5 w-6 h-6 bg-black/80 rounded-full flex items-center justify-center border border-white/20 z-10"
+                        className="absolute -top-5 -right-5 w-6 h-6 bg-black/80 rounded-full flex items-center justify-center border border-[var(--accent)]/20 z-10"
                         style={{ touchAction: "none" }}
                       >
                         <X size={10} className="text-white" strokeWidth={2.5} />
@@ -1129,7 +1129,7 @@ export default function StoriesNewPage() {
               <div className="px-4 pb-8 pt-2">
                 <button onClick={handlePostMediaStory} disabled={isPosting}
                   className="w-full bg-[#b08d57] text-black hover:bg-[#9a7545] py-3.5 rounded-full font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40 transition-colors tracking-[0.04em]">
-                  {isPosting && <Loader2 size={14} className="animate-spin" />}
+                  {isPosting && <Loader2 size={14} className="animate-spin text-[var(--accent)]" />}
                   {isPosting ? "Posting…" : "Post Story"}
                 </button>
               </div>
