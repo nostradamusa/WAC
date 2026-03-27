@@ -119,8 +119,8 @@ export default function Footer() {
               <ul className="flex flex-col gap-3 text-sm">
                 {[
                   { label: "Our Mission", href: "/vision" },
-                  { label: "Leadership Team", href: "#" },
-                  { label: "Become a Member", href: "#" },
+                  { label: "Leadership Team", href: "/vision" },
+                  { label: "Become a Member", href: "/contact" },
                   { label: "Contact Us", href: "/contact" },
                   { label: "Privacy Policy", href: "/privacy" },
                 ].map(({ label, href }) => (
