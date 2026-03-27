@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Check } from "lucide-react";
 
 export type PremiumSelectOption = {
@@ -44,6 +45,7 @@ export default function PremiumSelect({
 }: PremiumSelectProps) {
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const panelId = useId();
 
@@ -80,6 +82,55 @@ export default function PremiumSelect({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || isMobile) return;
+
+    const updatePanelPosition = () => {
+      const triggerRect = rootRef.current?.getBoundingClientRect();
+      if (!triggerRect) return;
+
+      const viewportPadding = 12;
+      const panelWidth = Math.max(triggerRect.width, compact ? 180 : 220);
+      const maxWidth = Math.min(Math.max(panelWidth, triggerRect.width), window.innerWidth - viewportPadding * 2);
+      const estimatedPanelHeight = Math.min(options.length * (compact ? 34 : 42) + 20, 320);
+      const spaceBelow = window.innerHeight - triggerRect.bottom - viewportPadding;
+      const spaceAbove = triggerRect.top - viewportPadding;
+      const openAbove = spaceBelow < Math.min(estimatedPanelHeight, 220) && spaceAbove > spaceBelow;
+      const top = openAbove
+        ? Math.max(viewportPadding, triggerRect.top - Math.min(estimatedPanelHeight, spaceAbove) - 8)
+        : triggerRect.bottom + 8;
+      const left = align === "right"
+        ? undefined
+        : Math.min(
+            Math.max(viewportPadding, triggerRect.left),
+            window.innerWidth - maxWidth - viewportPadding
+          );
+      const right = align === "right"
+        ? Math.max(viewportPadding, window.innerWidth - triggerRect.right)
+        : undefined;
+
+      setPanelStyle({
+        position: "fixed",
+        top,
+        left,
+        right,
+        minWidth: triggerRect.width,
+        maxWidth,
+        maxHeight: Math.max(160, openAbove ? spaceAbove : spaceBelow),
+        zIndex: 90,
+      });
+    };
+
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [align, isMobile, open]);
+
   const selected = useMemo(
     () => options.find((option) => option.value === value) ?? null,
     [options, value]
@@ -115,11 +166,12 @@ export default function PremiumSelect({
         />
       </button>
 
-      {open && !isMobile ? (
+      {open && !isMobile && panelStyle ? createPortal(
         <div
           id={panelId}
           role="listbox"
-          className={`absolute z-50 mt-2 min-w-full overflow-hidden rounded-2xl border border-[#b08d57]/20 bg-[#120f0d]/96 p-1.5 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl ${align === "right" ? "right-0" : "left-0"} ${panelClassName}`}
+          style={panelStyle}
+          className={`overflow-y-auto rounded-2xl border border-[#b08d57]/20 bg-[#120f0d]/96 p-1.5 shadow-[0_22px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl ${panelClassName}`}
         >
           {options.map((option) => {
             const active = option.value === value;
@@ -144,7 +196,8 @@ export default function PremiumSelect({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       ) : null}
 
       {open && isMobile ? (

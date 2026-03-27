@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock } from 'lucide-react';
 
 interface WacTimePickerProps {
@@ -10,9 +11,24 @@ interface WacTimePickerProps {
 
 export default function WacTimePicker({ value, onChange, placeholder = "Select time", disabled }: WacTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -20,7 +36,49 @@ export default function WacTimePicker({ value, onChange, placeholder = "Select t
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isMobile) return;
+
+    const updatePanelPosition = () => {
+      const triggerRect = containerRef.current?.getBoundingClientRect();
+      if (!triggerRect) return;
+
+      const viewportPadding = 12;
+      const desiredWidth = Math.max(triggerRect.width, 220);
+      const panelHeight = Math.min(window.innerHeight * 0.5, 320);
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - triggerRect.bottom - viewportPadding;
+      const spaceAbove = triggerRect.top - viewportPadding;
+      const openAbove = spaceBelow < panelHeight + 24 && spaceAbove > spaceBelow;
+      const top = openAbove
+        ? Math.max(viewportPadding, triggerRect.top - panelHeight - 8)
+        : Math.min(viewportHeight - panelHeight - viewportPadding, triggerRect.bottom + 8);
+      const width = Math.min(desiredWidth, window.innerWidth - viewportPadding * 2);
+      const left = Math.min(
+        Math.max(viewportPadding, triggerRect.left),
+        window.innerWidth - width - viewportPadding
+      );
+
+      setPanelStyle({
+        position: "fixed",
+        top,
+        left,
+        width,
+        zIndex: 90,
+      });
+    };
+
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [isMobile, isOpen]);
 
   // Generate 15-minute intervals
   const times = [];
@@ -60,31 +118,55 @@ export default function WacTimePicker({ value, onChange, placeholder = "Select t
         <>
           {/* Mobile Backdrop */}
           <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-xl md:hidden" onClick={() => setIsOpen(false)} />
-
-          <div className="fixed inset-x-0 bottom-0 z-[100] bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom flex flex-col items-center md:absolute md:inset-auto md:top-full md:mt-2 md:p-1 md:rounded-xl md:border md:bg-[#0a0a0a]/95 md:backdrop-blur-xl md:shadow-2xl md:shadow-black md:w-full md:min-w-[200px] md:origin-top md:slide-in-from-top-2">
-            
-            {/* Mobile Drag Handle */}
-            <div className="w-12 h-1.5 bg-white/10 rounded-full mb-5 md:hidden shrink-0" />
-            
-            <div className="w-full max-h-[50vh] md:max-h-64 overflow-y-auto no-scrollbar max-w-sm">
-              {times.map((time) => (
-                <button
-                  key={time}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onChange(time);
-                    setIsOpen(false);
-                  }}
-                  type="button"
-                  className={`w-full text-center md:text-left px-4 py-4 md:py-2.5 my-1 md:my-0.5 text-base md:text-sm rounded-xl md:rounded-lg transition-colors ${
-                    value === time ? "bg-purple-500/20 text-purple-400 font-semibold" : "text-white/70 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {formatTime(time)}
-                </button>
-              ))}
+          {isMobile ? (
+            <div className="fixed inset-x-0 bottom-0 z-[100] bg-[#0a0a0a] border-t border-white/10 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom flex flex-col items-center">
+              <div className="w-12 h-1.5 bg-white/10 rounded-full mb-5 shrink-0" />
+              
+              <div className="w-full max-h-[50vh] overflow-y-auto no-scrollbar max-w-sm">
+                {times.map((time) => (
+                  <button
+                    key={time}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onChange(time);
+                      setIsOpen(false);
+                    }}
+                    type="button"
+                    className={`w-full text-center px-4 py-4 my-1 text-base rounded-xl transition-colors ${
+                      value === time ? "bg-purple-500/20 text-purple-400 font-semibold" : "text-white/70 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {formatTime(time)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : panelStyle ? createPortal(
+            <div
+              style={panelStyle}
+              className="border border-white/10 bg-[#0a0a0a]/95 rounded-xl p-1 backdrop-blur-xl shadow-2xl shadow-black"
+            >
+              <div className="w-full max-h-64 overflow-y-auto no-scrollbar">
+                {times.map((time) => (
+                  <button
+                    key={time}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onChange(time);
+                      setIsOpen(false);
+                    }}
+                    type="button"
+                    className={`w-full text-left px-4 py-2.5 my-0.5 text-sm rounded-lg transition-colors ${
+                      value === time ? "bg-purple-500/20 text-purple-400 font-semibold" : "text-white/70 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    {formatTime(time)}
+                  </button>
+                ))}
+              </div>
+            </div>,
+            document.body
+          ) : null}
         </>
       )}
     </div>

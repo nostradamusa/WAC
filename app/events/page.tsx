@@ -65,36 +65,98 @@ interface QuestionItem {
   required: boolean;
 }
 
-// Relationship priority: personal > rsvp > group > org > business > people > browse
-// "browse"  = public/network-visible event the user does not own and hasn't RSVP'd
-// "personal" must only be set when created_by === current user's id
-type CalRelationship = "personal" | "rsvp" | "group" | "org" | "business" | "people" | "browse";
+type CalSource = "group" | "org" | "business";
+type CalendarSourceFilter = "wac" | CalSource;
+type CalendarSourcePreferences = Record<CalendarSourceFilter, boolean>;
+type SavedCalendarEntity = {
+  id: string;
+  name: string;
+  entityType: "organization" | "business";
+};
 
-const REL_COLORS: Record<CalRelationship, {
+const DEFAULT_CALENDAR_SOURCE_PREFERENCES: CalendarSourcePreferences = {
+  wac: true,
+  org: true,
+  group: true,
+  business: true,
+};
+
+const CORE_CALENDAR_SOURCE_IDS: CalendarSourceFilter[] = ["wac", "org", "group", "business"];
+
+const WAC_EVENT_COLORS: {
+  bg: string; text: string; border: string; dot: string; rule: string; hover: string;
+} = {
+  bg: "bg-white/[0.05]",
+  text: "text-white/70",
+  border: "border-white/[0.10]",
+  dot: "bg-white/55",
+  rule: "bg-white/[0.18]",
+  hover: "hover:bg-white/[0.09]",
+};
+
+const SOURCE_COLORS: Record<CalSource, {
   bg: string; text: string; border: string; dot: string; rule: string; hover: string;
 }> = {
-  personal: { bg: "bg-rose-500/[0.16]",    text: "text-rose-300",    border: "border-rose-400/[0.22]",    dot: "bg-rose-400",    rule: "bg-rose-500/30",    hover: "hover:bg-rose-500/[0.26]"    },
-  rsvp:     { bg: "bg-teal-500/[0.16]",    text: "text-teal-300",    border: "border-teal-400/[0.22]",    dot: "bg-teal-400",    rule: "bg-teal-500/30",    hover: "hover:bg-teal-500/[0.26]"    },
   group:    { bg: "bg-amber-500/[0.16]",   text: "text-amber-300",   border: "border-amber-400/[0.22]",   dot: "bg-amber-400",   rule: "bg-amber-500/30",   hover: "hover:bg-amber-500/[0.26]"   },
   org:      { bg: "bg-emerald-500/[0.16]", text: "text-emerald-300", border: "border-emerald-400/[0.22]", dot: "bg-emerald-400", rule: "bg-emerald-500/30", hover: "hover:bg-emerald-500/[0.26]" },
   business: { bg: "bg-blue-500/[0.16]",    text: "text-blue-300",    border: "border-blue-400/[0.22]",    dot: "bg-blue-400",    rule: "bg-blue-500/30",    hover: "hover:bg-blue-500/[0.26]"    },
-  people:   { bg: "bg-[#b08d57]/[0.16]",   text: "text-[#b08d57]",   border: "border-[#b08d57]/[0.22]",   dot: "bg-[#b08d57]",   rule: "bg-[#b08d57]/30",   hover: "hover:bg-[#b08d57]/[0.26]"   },
-  browse:   { bg: "bg-white/[0.05]",        text: "text-white/45",    border: "border-white/[0.10]",        dot: "bg-white/30",    rule: "bg-white/[0.12]",   hover: "hover:bg-white/[0.09]"        },
 };
 
-const REL_LABELS: Record<CalRelationship, string> = {
-  personal: "Private Items",
-  rsvp:     "My RSVP",
-  group:    "My Group",
-  org:      "Followed Org",
-  business: "Followed Business",
-  people:   "Followed Person",
-  browse:   "Public Event",
+const SOURCE_LABELS: Record<CalSource, string> = {
+  group: "Group Event",
+  org: "Organization Event",
+  business: "Business Event",
 };
 
-// Default to "browse" (neutral) — never assume personal without explicit classification
-function eventColors(source?: CalRelationship) {
-  return REL_COLORS[source ?? "browse"];
+function eventColors(source?: CalSource | null) {
+  return source ? SOURCE_COLORS[source] : WAC_EVENT_COLORS;
+}
+
+function eventSourceLabel(source?: CalSource | null) {
+  return source ? SOURCE_LABELS[source] : "WAC Event";
+}
+
+function sourceFilterId(source?: CalSource | null): CalendarSourceFilter {
+  return source ?? "wac";
+}
+
+function normalizeCalendarSourcePreferences(value: unknown): CalendarSourcePreferences {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return DEFAULT_CALENDAR_SOURCE_PREFERENCES;
+  }
+
+  const record = value as Partial<Record<CalendarSourceFilter, unknown>>;
+  return {
+    wac: typeof record.wac === "boolean" ? record.wac : DEFAULT_CALENDAR_SOURCE_PREFERENCES.wac,
+    org: typeof record.org === "boolean" ? record.org : DEFAULT_CALENDAR_SOURCE_PREFERENCES.org,
+    group: typeof record.group === "boolean" ? record.group : DEFAULT_CALENDAR_SOURCE_PREFERENCES.group,
+    business: typeof record.business === "boolean" ? record.business : DEFAULT_CALENDAR_SOURCE_PREFERENCES.business,
+  };
+}
+
+function buildCalendarSourceSet(preferences: CalendarSourcePreferences): Set<string> {
+  return new Set(
+    CORE_CALENDAR_SOURCE_IDS.filter((id) => preferences[id])
+  );
+}
+
+function getCalendarSourcePreferencesFromSet(activeSources: Set<string>): CalendarSourcePreferences {
+  return {
+    wac: activeSources.has("wac"),
+    org: activeSources.has("org"),
+    group: activeSources.has("group"),
+    business: activeSources.has("business"),
+  };
+}
+
+function monthCellPriority(event: CalEvent): number {
+  if (event.source === null && event.is_major) return 0;
+  if (event.current_user_rsvp_status && event.current_user_rsvp_status !== "not_going") return 1;
+  if (event.source === null) return 2;
+  if (event.source === "org") return 3;
+  if (event.source === "group") return 4;
+  if (event.source === "business") return 5;
+  return 6;
 }
 
 function getEventMetaBadge(event: CalEvent): { label: string; className: string } | null {
@@ -149,11 +211,12 @@ interface CalEvent {
   display_mode: "calendar" | "feed" | "both";
   status: "draft" | "published" | "cancelled" | "completed";
   event_type: "event" | "announcement" | "feature_drop" | "alert";
+  is_major: boolean;
 
   attending_count?: number;
   current_user_rsvp_status?: "going" | "interested" | "not_going" | null;
   current_user_approval_status?: "approved" | "pending" | "declined" | "waitlisted" | null;
-  source?:     CalRelationship; // classified after fetch — never defaults to personal
+  source?:     CalSource | null; // classified after fetch from source_type / source_id
 }
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
@@ -192,6 +255,8 @@ const DURATION_CHIPS = [
   { label: "2h",   minutes: 120 },
   { label: "3h",   minutes: 180 },
 ];
+
+const EVENT_DRAFT_KEY = "events:new:draft";
 
 // ── Draft factory ──────────────────────────────────────────────────────────────
 // endTime defaults to startTime + 1h; pass explicitEndTime to override (e.g. from week-grid drag)
@@ -279,8 +344,8 @@ const EVENT_TYPES = [
 ];
 
 const LENSES: { id: Lens; label: string; icon: React.ElementType }[] = [
-  { id: "my-network", label: "My Network", icon: Network      },
-  { id: "browse",     label: "Browse",     icon: LayoutGrid   },
+  { id: "my-network", label: "Highlights", icon: Network      },
+  { id: "browse",     label: "Explore",    icon: LayoutGrid   },
   { id: "calendar",   label: "Calendar",   icon: CalendarDays },
 ];
 
@@ -300,13 +365,11 @@ function formatHour(h: number): string {
   return `${h - 12} PM`;
 }
 
-const CAL_SOURCES = [
-  { id: "personal",   label: "Private Items",          dot: "bg-rose-400",    disabled: false },
-  { id: "rsvps",      label: "My RSVPs",               dot: "bg-teal-400",    disabled: false },
-  { id: "groups",     label: "My Groups",              dot: "bg-amber-400",   disabled: false },
-  { id: "orgs",       label: "Followed Orgs",          dot: "bg-emerald-400", disabled: false },
-  { id: "businesses", label: "Followed Businesses",    dot: "bg-blue-400",    disabled: false },
-  { id: "people",     label: "Followed People",        dot: "bg-[#b08d57]",   disabled: false },
+const CAL_SOURCES: Array<{ id: CalendarSourceFilter | "imported"; label: string; dot: string; disabled: boolean }> = [
+  { id: "wac",      label: "WAC Master",           dot: "bg-white/55",     disabled: false },
+  { id: "group",    label: "Group Calendars",      dot: "bg-amber-400",    disabled: false },
+  { id: "org",      label: "Organization Calendars", dot: "bg-emerald-400",  disabled: false },
+  { id: "business", label: "Business Calendars",   dot: "bg-blue-400",     disabled: false },
   { id: "imported",   label: "Imported Calendars",     dot: "bg-white/25",    disabled: true  },
 ];
 
@@ -317,12 +380,10 @@ const CAL_VIEW_TABS: { id: CalViewMode; label: string; icon: React.ElementType }
 ];
 
 function sourceLabelForChip(id: string, fallback: string): string {
-  if (id === "orgs") return "Orgs";
-  if (id === "businesses") return "Businesses";
-  if (id === "people") return "People";
-  if (id === "personal") return "Private";
-  if (id === "rsvps") return "RSVPs";
-  if (id === "groups") return "Groups";
+  if (id === "wac") return "WAC";
+  if (id === "org") return "Orgs";
+  if (id === "business") return "Businesses";
+  if (id === "group") return "Groups";
   return fallback;
 }
 
@@ -540,7 +601,7 @@ function CreateEventModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/65 backdrop-blur-xl" onClick={onClose} />
-      <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[84vh]">
+      <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col min-h-0 overflow-hidden max-h-[92dvh] sm:max-h-[84vh]">
 
         <div className="flex justify-center pt-3 sm:hidden shrink-0">
           <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
@@ -549,14 +610,22 @@ function CreateEventModal({
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-3 pb-3 sm:px-5 sm:pt-4 shrink-0">
           <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.08] rounded-full">
-            {(["event", "task"] as const).map((t) => (
-              <button key={t} onClick={() => set({ type: t })}
-                className={`px-3.5 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
-                  draft.type === t ? "bg-teal-500/[0.14] text-teal-400" : "text-white/38 hover:text-white/65"
-                }`}>
-                {t}
-              </button>
-            ))}
+            {(["event", "task"] as const).map((t) => {
+              const disabled = t === "task";
+              return (
+                <button key={t} onClick={() => !disabled && set({ type: t })}
+                  disabled={disabled}
+                  title={disabled ? "Coming soon" : undefined}
+                  className={`px-3.5 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
+                    disabled
+                      ? "cursor-not-allowed border border-white/[0.06] bg-white/[0.02] text-white/24"
+                      : draft.type === t ? "bg-teal-500/[0.14] text-teal-400" : "text-white/38 hover:text-white/65"
+                  }`}>
+                  <span>{t}</span>
+                  {disabled && <span className="ml-1 text-[9px] uppercase tracking-[0.12em] text-white/18">Soon</span>}
+                </button>
+              );
+            })}
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white/65 hover:bg-white/[0.05] transition-colors">
             <X size={13} />
@@ -574,7 +643,7 @@ function CreateEventModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-4 sm:px-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2 space-y-4 sm:px-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
           {/* ── TASK mode — lightweight ── */}
           {isTask && (
@@ -832,7 +901,7 @@ function FullEventEditorModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
 
-      <div className="relative z-10 w-full sm:max-w-xl bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[96vh] sm:max-h-[88vh]">
+      <div className="relative z-10 w-full sm:max-w-xl bg-[#0f0f0f] border border-white/[0.1] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col min-h-0 overflow-hidden max-h-[96dvh] sm:max-h-[88vh]">
 
         <div className="flex justify-center pt-3 sm:hidden shrink-0">
           <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
@@ -866,21 +935,29 @@ function FullEventEditorModal({
         </div>
 
         {/* ── Tab content ── */}
-        <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
           {/* ────────────── BASICS ────────────── */}
           {activeTab === "basics" && (
             <div className="px-4 py-4 space-y-4 sm:px-5">
               {/* Event / Task */}
               <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.08] rounded-full w-fit">
-                {(["event", "task"] as const).map((t) => (
-                  <button key={t} onClick={() => set({ type: t })}
-                    className={`px-3.5 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
-                      draft.type === t ? "bg-teal-500/[0.14] text-teal-400" : "text-white/38 hover:text-white/65"
-                    }`}>
-                    {t}
-                  </button>
-                ))}
+                {(["event", "task"] as const).map((t) => {
+                  const disabled = t === "task";
+                  return (
+                    <button key={t} onClick={() => !disabled && set({ type: t })}
+                      disabled={disabled}
+                      title={disabled ? "Coming soon" : undefined}
+                      className={`px-3.5 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
+                        disabled
+                          ? "cursor-not-allowed border border-white/[0.06] bg-white/[0.02] text-white/24"
+                          : draft.type === t ? "bg-teal-500/[0.14] text-teal-400" : "text-white/38 hover:text-white/65"
+                      }`}>
+                      <span>{t}</span>
+                      {disabled && <span className="ml-1 text-[9px] uppercase tracking-[0.12em] text-white/18">Soon</span>}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Title */}
@@ -1347,7 +1424,7 @@ function CalEventDetailModal({
   const [deleteError, setDeleteError] = useState("");
 
   const c          = eventColors(event.source);
-  const relLabel   = REL_LABELS[event.source ?? "browse"];
+  const relLabel   = eventSourceLabel(event.source);
 
   const start      = new Date(event.start_time);
   const end        = event.end_time ? new Date(event.end_time) : null;
@@ -1754,8 +1831,25 @@ function CalendarModeView() {
   }
 
   const [activeSources, setActiveSources] = useState<Set<string>>(
-    new Set(CAL_SOURCES.filter((source) => !source.disabled).map((source) => source.id))
+    buildCalendarSourceSet(DEFAULT_CALENDAR_SOURCE_PREFERENCES)
   );
+  const [calendarPrefsUserId, setCalendarPrefsUserId] = useState<string | null>(null);
+  const [calendarPrefsReady, setCalendarPrefsReady] = useState(false);
+  const [calendarEntitySubscriptions, setCalendarEntitySubscriptions] = useState<{
+    organization: Set<string>;
+    business: Set<string>;
+  }>({
+    organization: new Set(),
+    business: new Set(),
+  });
+  const [savedCalendarEntities, setSavedCalendarEntities] = useState<{
+    organizations: SavedCalendarEntity[];
+    businesses: SavedCalendarEntity[];
+  }>({
+    organizations: [],
+    businesses: [],
+  });
+  const lastSavedCalendarPreferencesRef = useRef<string | null>(null);
   function toggleSource(id: string) {
     setActiveSources((prev) => {
       const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
@@ -1765,6 +1859,221 @@ function CalendarModeView() {
   const [showSourceSheet,  setShowSourceSheet]  = useState(false);
   const [showImportModal,  setShowImportModal]  = useState(false);
   const [importedCals,     setImportedCals]     = useState<ImportedCal[]>(() => loadImportedCals());
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function applyCalendarSourcePreferences(userId: string | null) {
+      if (cancelled) return;
+
+      setCalendarPrefsReady(false);
+      setCalendarPrefsUserId(userId);
+
+      if (!userId) {
+        lastSavedCalendarPreferencesRef.current = null;
+        setActiveSources((prev) => {
+          const next = new Set([...prev].filter((id) => !CORE_CALENDAR_SOURCE_IDS.includes(id as CalendarSourceFilter)));
+          buildCalendarSourceSet(DEFAULT_CALENDAR_SOURCE_PREFERENCES).forEach((id) => next.add(id));
+          return next;
+        });
+        setCalendarPrefsReady(true);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_settings")
+        .select("calendar_source_preferences")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error && error.code !== "PGRST204") {
+        console.error("Failed to load calendar source preferences", error);
+      }
+
+      const preferences = normalizeCalendarSourcePreferences(data?.calendar_source_preferences);
+      lastSavedCalendarPreferencesRef.current = data?.calendar_source_preferences
+        ? JSON.stringify(preferences)
+        : null;
+      setActiveSources((prev) => {
+        const next = new Set([...prev].filter((id) => !CORE_CALENDAR_SOURCE_IDS.includes(id as CalendarSourceFilter)));
+        buildCalendarSourceSet(preferences).forEach((id) => next.add(id));
+        return next;
+      });
+      setCalendarPrefsReady(true);
+    }
+
+    async function loadInitialCalendarSourcePreferences() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+      await applyCalendarSourcePreferences(session?.user?.id ?? null);
+    }
+
+    loadInitialCalendarSourcePreferences();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      void applyCalendarSourcePreferences(session?.user?.id ?? null);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!calendarPrefsReady || !calendarPrefsUserId) return;
+
+    const calendarSourcePreferences = getCalendarSourcePreferencesFromSet(activeSources);
+    const serializedPreferences = JSON.stringify(calendarSourcePreferences);
+    if (lastSavedCalendarPreferencesRef.current === serializedPreferences) return;
+    lastSavedCalendarPreferencesRef.current = serializedPreferences;
+
+    void supabase
+      .from("user_settings")
+      .upsert(
+        {
+          user_id: calendarPrefsUserId,
+          calendar_source_preferences: calendarSourcePreferences,
+        },
+        { onConflict: "user_id" }
+      )
+      .then(({ error }) => {
+        if (error && error.code !== "PGRST204") {
+          lastSavedCalendarPreferencesRef.current = null;
+          console.error("Failed to save calendar source preferences", error);
+        }
+      });
+  }, [activeSources, calendarPrefsReady, calendarPrefsUserId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCalendarEntitySubscriptions() {
+      if (!calendarPrefsUserId) {
+        setCalendarEntitySubscriptions({
+          organization: new Set(),
+          business: new Set(),
+        });
+        setSavedCalendarEntities({
+          organizations: [],
+          businesses: [],
+        });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_calendar_entity_subscriptions")
+        .select("entity_type, entity_id")
+        .eq("user_id", calendarPrefsUserId)
+        .in("entity_type", ["organization", "business"]);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Failed to load calendar entity subscriptions", error);
+        setCalendarEntitySubscriptions({
+          organization: new Set(),
+          business: new Set(),
+        });
+        setSavedCalendarEntities({
+          organizations: [],
+          businesses: [],
+        });
+        return;
+      }
+
+      const organization = new Set<string>();
+      const business = new Set<string>();
+
+      for (const row of data ?? []) {
+        if (row.entity_type === "organization") organization.add(row.entity_id);
+        if (row.entity_type === "business") business.add(row.entity_id);
+      }
+
+      const [organizationDirectory, businessDirectory] = await Promise.all([
+        organization.size > 0
+          ? supabase
+              .from("organizations_directory_v1")
+              .select("id, name")
+              .in("id", Array.from(organization))
+          : Promise.resolve({ data: [], error: null }),
+        business.size > 0
+          ? supabase
+              .from("businesses_directory_v1")
+              .select("id, name")
+              .in("id", Array.from(business))
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (organizationDirectory.error) {
+        console.error("Failed to load saved organization calendars", organizationDirectory.error);
+      }
+      if (businessDirectory.error) {
+        console.error("Failed to load saved business calendars", businessDirectory.error);
+      }
+
+      setCalendarEntitySubscriptions({ organization, business });
+      setSavedCalendarEntities({
+        organizations: (organizationDirectory.data ?? []).map((entity) => ({
+          id: entity.id,
+          name: entity.name,
+          entityType: "organization",
+        })),
+        businesses: (businessDirectory.data ?? []).map((entity) => ({
+          id: entity.id,
+          name: entity.name,
+          entityType: "business",
+        })),
+      });
+    }
+
+    loadCalendarEntitySubscriptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [calendarPrefsUserId]);
+
+  async function removeSavedCalendar(entity: SavedCalendarEntity) {
+    if (!calendarPrefsUserId) return;
+
+    const { error } = await supabase
+      .from("user_calendar_entity_subscriptions")
+      .delete()
+      .eq("user_id", calendarPrefsUserId)
+      .eq("entity_type", entity.entityType)
+      .eq("entity_id", entity.id);
+
+    if (error) {
+      console.error("Failed to remove saved calendar", error);
+      return;
+    }
+
+    setCalendarEntitySubscriptions((prev) => {
+      const next = {
+        organization: new Set(prev.organization),
+        business: new Set(prev.business),
+      };
+      if (entity.entityType === "organization") next.organization.delete(entity.id);
+      if (entity.entityType === "business") next.business.delete(entity.id);
+      return next;
+    });
+
+    setSavedCalendarEntities((prev) => ({
+      organizations: entity.entityType === "organization"
+        ? prev.organizations.filter((item) => item.id !== entity.id)
+        : prev.organizations,
+      businesses: entity.entityType === "business"
+        ? prev.businesses.filter((item) => item.id !== entity.id)
+        : prev.businesses,
+    }));
+  }
+
+  const hasSavedCalendars =
+    savedCalendarEntities.organizations.length > 0 ||
+    savedCalendarEntities.businesses.length > 0;
 
   function addImportedCal(cal: ImportedCal) {
     const next = [...importedCals, cal];
@@ -1783,7 +2092,7 @@ function CalendarModeView() {
 
   const availableSourceIds = useMemo(
     () => [
-      ...CAL_SOURCES.filter((source) => source.id !== "imported" && !source.disabled).map((source) => source.id),
+      ...CORE_CALENDAR_SOURCE_IDS,
       ...importedCals.map((calendar) => calendar.id),
     ],
     [importedCals]
@@ -1839,7 +2148,7 @@ function CalendarModeView() {
       const [{ data, error }, { data: { user: authUser } }] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, start_time, end_time, location, description, created_by, access_mode, capacity, requires_approval, source_type, source_id, display_mode, status, event_type")
+          .select("id, title, start_time, end_time, location, description, created_by, access_mode, capacity, requires_approval, source_type, source_id, display_mode, status, event_type, is_major")
           .in("display_mode", ["calendar", "both"])
           .eq("status", "published")
           .gte("start_time", start.toISOString())
@@ -1888,16 +2197,23 @@ function CalendarModeView() {
 
         const classified = eventRows.map((ev): CalEvent => {
           const currentUserRsvp = currentUserRsvpByEvent.get(ev.id);
+          const source =
+            ev.source_type === "wac"
+              ? null
+              : ev.source_type === "organization" && ev.source_id
+              ? "org"
+              : ev.source_type === "group" && ev.source_id
+              ? "group"
+              : ev.source_type === "business" && ev.source_id
+              ? "business"
+              : null;
+
           return {
             ...ev,
             attending_count: attendeeCountByEvent.get(ev.id) ?? 0,
             current_user_rsvp_status: currentUserRsvp?.status ?? null,
             current_user_approval_status: currentUserRsvp?.approval_status ?? null,
-            source: (uid && ev.created_by === uid)
-              ? "personal"
-              : currentUserRsvp && currentUserRsvp.status !== "not_going"
-              ? "rsvp"
-              : "browse",
+            source,
           };
         });
         console.log("[CalFetch] fetched", classified.length, "events:", classified);
@@ -1919,6 +2235,25 @@ function CalendarModeView() {
     window.addEventListener("events-compose", handler);
     return () => window.removeEventListener("events-compose", handler);
   }, [router]);
+
+  function openCreateEventPage(draft: EventDraft) {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify({
+        eventKind: draft.type,
+        title: draft.title,
+        description: draft.description,
+        startDate: draft.startDate,
+        startTime: draft.startTime,
+        endDate: draft.endDate,
+        endTime: draft.endTime,
+        allDay: draft.allDay,
+        repeat: draft.repeat,
+        location: draft.location,
+        guests: draft.guests,
+      }));
+    }
+    router.push("/events/new");
+  }
 
   function closeModal() {
     setModalDraft(null); setShowFullEditor(false); setEditingEventId(null);
@@ -1958,10 +2293,20 @@ function CalendarModeView() {
     console.log("[EventSave] payload:", payload);
     let dbError;
     if (editingEventId) {
+      // This in-page editor currently updates timing/basic fields only.
+      // It does not persist host/source context changes, so source-aware fields
+      // remain untouched here until edit support recomputes them explicitly.
       const res = await supabase.from("events").update(payload).eq("id", editingEventId);
       dbError = res.error;
     } else {
-      const res = await supabase.from("events").insert(payload);
+      const res = await supabase.from("events").insert({
+        ...payload,
+        event_type: "event",
+        source_type: "wac",
+        source_id: null,
+        display_mode: "calendar",
+        status: "published",
+      });
       dbError = res.error;
     }
     if (dbError) throw new Error(dbError.message);
@@ -1971,10 +2316,32 @@ function CalendarModeView() {
   }
 
   const [agendaDay, setAgendaDay] = useState<number | null>(null);
+  const calendarRegionRef = useRef<HTMLDivElement | null>(null);
+
+  function scrollCalendarRegionIntoView() {
+    if (typeof window === "undefined" || window.innerWidth < 1024) return;
+    calendarRegionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   function handleDayClick(day: number) {
     setSelectedDay(day);
-    setAgendaDay((prev) => (prev === day ? null : day));
+    setAgendaDay((prev) => {
+      const next = prev === day ? null : day;
+      if (next !== null) {
+        requestAnimationFrame(() => {
+          scrollCalendarRegionIntoView();
+        });
+      }
+      return next;
+    });
+  }
+
+  function openDayAgenda(day: number) {
+    setSelectedDay(day);
+    setAgendaDay(day);
+    requestAnimationFrame(() => {
+      scrollCalendarRegionIntoView();
+    });
   }
 
   function handleSlotMouseDown(dayIdx: number, hour: number, e: React.MouseEvent) {
@@ -1993,8 +2360,7 @@ function CalendarModeView() {
       const date = weekDays[selDayIdx];
       const st   = `${String(lo).padStart(2, "0")}:00`;
       const et   = `${String(Math.min(hi + 1, 23)).padStart(2, "0")}:00`;
-      setModalDraft(makeDraft(date, st, et));
-      setShowFullEditor(false);
+      openCreateEventPage(makeDraft(date, st, et));
     }
     isSelectingRef.current = false;
   }
@@ -2031,8 +2397,22 @@ function CalendarModeView() {
 
   // Filter events by active calendar sources so toggles actually hide events
   const filteredCalEvents = useMemo(
-    () => calEvents.filter((ev) => activeSources.has(ev.source)),
-    [calEvents, activeSources]
+    () =>
+      calEvents.filter((ev) => {
+        if (!activeSources.has(sourceFilterId(ev.source))) return false;
+        if (!calendarPrefsUserId) return true;
+
+        if (ev.source_type === "organization") {
+          return !!ev.source_id && calendarEntitySubscriptions.organization.has(ev.source_id);
+        }
+
+        if (ev.source_type === "business") {
+          return !!ev.source_id && calendarEntitySubscriptions.business.has(ev.source_id);
+        }
+
+        return true;
+      }),
+    [calEvents, activeSources, calendarEntitySubscriptions, calendarPrefsUserId]
   );
 
   // Map "YYYY-MM-DD" (local) → CalEvent[] for O(1) lookup in month + week cells
@@ -2066,6 +2446,16 @@ function CalendarModeView() {
     })),
   ];
   const visibleMonthLineCount = isCompactCalendar ? 5 : 7;
+  const selectedDayAgenda = useMemo(() => {
+    if (calView !== "month" || agendaDay === null) return null;
+
+    const dateKey = `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, "0")}-${String(agendaDay).padStart(2, "0")}`;
+    const dayEvs = filteredCalEvents.filter((ev) => localDateKey(ev.start_time) === dateKey);
+    const date = new Date(navDate.getFullYear(), navDate.getMonth(), agendaDay);
+    const dateLabel = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+    return { date, dateLabel, dayEvs };
+  }, [agendaDay, calView, filteredCalEvents, navDate]);
 
   const selLo = selStartH !== null && selEndH !== null ? Math.min(selStartH, selEndH) : null;
   const selHi = selStartH !== null && selEndH !== null ? Math.max(selStartH, selEndH) : null;
@@ -2076,7 +2466,7 @@ function CalendarModeView() {
   }
 
   return (
-    <div className="mt-2 md:mt-4 flex flex-col lg:flex-row gap-5 min-h-[calc(100vh-240px)]">
+    <div ref={calendarRegionRef} className="mt-2 md:mt-4 flex flex-col lg:flex-row gap-4 lg:gap-6 xl:gap-8 min-h-[calc(100vh-240px)] scroll-mt-24">
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Toolbar */}
@@ -2130,7 +2520,7 @@ function CalendarModeView() {
           <div className="space-y-2">
             <div className="hidden sm:flex items-center justify-between gap-3">
               <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/28">
-                {activeSourceCount}/{availableSourceIds.length} calendars visible
+                {activeSourceCount}/{availableSourceIds.length} sources active
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -2193,11 +2583,16 @@ function CalendarModeView() {
                     ? `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                     : null;
                   const dayEvs = dateKey ? (eventsMap.get(dateKey) ?? []) : [];
+                  const prioritizedDayEvs = [...dayEvs].sort((a, b) => {
+                    const priorityDiff = monthCellPriority(a) - monthCellPriority(b);
+                    if (priorityDiff !== 0) return priorityDiff;
+                    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+                  });
                   return (
                     <div key={i} onClick={() => day !== null && handleDayClick(day)}
                       className={`relative min-h-[104px] sm:min-h-[128px] p-1 sm:p-1.5 border-b border-r border-white/[0.04] transition-colors ${lastInRow ? "border-r-0" : ""} ${
                         day === null ? "bg-white/[0.01]"
-                        : isSelected ? "bg-white/[0.04] cursor-pointer"
+                        : isSelected ? "bg-white/[0.045] ring-1 ring-inset ring-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] cursor-pointer"
                         : isWeekend  ? "bg-white/[0.012] cursor-pointer hover:bg-white/[0.03]"
                         : "cursor-pointer hover:bg-white/[0.025]"
                       }`}>
@@ -2210,24 +2605,26 @@ function CalendarModeView() {
                           )}
                           <span className={`inline-flex items-center justify-center w-6 h-6 text-[11px] rounded-full ${
                             isToday    ? "bg-teal-500/20 text-teal-400 font-semibold ring-1 ring-teal-400/40"
-                            : isSelected ? "bg-white/10 text-white/80 font-semibold"
+                            : isSelected ? "bg-white/12 text-white/90 font-semibold ring-1 ring-white/[0.14]"
                             : "text-white/35 font-medium"
                           }`}>
                             {day}
                           </span>
                           {/* Compact density lines — fits more events per day without crowding the cell */}
                           <div className="mt-1.5 space-y-1">
-                            {dayEvs.slice(0, visibleMonthLineCount).map((ev) => {
+                            {prioritizedDayEvs.slice(0, visibleMonthLineCount).map((ev) => {
                               const c = eventColors(ev.source);
                               const badge = getEventMetaBadge(ev);
+                              const sourceLabel = eventSourceLabel(ev.source);
                               return (
                                 <button
                                   key={ev.id}
-                                  title={ev.title}
+                                  title={`${sourceLabel}: ${ev.title}`}
                                   onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
                                   className="w-full text-left transition-opacity hover:opacity-100 opacity-90"
                                 >
                                   <div className="flex items-center gap-1">
+                                    <span className={`h-[4px] w-[4px] shrink-0 rounded-full ${c.dot} opacity-85`} />
                                     <span className={`h-[4px] flex-1 rounded-full ${c.rule}`} />
                                     {badge && (
                                       <span className={`shrink-0 rounded-full px-1 py-0.5 text-[7px] font-semibold leading-none ${badge.className}`}>
@@ -2238,11 +2635,11 @@ function CalendarModeView() {
                                 </button>
                               );
                             })}
-                            {dayEvs.length > visibleMonthLineCount && (
+                            {prioritizedDayEvs.length > visibleMonthLineCount && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDayClick(day); }}
-                                className="w-full text-left px-1 py-[1px] text-[8px] text-white/35 hover:text-white/60 leading-none transition-colors font-medium">
-                                +{dayEvs.length - visibleMonthLineCount} more
+                                onClick={(e) => { e.stopPropagation(); openDayAgenda(day); }}
+                                className="w-full rounded-md border border-white/[0.06] bg-white/[0.03] px-1.5 py-1 text-left text-[8px] font-semibold leading-none text-white/42 transition-colors hover:border-white/[0.12] hover:text-white/68">
+                                View +{prioritizedDayEvs.length - visibleMonthLineCount} more
                               </button>
                             )}
                           </div>
@@ -2254,25 +2651,21 @@ function CalendarModeView() {
               </div>
             </div>
             <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
-              <p className="text-xs text-white/28">Click a day to see its agenda. Click + drag in week view to create an event.</p>
+              <p className="text-xs text-white/28">{calendarPrefsUserId ? "Toggle sources above to focus the view. WAC follows its source toggle, groups stay category-based, and org/business events come from calendars you've added. Click a day to see its agenda, or click and drag in week view to create an event." : "Toggle calendar sources above to focus the view. Signed-out browsing uses category filters only. Click a day to see its agenda, or click and drag in week view to create an event."}</p>
             </div>
 
             {/* Day Agenda Sheet — slides up when a day is tapped */}
-            {agendaDay !== null && (() => {
-              const dateKey = `${navDate.getFullYear()}-${String(navDate.getMonth() + 1).padStart(2, "0")}-${String(agendaDay).padStart(2, "0")}`;
-              const dayEvs  = filteredCalEvents.filter((ev) => localDateKey(ev.start_time) === dateKey);
-              const date    = new Date(navDate.getFullYear(), navDate.getMonth(), agendaDay);
-              const dateLabel = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-              return (
-                <div className="mt-3 rounded-2xl border border-white/[0.09] bg-[#111]/90 backdrop-blur-xl p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{dateLabel}</p>
-                    <div className="flex items-center gap-2">
+            {selectedDayAgenda && (
+                <div className="mt-3 rounded-2xl border border-white/[0.09] bg-[#111]/90 backdrop-blur-xl p-4 lg:hidden">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">{selectedDayAgenda.dateLabel}</p>
+                      <p className="mt-1 text-[10px] text-white/24">{selectedDayAgenda.dayEvs.length} scheduled</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => {
-                          const d = new Date(navDate.getFullYear(), navDate.getMonth(), agendaDay);
-                          setModalDraft(makeDraft(d));
-                          setShowFullEditor(false);
+                          openCreateEventPage(makeDraft(selectedDayAgenda.date));
                           setAgendaDay(null);
                         }}
                         className="flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/45 hover:text-white/75 transition-colors"
@@ -2288,12 +2681,13 @@ function CalendarModeView() {
                       </button>
                     </div>
                   </div>
-                  {dayEvs.length === 0 ? (
+                  {selectedDayAgenda.dayEvs.length === 0 ? (
                     <p className="py-4 text-center text-[12px] text-white/28">No events on this day.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-[220px] overflow-y-auto [scrollbar-width:none]">
-                      {dayEvs.map((ev) => {
+                      {selectedDayAgenda.dayEvs.map((ev) => {
                         const c = eventColors(ev.source);
+                        const sourceLabel = eventSourceLabel(ev.source);
                         const timeLabel = new Date(ev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
                         return (
                           <button key={ev.id}
@@ -2303,6 +2697,7 @@ function CalendarModeView() {
                             <div className={`h-8 w-1 shrink-0 rounded-full ${c.rule}`} />
                             <div className="min-w-0">
                               <p className={`truncate text-[13px] font-medium leading-snug ${c.text}`}>{ev.title}</p>
+                              <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/24">{sourceLabel}</p>
                               <p className="text-[10px] text-white/35">{timeLabel}{ev.location ? ` · ${ev.location}` : ""}</p>
                             </div>
                           </button>
@@ -2311,8 +2706,7 @@ function CalendarModeView() {
                     </div>
                   )}
                 </div>
-              );
-            })()}
+            )}
 
             {/* Mobile: compact event summary strip */}
             <MobileEventStrip
@@ -2369,6 +2763,7 @@ function CalendarModeView() {
                                     onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
                                     onMouseDown={(e) => e.stopPropagation()}
                                     className={`absolute inset-x-[2px] top-[2px] bottom-[2px] ${c.bg} border ${c.border} rounded px-1 flex items-center ${c.hover} transition-colors z-10`}>
+                                    <span className={`mr-1 h-1.5 w-1.5 shrink-0 rounded-full ${c.dot} opacity-85`} />
                                     <span className={`text-[8px] font-semibold ${c.text} truncate leading-none`}>{ev.title}</span>
                                     {badge && (
                                       <span className={`ml-1 shrink-0 rounded px-1 py-[1px] text-[7px] leading-none ${badge.className}`}>
@@ -2465,6 +2860,7 @@ function CalendarModeView() {
                     <div className="space-y-2 pl-0">
                       {dayEvs.map((ev) => {
                         const c         = eventColors(ev.source);
+                        const sourceLabel = eventSourceLabel(ev.source);
                         const badge     = getEventMetaBadge(ev);
                         const evStart   = new Date(ev.start_time);
                         const evEnd     = ev.end_time ? new Date(ev.end_time) : null;
@@ -2495,6 +2891,10 @@ function CalendarModeView() {
                                       </span>
                                     )}
                                   </div>
+                                  <div className="mt-0.5 flex items-center gap-1.5">
+                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.dot} opacity-85`} />
+                                    <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-white/24">{sourceLabel}</span>
+                                  </div>
                                   {ev.location && (
                                     <div className="mt-0.5 flex items-center gap-1">
                                       <MapPin size={9} className="shrink-0 text-white/25" />
@@ -2520,7 +2920,81 @@ function CalendarModeView() {
       </div>
 
       {/* Sidebar — desktop only; mobile uses toolbar + button for actions */}
-      <div className="hidden lg:block lg:w-52 shrink-0 space-y-3">
+      <div className="hidden lg:block shrink-0 space-y-3 lg:w-[17.5rem] xl:w-[18.5rem]">
+
+        {calView === "month" && !selectedDayAgenda && (
+          <div className="wac-card p-4 lg:sticky lg:top-[112px]">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Selected Day</div>
+                <p className="mt-1 text-[13px] font-medium text-white/42 leading-snug">Choose a date</p>
+              </div>
+            </div>
+            <p className="text-[11px] leading-relaxed text-white/24">
+              Select a day to preview its agenda here and keep the month view in focus.
+            </p>
+          </div>
+        )}
+
+        {selectedDayAgenda && (
+          <div className="wac-card p-4 lg:sticky lg:top-[112px]">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Selected Day</div>
+                <p className="mt-1 text-[13px] font-medium text-white/68 leading-snug">{selectedDayAgenda.dateLabel}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="rounded-full border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-[9px] font-semibold text-white/34">
+                  {selectedDayAgenda.dayEvs.length}
+                </span>
+                <button
+                  onClick={() => { setAgendaDay(null); setSelectedDay(null); }}
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-white/[0.05] text-white/35 hover:text-white/65 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+            <div className="mb-3 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  openCreateEventPage(makeDraft(selectedDayAgenda.date));
+                  setAgendaDay(null);
+                }}
+                className="flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-2.5 py-1 text-[10px] text-white/45 hover:text-white/75 transition-colors"
+              >
+                <Plus size={10} />
+                Add event
+              </button>
+              <span className="text-[10px] text-white/24">Scheduled</span>
+            </div>
+            {selectedDayAgenda.dayEvs.length === 0 ? (
+              <p className="py-4 text-center text-[11px] text-white/22">No events on this day.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-[280px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {selectedDayAgenda.dayEvs.map((ev) => {
+                  const c = eventColors(ev.source);
+                  const sourceLabel = eventSourceLabel(ev.source);
+                  const timeLabel = new Date(ev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                  return (
+                    <button
+                      key={ev.id}
+                      onClick={() => { openEventDetail(ev); setAgendaDay(null); setSelectedDay(null); }}
+                      className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2.5 text-left transition-colors hover:border-white/[0.12]"
+                    >
+                      <div className={`h-8 w-1 shrink-0 rounded-full ${c.rule}`} />
+                      <div className="min-w-0">
+                        <p className={`truncate text-[13px] font-medium leading-snug ${c.text}`}>{ev.title}</p>
+                        <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-white/24">{sourceLabel}</p>
+                        <p className="text-[10px] text-white/35">{timeLabel}{ev.location ? ` · ${ev.location}` : ""}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Source legend */}
         <div className="wac-card p-4">
@@ -2591,6 +3065,67 @@ function CalendarModeView() {
           </button>
         </div>
 
+        {calendarPrefsUserId && (
+          <div className="wac-card p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Saved Calendars</div>
+              {hasSavedCalendars && (
+                <div className="text-[9px] text-white/20">
+                  {savedCalendarEntities.organizations.length + savedCalendarEntities.businesses.length}
+                </div>
+              )}
+            </div>
+            {!hasSavedCalendars ? (
+              <p className="text-[11px] text-white/22 leading-relaxed">
+                Follow an organization or business and add its calendar to see it here.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {savedCalendarEntities.organizations.length > 0 && (
+                  <div>
+                    <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Organizations</div>
+                    <div className="space-y-2">
+                      {savedCalendarEntities.organizations.map((entity) => (
+                        <div key={entity.id} className="flex items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-70" />
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-white/52">{entity.name}</span>
+                          <button
+                            onClick={() => void removeSavedCalendar(entity)}
+                            className="shrink-0 text-white/20 transition-colors hover:text-red-400/70"
+                            title="Remove saved calendar"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {savedCalendarEntities.businesses.length > 0 && (
+                  <div className={savedCalendarEntities.organizations.length > 0 ? "border-t border-white/[0.06] pt-3" : ""}>
+                    <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Businesses</div>
+                    <div className="space-y-2">
+                      {savedCalendarEntities.businesses.map((entity) => (
+                        <div key={entity.id} className="flex items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-400 opacity-70" />
+                          <span className="min-w-0 flex-1 truncate text-[11px] text-white/52">{entity.name}</span>
+                          <button
+                            onClick={() => void removeSavedCalendar(entity)}
+                            className="shrink-0 text-white/20 transition-colors hover:text-red-400/70"
+                            title="Remove saved calendar"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* This period's events — real data from calendar fetch */}
         <div className="wac-card p-4">
           <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25 mb-3">
@@ -2654,7 +3189,7 @@ function CalendarModeView() {
               </div>
               <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
                 <span className="text-[11px] text-white/42">
-                  {activeSourceCount} of {availableSourceIds.length} calendars visible
+                  {activeSourceCount} of {availableSourceIds.length} sources active
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -2713,6 +3248,56 @@ function CalendarModeView() {
                   </div>
                 )}
 
+                {calendarPrefsUserId && (
+                  <div className="border-t border-white/[0.07] pt-4 space-y-3">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/25">Saved Calendars</div>
+                    {!hasSavedCalendars ? (
+                      <p className="text-[11px] text-white/30 leading-relaxed">
+                        Follow an organization or business and add its calendar to manage it here.
+                      </p>
+                    ) : (
+                      <>
+                        {savedCalendarEntities.organizations.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Organizations</div>
+                            {savedCalendarEntities.organizations.map((entity) => (
+                              <div key={entity.id} className="flex items-center gap-3">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-emerald-400 opacity-75" />
+                                <span className="text-[13px] flex-1 truncate text-white/60">{entity.name}</span>
+                                <button
+                                  onClick={() => void removeSavedCalendar(entity)}
+                                  className="text-white/18 hover:text-red-400/65 transition-colors shrink-0"
+                                  title="Remove saved calendar"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {savedCalendarEntities.businesses.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Businesses</div>
+                            {savedCalendarEntities.businesses.map((entity) => (
+                              <div key={entity.id} className="flex items-center gap-3">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-blue-400 opacity-75" />
+                                <span className="text-[13px] flex-1 truncate text-white/60">{entity.name}</span>
+                                <button
+                                  onClick={() => void removeSavedCalendar(entity)}
+                                  className="text-white/18 hover:text-red-400/65 transition-colors shrink-0"
+                                  title="Remove saved calendar"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Add Calendar CTA */}
                 <div className="border-t border-white/[0.07] pt-4">
                   <button
@@ -2758,19 +3343,41 @@ export default function EventsPage() {
   const router = useRouter();
   const [activeLens, setActiveLens] = useState<Lens>("my-network");
   const [activeType, setActiveType] = useState("All");
+  const [calendarHeaderSignedIn, setCalendarHeaderSignedIn] = useState(false);
 
   const showFeatured   = activeLens === "my-network";
   const showBrowse     = activeLens !== "calendar";
   const showCategories = activeLens !== "calendar";
-  const browseLabel    = activeLens === "browse" ? "Browse Events" : "All Events";
+  const browseLabel    = activeLens === "browse" ? "Explore Events" : "Network Events";
 
   const isCalendar = activeLens === "calendar";
+  const calendarLensHelperText = calendarHeaderSignedIn
+    ? "WAC follows its source toggle. Groups stay category-based for now. Organization and business events are refined by the calendars you've added."
+    : "Track WAC, organization, group, and business events in one source-aware calendar.";
 
   // When NOT in calendar mode, the "events-compose" dispatch from the navbar
   // should fall through to the full event builder at /events/new.
   // (When in calendar mode, CalendarModeView handles the same event to open Quick Create.)
   const isCalendarRef = useRef(isCalendar);
   useEffect(() => { isCalendarRef.current = isCalendar; }, [isCalendar]);
+  useEffect(() => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled) {
+        setCalendarHeaderSignedIn(!!data.session?.user);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCalendarHeaderSignedIn(!!session?.user);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
   useEffect(() => {
     const handler = () => { if (!isCalendarRef.current) router.push("/events/new"); };
     window.addEventListener("events-compose", handler);
@@ -2788,7 +3395,7 @@ export default function EventsPage() {
               <span className="italic font-light opacity-90 text-teal-400">Calendar</span>
             </h1>
             <p className="mt-2 text-sm text-white/45">
-              Your personal events and network gatherings, all in one place.
+              {calendarLensHelperText}
             </p>
           </>
         ) : (
@@ -2815,7 +3422,7 @@ export default function EventsPage() {
                       active ? "bg-white/[0.08] text-white/80" : "text-white/40 hover:text-white/65"
                     }`}>
                     <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
-                    <span className="sm:hidden">{id === "my-network" ? "Network" : label}</span>
+                    <span className="sm:hidden">{label}</span>
                     <span className="hidden sm:inline">{label}</span>
                   </button>
                 );

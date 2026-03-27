@@ -3,30 +3,20 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import EventCard, { EventEntry } from "./EventCard";
+import EventCard, { EventDisplayMode, EventEntry, EventSourceType, EventStatus, EventType } from "./EventCard";
 
 interface EventsResultsProps {
   eventType?: string;
 }
 
-type EventRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  organization_id: string | null;
-  host_entity_type: "organization" | "business" | "group" | null;
-  host_entity_id: string | null;
-  linked_entity_type: "organization" | "business" | "group" | null;
-  linked_entity_id: string | null;
-  hosting_metadata: unknown;
-  location_name: string | null;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  start_time: string;
-  end_time: string;
-  event_type: string | null;
-  visibility: string;
+const NORMALIZED_EVENT_TYPES: EventType[] = ["event", "announcement", "feature_drop", "alert"];
+
+type EventRow = EventEntry & {
+  source_type: EventSourceType;
+  source_id: string | null;
+  display_mode: EventDisplayMode;
+  status: EventStatus;
+  event_type: EventType | null;
   access_mode: string | null;
   capacity: number | null;
 };
@@ -60,7 +50,9 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
 
         let query = supabase
           .from("events")
-          .select("id, title, description, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, location_name, city, state, country, start_time, end_time, event_type, visibility, access_mode, capacity")
+          .select("id, title, description, source_type, source_id, display_mode, status, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, location_name, city, state, country, start_time, end_time, event_type, visibility, access_mode, capacity")
+          .eq("status", "published")
+          .in("display_mode", ["calendar", "both"])
           .order("start_time", { ascending: true });
 
         if (searchQuery.trim()) {
@@ -69,7 +61,7 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
           );
         }
 
-        if (eventType) {
+        if (eventType && NORMALIZED_EVENT_TYPES.includes(eventType as EventType)) {
           query = query.ilike("event_type", eventType);
         }
 

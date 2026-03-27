@@ -4,11 +4,28 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Clock, Users, Building2 } from "lucide-react";
 import { normalizeEventHostingMetadata } from "@/lib/events/hosting";
 
+export type EventSourceType = "wac" | "organization" | "group" | "business";
+export type EventDisplayMode = "calendar" | "feed" | "both";
+export type EventStatus = "draft" | "published" | "cancelled" | "completed";
+export type EventType = "event" | "announcement" | "feature_drop" | "alert";
+
+const EVENT_TYPE_LABELS: Partial<Record<EventType, string>> = {
+  event: "Event",
+  announcement: "Announcement",
+  feature_drop: "Feature Drop",
+  alert: "Alert",
+};
+
 export interface EventEntry {
   id: string;
   title: string;
   description: string | null;
+  source_type?: EventSourceType | null;
+  source_id?: string | null;
+  display_mode?: EventDisplayMode;
+  status?: EventStatus;
   organization_id: string | null;
+  is_major?: boolean;
   host_entity_type?: "organization" | "business" | "group" | null;
   host_entity_id?: string | null;
   linked_entity_type?: "organization" | "business" | "group" | null;
@@ -20,7 +37,7 @@ export interface EventEntry {
   country: string | null;
   start_time: string;
   end_time: string;
-  event_type: string | null;
+  event_type: EventType | null;
   visibility: string;
   access_mode?: string | null;
   capacity?: number | null;
@@ -54,9 +71,24 @@ export default function EventCard({ event }: { event: EventEntry }) {
     locationParts.length > 0 ? locationParts.join(", ") : event.country || "Virtual";
   const hosting = normalizeEventHostingMetadata(event.hosting_metadata);
   const coHosts = hosting.co_hosts;
+  const isMajorWacEvent = event.source_type === "wac" && event.is_major === true;
 
   const sourceLabel =
-    hosting.host_entity?.name
+    event.source_type === "wac"
+      ? "WAC Event"
+      : event.source_type === "organization"
+      ? hosting.host_entity?.name
+        ? `Hosted by ${hosting.host_entity.name}`
+        : "Organization Event"
+      : event.source_type === "group"
+      ? hosting.host_entity?.name
+        ? `Hosted by ${hosting.host_entity.name}`
+        : "Group Event"
+      : event.source_type === "business"
+      ? hosting.host_entity?.name
+        ? `Hosted by ${hosting.host_entity.name}`
+        : "Business Event"
+      : hosting.host_entity?.name
       ? `Hosted by ${hosting.host_entity.name}`
       : hosting.primary_host?.name
       ? `By ${hosting.primary_host.name}${coHosts.length > 0 ? ` + ${coHosts.length} more` : ""}`
@@ -67,7 +99,11 @@ export default function EventCard({ event }: { event: EventEntry }) {
       : "WAC Community Event";
 
   const SourceIcon =
-    hosting.host_entity?.type === "organization" || hosting.host_entity?.type === "business" || event.organization_id
+    event.source_type === "organization" ||
+    event.source_type === "business" ||
+    hosting.host_entity?.type === "organization" ||
+    hosting.host_entity?.type === "business" ||
+    event.organization_id
       ? Building2
       : Users;
   const remainingSpots =
@@ -88,6 +124,7 @@ export default function EventCard({ event }: { event: EventEntry }) {
     ? "Interested"
     : null;
   const ctaLabel = event.current_user_rsvp_status ? "View" : "RSVP";
+  const eventTypeLabel = event.event_type ? EVENT_TYPE_LABELS[event.event_type] ?? event.event_type : null;
 
   return (
     <Link
@@ -98,6 +135,11 @@ export default function EventCard({ event }: { event: EventEntry }) {
       <div className="px-4 pt-3.5 pb-0 flex items-center gap-1.5">
         <SourceIcon size={11} className="text-white/25 shrink-0" />
         <span className="text-[11px] text-white/30 truncate">{sourceLabel}</span>
+        {isMajorWacEvent && (
+          <span className="shrink-0 rounded-full border border-[#b08d57]/25 bg-[#b08d57]/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-[#d4b277]">
+            Featured
+          </span>
+        )}
         {isPast && (
           <span className="ml-auto shrink-0 text-[9px] font-bold uppercase tracking-wider text-white/20 bg-white/[0.04] border border-white/[0.07] px-1.5 py-0.5 rounded-full">
             Past
@@ -186,7 +228,7 @@ export default function EventCard({ event }: { event: EventEntry }) {
       </div>
 
       {/* Footer: co-hosts or event type */}
-      {(event.event_type || coHosts.length > 0 || (event.co_hosts && event.co_hosts.length > 1)) && (
+      {(eventTypeLabel || coHosts.length > 0 || (event.co_hosts && event.co_hosts.length > 1)) && (
         <div className="px-4 pb-3.5 border-t border-white/[0.05] flex items-center justify-between pt-2.5">
           {coHosts.length > 0 ? (
             <div className="flex items-center gap-1.5">
@@ -234,9 +276,9 @@ export default function EventCard({ event }: { event: EventEntry }) {
             <span />
           )}
 
-          {event.event_type && (
+          {eventTypeLabel && (
             <span className="text-[10px] text-white/45 bg-white/[0.06] border border-white/[0.10] px-2 py-0.5 rounded-full ml-auto">
-              {event.event_type}
+              {eventTypeLabel}
             </span>
           )}
         </div>

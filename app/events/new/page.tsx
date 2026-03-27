@@ -1201,6 +1201,7 @@ export default function CreateEventPage() {
   const today = todayStr();
   const router = useRouter();
   const { loggedInUserId, ownedEntities } = useActor();
+  const builderSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [activeSection, setActiveSection] = useState<SectionId>("basics");
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -1259,6 +1260,7 @@ export default function CreateEventPage() {
   const [rsvpReminder,    setRsvpReminder]    = useState("1day");
   const [eventReminder,   setEventReminder]   = useState("1hr");
   const [postEventFollowup, setPostEventFollowup] = useState(false);
+  const [isMajor,         setIsMajor]         = useState(false);
   const [isSubmitting,    setIsSubmitting]    = useState(false);
   const [error,           setError]           = useState<string | null>(null);
   const [notice,          setNotice]          = useState<string | null>(null);
@@ -1450,9 +1452,10 @@ export default function CreateEventPage() {
         rsvpReminder: string;
         eventReminder: string;
         postEventFollowup: boolean;
+        isMajor: boolean;
       }>;
 
-      if (draft.eventKind) setEventKind(draft.eventKind);
+      if (draft.eventKind === "event") setEventKind(draft.eventKind);
       if (typeof draft.title === "string") setTitle(draft.title);
       if (typeof draft.description === "string") setDescription(draft.description);
       if (typeof draft.startDate === "string") setStartDate(draft.startDate);
@@ -1493,6 +1496,7 @@ export default function CreateEventPage() {
       if (typeof draft.rsvpReminder === "string") setRsvpReminder(draft.rsvpReminder);
       if (typeof draft.eventReminder === "string") setEventReminder(draft.eventReminder);
       if (typeof draft.postEventFollowup === "boolean") setPostEventFollowup(draft.postEventFollowup);
+      if (typeof draft.isMajor === "boolean") setIsMajor(draft.isMajor);
     } catch {
       window.localStorage.removeItem(EVENT_DRAFT_KEY);
     }
@@ -1518,9 +1522,15 @@ export default function CreateEventPage() {
   const canPrev    = currentIdx > 0;
   const canNext    = currentIdx < SECTION_IDS.length - 1;
 
+  function scrollBuilderSectionIntoView() {
+    builderSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function goTo(id: SectionId) {
     setActiveSection(id);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    requestAnimationFrame(() => {
+      scrollBuilderSectionIntoView();
+    });
   }
 
   const managedEntityOptions: HostEntityOption[] = [
@@ -1594,6 +1604,7 @@ export default function CreateEventPage() {
       rsvpReminder,
       eventReminder,
       postEventFollowup,
+      isMajor,
     };
 
     window.localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify(payload));
@@ -1714,6 +1725,7 @@ export default function CreateEventPage() {
         location: location.trim() || null,
         location_name: location.trim() || null,
         event_type: "event",
+        is_major: hostAs === "me" ? isMajor : false,
         source_type: sourceType,
         source_id: sourceId,
         display_mode: "calendar",
@@ -1795,7 +1807,7 @@ export default function CreateEventPage() {
         <CoverImageArea value={coverImage} onChange={setCoverImage} />
 
         {/* Two-column layout */}
-        <div className="mt-8 flex gap-6 lg:gap-10 items-start">
+        <div ref={builderSectionRef} className="mt-8 flex gap-6 lg:gap-10 items-start scroll-mt-24">
 
           {/* Left sidebar nav */}
           <aside className="hidden md:block w-44 shrink-0 sticky top-24 self-start">
@@ -1845,19 +1857,28 @@ export default function CreateEventPage() {
                 <Card>
                   {/* Event / Task toggle */}
                   <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.04] border border-white/[0.08] rounded-full w-fit mb-5">
-                    {(["event", "task"] as const).map((k) => (
+                    {(["event", "task"] as const).map((k) => {
+                      const disabled = k === "task";
+                      return (
                       <button
                         key={k}
-                        onClick={() => setEventKind(k)}
+                        onClick={() => !disabled && setEventKind(k)}
+                        disabled={disabled}
+                        title={disabled ? "Coming soon" : undefined}
                         className={`px-4 py-1 rounded-full text-xs font-semibold capitalize transition-all ${
+                          disabled
+                            ? "cursor-not-allowed border border-white/[0.06] bg-white/[0.02] text-white/24"
+                            :
                           eventKind === k
                             ? "bg-teal-500/[0.12] text-teal-400"
                             : "text-white/36 hover:text-white/60"
                         }`}
                       >
-                        {k}
+                        <span>{k}</span>
+                        {disabled && <span className="ml-1 text-[9px] uppercase tracking-[0.12em] text-white/18">Soon</span>}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Title */}
@@ -2407,6 +2428,15 @@ export default function CreateEventPage() {
                     checked={postEventFollowup}
                     onChange={() => setPostEventFollowup(!postEventFollowup)}
                   />
+
+                  {hostAs === "me" && (
+                    <ToggleRow
+                      label="Feature as major WAC event"
+                      sublabel="Major events are prioritized in the WAC calendar."
+                      checked={isMajor}
+                      onChange={() => setIsMajor(!isMajor)}
+                    />
+                  )}
                 </Card>
 
                 {/* Stubs */}

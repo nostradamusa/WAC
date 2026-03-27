@@ -19,6 +19,9 @@ type EventDetail = {
   id: string;
   title: string;
   description: string | null;
+  source_type: "wac" | "organization" | "group" | "business";
+  source_id: string | null;
+  is_major: boolean;
   organization_id: string | null;
   host_entity_type: "organization" | "business" | "group" | null;
   host_entity_id: string | null;
@@ -112,7 +115,7 @@ export default function EventDetailPage({
         const [{ data: eventData, error: eventError }, { data: questionsData, error: questionsError }, { count, error: rsvpCountError }, { data: authData }] = await Promise.all([
           supabase
             .from("events")
-            .select("id, title, description, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, start_time, end_time, location, location_name, city, state, country, event_type, virtual_link, cover_image_url, visibility, rsvp_enabled, access_mode, requires_approval, capacity, waitlist_enabled, allow_plus_ones, require_guest_names, created_by")
+            .select("id, title, description, source_type, source_id, is_major, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, start_time, end_time, location, location_name, city, state, country, event_type, virtual_link, cover_image_url, visibility, rsvp_enabled, access_mode, requires_approval, capacity, waitlist_enabled, allow_plus_ones, require_guest_names, created_by")
             .eq("id", resolvedParams.id)
             .single(),
           supabase
@@ -566,6 +569,11 @@ export default function EventDetailPage({
               {event.event_type && (
                 <span className="wac-button-chip-primary bg-amber-500/10 text-amber-300 pointer-events-none py-1.5">
                   {event.event_type}
+                </span>
+              )}
+              {event.source_type === "wac" && event.is_major && (
+                <span className="rounded-full border border-[#b08d57]/25 bg-[#b08d57]/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#d4b277]">
+                  Featured
                 </span>
               )}
               <span className="text-xs uppercase tracking-[0.18em] text-white/35">
