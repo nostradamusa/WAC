@@ -2,11 +2,19 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // 1. Enforce First-Time Welcome Routing at the Edge
+  // 1. Enforce First-Time Welcome Routing & Mobile Redirect at the Edge
   if (request.nextUrl.pathname === "/") {
     const hasSeenWelcome = request.cookies.has("wac_welcome_seen");
     if (!hasSeenWelcome) {
       return NextResponse.redirect(new URL("/welcome", request.url));
+    }
+    
+    // Detect mobile logic off user-agent cache
+    const userAgent = request.headers.get("user-agent") || "";
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    
+    if (isMobile) {
+      return NextResponse.redirect(new URL("/vision", request.url));
     }
   }
   const isDev = process.env.NODE_ENV === "development";

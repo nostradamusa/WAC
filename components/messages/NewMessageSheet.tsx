@@ -11,17 +11,21 @@ interface NewMessageSheetProps {
 
 export default function NewMessageSheet({ isOpen, onClose }: NewMessageSheetProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [shouldRender, setShouldRender] = useState(isOpen);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
+      setShouldRender(true);
       setTimeout(() => inputRef.current?.focus(), 150);
     } else {
       setSearchQuery("");
+      const timer = setTimeout(() => setShouldRender(false), 300);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!shouldRender && !isOpen) return null;
 
   // Mock search results (Priority: 1. People, 2. Organizations, 3. Businesses)
   const results = [
@@ -37,9 +41,9 @@ export default function NewMessageSheet({ isOpen, onClose }: NewMessageSheetProp
   const businesses = results.filter(r => r.type === "business");
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-center items-end sm:items-center bg-black/60 backdrop-blur-xl transition-all" onClick={onClose}>
+    <div className={`fixed inset-0 z-[100] flex justify-center items-end sm:items-center bg-black/60 backdrop-blur-xl transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={onClose}>
       <div 
-        className="w-full sm:max-w-lg bg-[#0A0A0A] sm:rounded-2xl sm:border border-white/5 h-[90dvh] sm:h-[650px] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300"
+        className={`w-full sm:max-w-lg bg-[#0A0A0A] sm:rounded-2xl sm:border border-white/5 h-[90dvh] sm:h-[650px] flex flex-col shadow-2xl transition-all duration-300 ${isOpen ? "translate-y-0 opacity-100" : "translate-y-full sm:translate-y-8 opacity-0"}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

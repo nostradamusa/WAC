@@ -108,7 +108,7 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
                 </div>
 
                 {/* 2. Headline */}
-                <p className="text-[17px] md:text-[18px] text-white/90 font-medium leading-relaxed mt-1">
+                <p className="text-[17px] md:text-[18px] text-white/90 font-medium leading-relaxed mt-1 line-clamp-2 md:line-clamp-none text-balance">
                    {profile.headline || profile.current_title || profile.profession_name || "Professional"}
                 </p>
              </div>

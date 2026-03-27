@@ -87,8 +87,8 @@ export function BetaFeedback() {
   }
 
   return (
-    <div className="fixed bottom-24 md:bottom-6 right-6 md:right-auto md:left-8 z-[100] flex flex-col items-end md:items-start pointer-events-none">
-      <div className="pointer-events-auto flex flex-col items-end md:items-start">
+    <div className="fixed bottom-24 md:bottom-6 left-6 md:left-8 z-[100] flex flex-col items-start pointer-events-none">
+      <div className="pointer-events-auto flex flex-col items-start">
 
       {isOpen && (
         <div className="mb-4 w-[320px] sm:w-[380px] rounded-2xl bg-[#171513] border border-white/[0.08] shadow-2xl overflow-hidden animate-in slide-in-from-bottom-5 fade-in duration-200">

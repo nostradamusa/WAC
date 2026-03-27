@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
 
 import Hero from "@/components/home/Hero";
 import WhyItExists from "@/components/home/WhyItExists";
@@ -14,18 +13,7 @@ import JoinNetwork from "@/components/home/JoinNetwork";
 
 export default function Home() {
   const [userId, setUserId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState<boolean | null>(null);
-  const router = useRouter();
-
   useEffect(() => {
-    const mobile = window.innerWidth < 768;
-    setIsMobile(mobile);
-
-    if (mobile) {
-      router.replace("/vision");
-      return;
-    }
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id ?? null);
     });
@@ -37,12 +25,7 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
-
-  // On mobile: render nothing while redirect fires (avoids launchpad flash)
-  if (isMobile === null || isMobile) {
-    return <div className="min-h-screen bg-[var(--background)]" />;
-  }
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">

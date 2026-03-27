@@ -25,7 +25,7 @@ export default function VerifiedBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 shrink-0 ${className}`}
+      className={`inline-flex items-center gap-1 shrink-0 ml-1 ${className}`}
       title="WAC Verified"
     >
       {/*

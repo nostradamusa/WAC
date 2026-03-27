@@ -142,6 +142,14 @@ interface CalEvent {
   access_mode?: string | null;
   capacity?: number | null;
   requires_approval?: boolean;
+  
+  // New fields
+  source_type: "wac" | "organization" | "group" | "business";
+  source_id: string | null;
+  display_mode: "calendar" | "feed" | "both";
+  status: "draft" | "published" | "cancelled" | "completed";
+  event_type: "event" | "announcement" | "feature_drop" | "alert";
+
   attending_count?: number;
   current_user_rsvp_status?: "going" | "interested" | "not_going" | null;
   current_user_approval_status?: "approved" | "pending" | "declined" | "waitlisted" | null;
@@ -1831,7 +1839,9 @@ function CalendarModeView() {
       const [{ data, error }, { data: { user: authUser } }] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, start_time, end_time, location, description, created_by, access_mode, capacity, requires_approval")
+          .select("id, title, start_time, end_time, location, description, created_by, access_mode, capacity, requires_approval, source_type, source_id, display_mode, status, event_type")
+          .in("display_mode", ["calendar", "both"])
+          .eq("status", "published")
           .gte("start_time", start.toISOString())
           .lte("start_time", end.toISOString())
           .order("start_time", { ascending: true }),

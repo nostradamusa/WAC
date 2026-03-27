@@ -388,7 +388,7 @@ export default function ProfilePage() {
       </div>
 
       {activeTab === "personal" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start relative px-4 md:px-0">
            
           {/* FLOATING SAVE STATUS INDICATOR */}
           <div className={`fixed right-6 z-[100] transition-all duration-300 ease-in-out ${scrollDirection === "down" ? "bottom-6" : "bottom-[100px]"}`}>
@@ -423,7 +423,7 @@ export default function ProfilePage() {
                      <div className="flex flex-col gap-1">
                         <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">{fullName || "Your Name"}</h2>
                         <div className="flex flex-col text-sm opacity-80">
-                           <span className="font-medium text-[#b08d57]">{headline || "Add a professional headline"}</span>
+                           <span className="font-medium text-balance text-[#b08d57] line-clamp-2 md:line-clamp-none">{headline || "Add a professional headline"}</span>
                            {currentTitle && currentCompany && (
                               <span className="flex items-center gap-1.5 opacity-70 mt-1">
                                  <Briefcase size={13} /> {currentTitle} — {currentCompany}
@@ -692,10 +692,14 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {activeTab === "entities" && <ManagedEntitiesTab userId={userId!} />}
+      {activeTab === "entities" && (
+        <div className="px-4 md:px-0">
+          <ManagedEntitiesTab userId={userId!} />
+        </div>
+      )}
       
       {activeTab === "settings" && (
-        <div className="grid gap-6">
+        <div className="grid gap-6 px-4 md:px-0">
           {isAdmin && (
             <div className="wac-card p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-rose-500/20 bg-rose-500/5 relative overflow-hidden">
               <div className="absolute inset-0 bg-[url('https://transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none"></div>

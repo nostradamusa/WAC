@@ -1696,6 +1696,16 @@ export default function CreateEventPage() {
           ? hostEntity.id
           : null;
 
+      const sourceType =
+        hostAs === "me"
+          ? "wac"
+          : selectedHostEntity?.type ?? "wac";
+
+      const sourceId =
+        hostAs === "me"
+          ? null
+          : selectedHostEntity?.id ?? null;
+
       const { data: insertedEvent, error: insertError } = await supabase
         .from("events")
         .insert({
@@ -1703,7 +1713,11 @@ export default function CreateEventPage() {
         description: description.trim() || null,
         location: location.trim() || null,
         location_name: location.trim() || null,
-        event_type: category || null,
+        event_type: "event",
+        source_type: sourceType,
+        source_id: sourceId,
+        display_mode: "calendar",
+        status: "published",
         virtual_link: virtualLink.trim() || null,
         cover_image_url: coverImage,
         start_time: start.toISOString(),

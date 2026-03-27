@@ -323,7 +323,7 @@ export default function FeedList({ refreshTrigger }: { refreshTrigger?: number }
           </div>
         </div>
       ) : (
-        <div>
+        <div className="flex flex-col gap-6 lg:gap-8 pb-10">
           {posts.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}
