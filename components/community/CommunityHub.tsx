@@ -2,9 +2,9 @@
 
 import { useRef, useEffect } from "react";
 import Link from "next/link";
-import { Hash, Building2, Landmark } from "lucide-react";
+import { Building2, Landmark } from "lucide-react";
 import FeedList from "@/components/feed/FeedList";
-import WacSpotlightWidget from "./WacSpotlightWidget";
+import SuggestedPeopleWidget from "./SuggestedPeopleWidget";
 import { useActor } from "@/components/providers/ActorProvider";
 
 export default function CommunityHub() {
@@ -67,9 +67,9 @@ export default function CommunityHub() {
         {/* ── LEFT COLUMN ─────────────────────────────── */}
         <div className="col-span-1 lg:col-span-8 pb-32">
 
-          {/* Acting-as banner — desktop only */}
+          {/* Acting-as banner */}
           {isEntityContext && (
-            <div className="hidden md:flex items-center gap-2.5 mb-6 py-2.5 px-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04]">
+            <div className="flex items-center gap-2.5 mb-6 py-2.5 px-3 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent)]/[0.04]">
               <div className="w-6 h-6 rounded-full overflow-hidden bg-[var(--accent)]/15 border border-[var(--accent)]/25 flex items-center justify-center shrink-0">
                 {currentActor.avatar_url
                   ? <img src={currentActor.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -94,40 +94,10 @@ export default function CommunityHub() {
 
         {/* ── RIGHT COLUMN — desktop only, sticky ────────────── */}
         <div className="hidden lg:flex lg:col-span-4 sticky top-24 self-start h-[calc(100vh-7rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex-col">
-          <div className="space-y-4 pb-12 pr-1">
+          <div className="space-y-4 pb-12 pt-2 pr-4">
 
-            {/* WAC Spotlight — featured person card */}
-            <WacSpotlightWidget />
-
-            {/* Trending — hardcoded seed data; will be dynamic in V2 */}
-            <div className="wac-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Hash size={11} className="text-white/30 shrink-0" />
-                <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-white/45">
-                  Trending
-                </span>
-              </div>
-              <div className="space-y-3.5">
-                <div>
-                  <div className="text-[10px] text-white/30 mb-0.5">Global Summit 2026</div>
-                  <div className="text-sm font-semibold text-white/75 leading-snug">
-                    #WAC2026 London Registration Open
-                  </div>
-                </div>
-                <div className="border-t border-white/[0.05] pt-3.5">
-                  <div className="text-[10px] text-white/30 mb-0.5">Mentorship Network</div>
-                  <div className="text-sm font-semibold text-white/75 leading-snug">
-                    Spring Cohort Applications Live
-                  </div>
-                </div>
-                <div className="border-t border-white/[0.05] pt-3.5">
-                  <div className="text-[10px] text-white/30 mb-0.5">Tech Diaspora</div>
-                  <div className="text-sm font-semibold text-white/75 leading-snug">
-                    Albanian AI Startup Funding Round
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Suggested people — real data from follows + profiles */}
+            <SuggestedPeopleWidget />
 
             {/* Build Your Network */}
             <div className="wac-card p-5">

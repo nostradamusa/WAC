@@ -18,7 +18,12 @@ import {
   ExternalLink,
   Share2,
   CheckCircle2,
+  HelpCircle,
+  MapPin,
+  Zap,
 } from "lucide-react";
+import { getCategoryLabel } from "@/lib/constants/askConstants";
+import { getIntentDef } from "@/lib/constants/intentConstants";
 import PostComments from "./PostComments";
 import { ReactionIcon, SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
@@ -166,6 +171,9 @@ function ViewerInner({ post, onClose }: Props) {
   const isGroupPost   = post.source_type === "group";
   const isEvent       = post.content_type === "event";
   const isDiscussion  = post.content_type === "discussion";
+  const isAsk         = post.post_intent === "ask";
+  const intentDef     = !isAsk ? getIntentDef(post.post_intent) : null;
+  const showIntentBadge = intentDef && intentDef.slug !== "update" && intentDef.badgeCls;
   const hasCTA        = !!(post.cta_url && post.cta_label);
   const displayItems  = getDisplayMediaItems(post.media_items, post.image_url);
   const hasMedia      = displayItems.length > 0;
@@ -256,6 +264,20 @@ function ViewerInner({ post, onClose }: Props) {
             <div className="flex-1 relative min-h-0">
               <MediaStage items={post.media_items} fallbackUrl={post.image_url} />
             </div>
+          ) : isAsk ? (
+            <div className="flex-1 relative min-h-0 flex items-center justify-center p-10 bg-[#060606]">
+              <div className="max-w-sm text-center space-y-3">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/25">
+                  <HelpCircle size={13} strokeWidth={2.5} className="text-[#b08d57]/70" />
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-[#b08d57]/80">Ask the Network</span>
+                </div>
+                {getCategoryLabel(post.ask_category) && (
+                  <p className="text-[12px] text-white/30 font-medium uppercase tracking-wider">
+                    {getCategoryLabel(post.ask_category)}
+                  </p>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="flex-1 relative min-h-0">
               <ContentStage content={post.content} authorName={authorName} />
@@ -292,8 +314,48 @@ function ViewerInner({ post, onClose }: Props) {
             </Link>
 
             {/* WAC context chips */}
-            {(isEvent || isGroupPost || isDiscussion || (isEntityPost && sourceLabel)) && (
+            {(isAsk || isEvent || isGroupPost || isDiscussion || showIntentBadge || (isEntityPost && sourceLabel)) && (
               <div className="flex flex-wrap gap-1.5 mt-3">
+                {isAsk && (
+                  <>
+                    {/* Ask badge */}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57]/80 text-[10px] font-semibold">
+                      <HelpCircle size={9} /> Ask
+                    </span>
+                    {/* Category */}
+                    {post.ask_category && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.10] text-white/50 text-[10px] font-semibold">
+                        {getCategoryLabel(post.ask_category)}
+                      </span>
+                    )}
+                    {/* Location */}
+                    {post.ask_location && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.05] border border-white/[0.10] text-white/40 text-[10px]">
+                        <MapPin size={8} strokeWidth={2} />
+                        {post.ask_location}
+                      </span>
+                    )}
+                    {/* Urgency */}
+                    {post.ask_urgency === "soon" && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400/80 text-[10px] font-semibold">
+                        <Zap size={8} strokeWidth={2.5} /> Soon
+                      </span>
+                    )}
+                    {post.ask_urgency === "urgent" && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400/80 text-[10px] font-semibold">
+                        <Zap size={8} strokeWidth={2.5} /> Urgent
+                      </span>
+                    )}
+                    {/* Status */}
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-white/35 text-[10px]">
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                        post.ask_status === "open"     ? "bg-emerald-400" :
+                        post.ask_status === "answered" ? "bg-amber-400"   : "bg-white/25"
+                      }`} />
+                      {post.ask_status === "open" ? "Open" : post.ask_status === "answered" ? "Answered" : "Solved"}
+                    </span>
+                  </>
+                )}
                 {isEvent && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57]/80 text-[10px] font-semibold">
                     <Calendar size={9} /> Event
@@ -321,15 +383,122 @@ function ViewerInner({ post, onClose }: Props) {
                     {sourceLabel}
                   </span>
                 )}
+                {showIntentBadge && intentDef && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold ${intentDef.badgeCls}`}>
+                    <intentDef.icon size={9} strokeWidth={2} />
+                    {intentDef.label}
+                  </span>
+                )}
               </div>
             )}
           </div>
 
-          {/* Scrollable body — caption + CTA + engagement + comments */}
+          {/* Engagement row — outside scroll so reaction picker is never clipped */}
+          <div className="px-5 py-3 border-b border-white/[0.05] flex items-center gap-3 shrink-0">
+            {/* Reaction trigger */}
+            <div
+              className="relative"
+              onMouseEnter={() => setShowReactions(true)}
+              onMouseLeave={() => setShowReactions(false)}
+            >
+              <button
+                onClick={() => handleReaction(activeReaction || "like")}
+                disabled={isReacting}
+                className={`flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                  activeReaction ? "text-[#b08d57]" : "text-white/40 hover:text-white/70"
+                }`}
+              >
+                <ReactionIcon
+                  type={activeReaction || "like"}
+                  size={18}
+                  active={!!activeReaction}
+                  animateOnClick={false}
+                  className={activeReaction ? "drop-shadow-[0_0_6px_rgba(176,141,87,0.6)]" : ""}
+                />
+                {reactionCount > 0 && <span>{reactionCount.toLocaleString()}</span>}
+              </button>
+
+              {showReactions && (
+                <div className="absolute bottom-full left-0 pb-2 z-50 w-max">
+                  <div
+                    className="bg-[#1a1a1a] border border-white/10 rounded-full px-3 py-2 flex gap-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+                    onClick={() => setShowReactions(false)}
+                  >
+                    {SUPPORTED_REACTIONS.map(({ type }) => (
+                      <button
+                        key={type}
+                        onClick={(e) => { e.stopPropagation(); handleReaction(type); }}
+                        className="p-1"
+                      >
+                        <ReactionIcon
+                          type={type}
+                          size={24}
+                          active={activeReaction === type}
+                          showTooltip={false}
+                          className="hover:-translate-y-1.5 hover:scale-110"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <span className="text-white/15">·</span>
+
+            <span className="text-xs font-medium text-white/35">
+              {post.comments_count > 0
+                ? `${post.comments_count.toLocaleString()} ${isAsk ? (post.comments_count === 1 ? "response" : "responses") : (post.comments_count === 1 ? "comment" : "comments")}`
+                : isAsk ? "No responses yet" : "No comments yet"}
+            </span>
+
+            {/* Right-side share */}
+            <div className="ml-auto flex items-center gap-2.5">
+              <button
+                onClick={handleCopyLink}
+                title="Copy link"
+                className="text-white/30 hover:text-white/65 transition"
+              >
+                <ExternalLink size={14} strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("open-mini-chat", {
+                      detail: { text: `Check out this post: ${window.location.origin}/post/${post.id}` },
+                    })
+                  );
+                  showToast("Opening WAC Messages…");
+                }}
+                title="Send in WAC Message"
+                className="text-white/30 hover:text-white/65 transition"
+              >
+                <Share2 size={14} strokeWidth={1.5} />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable body — caption + CTA + comments */}
           <div className="flex-1 overflow-y-auto min-h-0">
 
-            {/* Caption (only shown in panel when there is media — otherwise text is the left stage) */}
-            {post.content && hasMedia && (
+            {/* Ask title + body — shown for ask posts */}
+            {isAsk && (
+              <div className="px-5 py-4 border-b border-white/[0.05] border-l-2 border-l-[#b08d57]/40 ml-5">
+                {post.ask_title && (
+                  <p className="text-[16px] font-semibold text-white/90 leading-snug mb-2">
+                    {post.ask_title}
+                  </p>
+                )}
+                {post.content && (
+                  <p className="text-sm text-white/65 leading-relaxed whitespace-pre-wrap">
+                    {post.content}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Caption (only shown in panel when there is media and not an ask) */}
+            {post.content && hasMedia && !isAsk && (
               <div className="px-5 py-4 border-b border-white/[0.05]">
                 <p className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
                   {post.content}
@@ -356,94 +525,9 @@ function ViewerInner({ post, onClose }: Props) {
               </div>
             )}
 
-            {/* Engagement row */}
-            <div className="px-5 py-3 border-b border-white/[0.05] flex items-center gap-3 shrink-0">
-              {/* Reaction trigger */}
-              <div
-                className="relative"
-                onMouseEnter={() => setShowReactions(true)}
-                onMouseLeave={() => setShowReactions(false)}
-              >
-                <button
-                  onClick={() => handleReaction(activeReaction || "like")}
-                  disabled={isReacting}
-                  className={`flex items-center gap-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                    activeReaction ? "text-[#b08d57]" : "text-white/40 hover:text-white/70"
-                  }`}
-                >
-                  <ReactionIcon
-                    type={activeReaction || "like"}
-                    size={18}
-                    active={!!activeReaction}
-                    animateOnClick={false}
-                    className={activeReaction ? "drop-shadow-[0_0_6px_rgba(176,141,87,0.6)]" : ""}
-                  />
-                  {reactionCount > 0 && <span>{reactionCount.toLocaleString()}</span>}
-                </button>
-
-                {showReactions && (
-                  <div className="absolute bottom-full left-0 pb-2 z-50 w-max">
-                    <div
-                      className="bg-[#1a1a1a] border border-white/10 rounded-full px-3 py-2 flex gap-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-                      onClick={() => setShowReactions(false)}
-                    >
-                      {SUPPORTED_REACTIONS.map(({ type }) => (
-                        <button
-                          key={type}
-                          onClick={(e) => { e.stopPropagation(); handleReaction(type); }}
-                          className="p-1"
-                        >
-                          <ReactionIcon
-                            type={type}
-                            size={24}
-                            active={activeReaction === type}
-                            showTooltip={false}
-                            className="hover:-translate-y-1.5 hover:scale-110"
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <span className="text-white/15">·</span>
-
-              <span className="text-[11px] text-white/35">
-                {post.comments_count > 0
-                  ? `${post.comments_count.toLocaleString()} ${post.comments_count === 1 ? "comment" : "comments"}`
-                  : "No comments yet"}
-              </span>
-
-              {/* Right-side share actions */}
-              <div className="ml-auto flex items-center gap-2.5">
-                <button
-                  onClick={handleCopyLink}
-                  title="Copy link"
-                  className="text-white/30 hover:text-white/65 transition"
-                >
-                  <ExternalLink size={14} strokeWidth={1.5} />
-                </button>
-                <button
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("open-mini-chat", {
-                        detail: { text: `Check out this post: ${window.location.origin}/post/${post.id}` },
-                      })
-                    );
-                    onClose();
-                  }}
-                  title="Send in WAC Message"
-                  className="text-white/30 hover:text-white/65 transition"
-                >
-                  <Share2 size={14} strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-
             {/* Comments thread */}
             <div className="px-5 pt-3 pb-4">
-              <PostComments postId={post.id} />
+              <PostComments postId={post.id} isAskPost={isAsk} />
             </div>
 
           </div>

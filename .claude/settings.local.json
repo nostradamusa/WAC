@@ -13,7 +13,16 @@
       "Bash(find c:UsersAdminDesktopwacapp -name *story* -type f)",
       "Bash(grep -r post_type.*story c:UsersAdminDesktopwac --include=*.ts --include=*.tsx)",
       "Bash(find c:UsersAdminDesktopwac -name *.tsx -o -name *.ts)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(find c:/Users/Admin/Desktop/wac/supabase -name *.sql)",
+      "Bash(find /c/Users/Admin/Desktop/wac -name *ulse* -o -name *Pulse*)",
+      "Bash(grep -l \"entity_roles\\\\|group_members\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(grep -l \"entity_roles\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(grep -n \"owner_id\\\\|admin\\\\|member\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(grep -A 20 \"CREATE TABLE.*businesses\\\\|CREATE TABLE.*organizations\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(grep -r 'CREATE TABLE.*businesses' /c/Users/Admin/Desktop/wac/ --include=*.sql)",
+      "Bash(npx next:*)",
+      "Bash(grep -E \"\\\\.\\(ts|sql\\)$\")"
     ]
   }
 }

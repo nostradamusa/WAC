@@ -33,10 +33,11 @@ import {
 } from "lucide-react";
 import type { GroupData, GroupMemberRole, GroupPost, GroupEvent, GroupMedia, GroupFile, GroupMember } from "@/lib/types/group";
 import SectionLabel from "@/components/ui/SectionLabel";
+import GroupFeed from "@/components/feed/GroupFeed";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TabId = "about" | "discussion" | "members" | "events" | "media" | "files";
+type TabId = "about" | "activity" | "discussion" | "members" | "events" | "media" | "files";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -287,6 +288,7 @@ function GroupHero({
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "about",      label: "About"      },
+  { id: "activity",   label: "Activity"   },
   { id: "discussion", label: "Discussion" },
   { id: "members",    label: "Members"    },
   { id: "events",     label: "Events"     },
@@ -900,6 +902,7 @@ export default function GroupProfilePage({ group }: { group: GroupData }) {
   const [activeTab,        setActiveTab]        = useState<TabId>("about");
   const [isMember,         setIsMember]         = useState(group.is_member);
   const [currentUserRole,  setCurrentUserRole]  = useState<GroupMemberRole | null>(group.current_user_role ?? null);
+  const [feedRefreshKey,   setFeedRefreshKey]   = useState(0);
 
   // Hydrate membership state from Supabase on client mount
   useEffect(() => {
@@ -923,10 +926,28 @@ export default function GroupProfilePage({ group }: { group: GroupData }) {
     checkMembership();
   }, [group.id]);
 
+  // Listen for feed refresh after posting
+  useEffect(() => {
+    const handler = () => setFeedRefreshKey((n) => n + 1);
+    window.addEventListener("wac-refresh-feed", handler);
+    return () => window.removeEventListener("wac-refresh-feed", handler);
+  }, []);
+
   function handleJoinRequest() {
     // TODO: wire to API
     setIsMember(true);
   }
+
+  const handleGroupCompose = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-compose-sheet", {
+        detail: {
+          linkedGroupId: group.id,
+          linkedGroupName: group.name,
+        },
+      })
+    );
+  };
 
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
@@ -940,6 +961,22 @@ export default function GroupProfilePage({ group }: { group: GroupData }) {
       {/* Tab content */}
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-8 pb-24">
         {activeTab === "about"      && <AboutTab      group={group} />}
+        {activeTab === "activity"   && (
+          <div className="max-w-2xl space-y-6">
+            {isMember && (
+              <button
+                onClick={handleGroupCompose}
+                className="w-full text-left bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-2xl p-4 border border-white/[0.06] flex items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center shrink-0">
+                  <Users size={16} className="text-white/30" strokeWidth={1.8} />
+                </div>
+                <span className="text-[14.5px] font-medium text-white/40">Share an update with this group...</span>
+              </button>
+            )}
+            <GroupFeed groupId={group.id} refreshKey={feedRefreshKey} />
+          </div>
+        )}
         {activeTab === "discussion" && <DiscussionTab group={group} isMember={isMember} onJoinRequest={handleJoinRequest} />}
         {activeTab === "members"    && <MembersTab    group={group} />}
         {activeTab === "events"     && <EventsTab     group={group} />}

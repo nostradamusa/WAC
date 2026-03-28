@@ -14,6 +14,7 @@ export type StoryViewer = { name: string; avatarUrl: string | null };
 export type MyStory = {
   id: string;
   bgGradient?: string;
+  cssFilter?: string;
   mediaUrl?: string | null;
   isVideo?: boolean;
   content?: string;
@@ -217,7 +218,8 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
               <img
                 src={current.mediaUrl}
                 alt="Story"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-contain"
+                style={current.cssFilter ? { filter: current.cssFilter } : undefined}
                 draggable={false}
               />
             )}
@@ -228,7 +230,8 @@ function ViewerInner({ authorName, authorAvatar, stories, onClose, isAuthor = tr
                 muted
                 loop
                 playsInline
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-contain"
+                style={current.cssFilter ? { filter: current.cssFilter } : undefined}
               />
             )}
             {current.content && (

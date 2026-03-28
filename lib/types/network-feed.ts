@@ -16,6 +16,11 @@ export type PostIntent =
   | "job"
   | "volunteer"
   | "fundraiser"
+  | "ask"
+  | "hiring"
+  | "mentorship"
+  | "referral"
+  | "discussion"
   | null;
 
 /** Who is publishing */
@@ -86,7 +91,7 @@ export interface NetworkPost {
 
   content: string;
   /** Legacy type field — kept for backward compat, not used in new code */
-  post_type: "general" | "opportunity" | "ask";
+  post_type: "general" | "opportunity";
   /** Legacy single-media field — still written for single-photo backward compat */
   image_url: string | null;
   /** V1 multi-media array — preferred over image_url when present and non-empty */
@@ -121,6 +126,14 @@ export interface NetworkPost {
   author_profile?: PostAuthorProfile;
   author_business?: PostAuthorBusiness;
   author_organization?: PostAuthorOrganization;
+
+  // ── Ask the Network fields (null on non-ask posts) ───────────────────────
+  ask_title?:             string | null;
+  ask_category?:          string | null;
+  ask_location?:          string | null;
+  ask_status?:            "open" | "answered" | "solved" | null;
+  ask_urgency?:           "normal" | "soon" | "urgent" | null;
+  ask_best_response_id?:  string | null;
 
   // ── Client state ──────────────────────────────────────────────────────────
   user_reaction_type?: "like" | "heart" | "laugh" | "fire" | "applause" | "smile" | null;

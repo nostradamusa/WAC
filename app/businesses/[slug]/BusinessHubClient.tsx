@@ -1,18 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BusinessProfile } from "@/lib/types/business-directory";
 import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
 import WacReviewTrigger from "@/components/reviews/WacReviewTrigger";
 import { 
-  Briefcase, MapPin, Globe, Clock, Star, Users, CheckCircle, 
-  MessageCircle, MoreHorizontal, ExternalLink, Calendar, Plus 
+  Briefcase, MapPin, Globe, Users, CheckCircle,
+  MessageCircle, MoreHorizontal, ExternalLink, Calendar, Plus
 } from "lucide-react";
+import EntityFeed from "@/components/feed/EntityFeed";
+import CommunityUtilityBadge from "@/components/ui/CommunityUtilityBadge";
+import { useActor } from "@/components/providers/ActorProvider";
 
 type TabType = "Overview" | "Pulse" | "About" | "Services" | "Reviews";
 
 export default function BusinessHubClient({ business }: { business: BusinessProfile }) {
   const [activeTab, setActiveTab] = useState<TabType>("Overview");
+  
+  const { currentActor } = useActor();
+  const isAdmin = currentActor?.type === "person" && currentActor?.id === business.owner_id;
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setFeedRefreshKey((n) => n + 1);
+    window.addEventListener("wac-refresh-feed", handler);
+    return () => window.removeEventListener("wac-refresh-feed", handler);
+  }, []);
+
+  const handleCompose = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-compose-sheet", {
+        detail: {
+          overrideActorType: "business",
+          overrideActorId: business.id,
+          overrideActorName: business.name,
+          overrideActorAvatarUrl: business.logo_url,
+        },
+      })
+    );
+  };
 
   const locationPts = [business.city, business.state, business.country].filter(Boolean);
   const locationString = locationPts.length > 0 ? locationPts.join(", ") : "Global";
@@ -190,6 +216,9 @@ export default function BusinessHubClient({ business }: { business: BusinessProf
                 </div>
               </div>
 
+              {/* Community Utility — only renders if a real record exists */}
+              <CommunityUtilityBadge entityType="business" entityId={business.id} variant="full" />
+
            </div>
 
            {/* MAIN / RIGHT COLUMN (Pulse Feed / Content) */}
@@ -198,20 +227,29 @@ export default function BusinessHubClient({ business }: { business: BusinessProf
              {activeTab === "Overview" || activeTab === "Pulse" ? (
                <div className="flex flex-col gap-6">
                  {/* Create Post Input / Fake Feed Prompt */}
-                 <div className="wac-card bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 flex gap-4 items-center opacity-60 pointer-events-none">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
-                      <Briefcase size={18} strokeWidth={2} />
-                    </div>
-                    <div className="flex-1 text-white/30 text-sm font-medium">Write an update on behalf of this business... (Admin Only)</div>
-                 </div>
+                 {isAdmin && (
+                   <button
+                     onClick={handleCompose}
+                     className="w-full text-left bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-2xl p-4 border border-white/[0.06] flex items-center gap-4"
+                   >
+                     <div className="w-10 h-10 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                        {business.logo_url ? (
+                          <img src={business.logo_url} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <Briefcase size={16} className="text-blue-400" strokeWidth={2} />
+                        )}
+                     </div>
+                     <span className="text-[14.5px] font-medium text-white/40">Write an update on behalf of this business...</span>
+                   </button>
+                 )}
 
-                 <div className="wac-card bg-[var(--surface)]/50 border border-[var(--border)] rounded-2xl p-12 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mb-5 border border-blue-500/20">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
-                    </div>
-                    <h3 className="text-2xl font-extrabold text-white mb-2 tracking-tight">Pulse Feed</h3>
-                    <p className="text-white/50 text-base max-w-sm">This business hasn't shared any public updates or announcements yet.</p>
-                 </div>
+                 <EntityFeed
+                   entityType="business"
+                   entityId={business.id}
+                   emptyStateTitle="No updates yet"
+                   emptyStateDesc="When this business shares updates, announcements, or asks, they'll appear here."
+                   refreshKey={feedRefreshKey}
+                 />
                </div>
              ) : activeTab === "Services" ? (
                <div className="wac-card bg-[var(--surface)]/50 border border-[var(--border)] rounded-2xl p-12 text-center">

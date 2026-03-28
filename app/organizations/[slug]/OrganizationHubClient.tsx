@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
 import GoogleRatingBadge from "@/components/ui/GoogleRatingBadge";
 import WacReviewTrigger from "@/components/reviews/WacReviewTrigger";
 import { 
-  Landmark, MapPin, Globe, Clock, Star, Users, CheckCircle, 
-  MessageCircle, MoreHorizontal, ExternalLink, Calendar, Plus, HeartHandshake,
-  Megaphone, Activity, ShieldCheck, AlignLeft, Info, FileSpreadsheet,
+  Landmark, MapPin, Globe, Users, CheckCircle,
+  MessageCircle, MoreHorizontal, ExternalLink, Calendar, HeartHandshake,
+  Megaphone, Activity, ShieldCheck, AlignLeft, Info,
   Award
 } from "lucide-react";
 import OrganizationEventsTab from "./OrganizationEventsTab";
+import EntityFeed from "@/components/feed/EntityFeed";
+import CommunityUtilityBadge from "@/components/ui/CommunityUtilityBadge";
+import { useActor } from "@/components/providers/ActorProvider";
 
 type TabType = "Overview" | "Announcements" | "Pulse" | "Events" | "Programs" | "Members" | "About";
 
@@ -18,6 +21,29 @@ export default function OrganizationHubClient({ organization }: { organization: 
   const [activeTab, setActiveTab] = useState<TabType>("Overview");
   const [isJoined, setIsJoined] = useState(false);
   const [loadingJoin, setLoadingJoin] = useState(false);
+
+  const { currentActor } = useActor();
+  const isAdmin = currentActor?.type === "person" && currentActor?.id === (organization as any).owner_id;
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setFeedRefreshKey((n) => n + 1);
+    window.addEventListener("wac-refresh-feed", handler);
+    return () => window.removeEventListener("wac-refresh-feed", handler);
+  }, []);
+
+  const handleCompose = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-compose-sheet", {
+        detail: {
+          overrideActorType: "organization",
+          overrideActorId: organization.id,
+          overrideActorName: organization.name,
+          overrideActorAvatarUrl: organization.logo_url,
+        },
+      })
+    );
+  };
 
   const locationPts = [organization.city, organization.state, organization.country].filter(Boolean);
   const locationString = locationPts.length > 0 ? locationPts.join(", ") : "Global";
@@ -216,6 +242,9 @@ export default function OrganizationHubClient({ organization }: { organization: 
                 </div>
               </div>
 
+              {/* Community Utility — only renders if a real record exists */}
+              <CommunityUtilityBadge entityType="organization" entityId={(organization as any).id} variant="full" />
+
            </div>
 
            {/* MAIN / RIGHT COLUMN */}
@@ -268,29 +297,35 @@ export default function OrganizationHubClient({ organization }: { organization: 
              {activeTab === "Pulse" && (
                <div className="flex flex-col gap-6">
                  {/* Pulse Social Composer (Admin) */}
-                 <div className="wac-card bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 flex flex-col gap-3">
-                    <div className="flex items-center gap-2 text-white/50 mb-1">
-                      <Activity size={16} />
-                      <span className="text-sm font-bold uppercase tracking-widest">Share to Pulse Feed</span>
-                    </div>
-                    <div className="flex gap-4 items-center opacity-60 pointer-events-none text-left">
-                      <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/50 shrink-0">
-                        <Landmark size={18} strokeWidth={2} />
+                 {isAdmin && (
+                   <button 
+                     onClick={handleCompose}
+                     className="w-full text-left bg-white/[0.02] hover:bg-white/[0.04] transition-colors rounded-2xl p-6 border border-white/[0.06] flex flex-col gap-3"
+                   >
+                      <div className="flex items-center gap-2 text-white/50 mb-1">
+                        <Activity size={16} />
+                        <span className="text-sm font-bold uppercase tracking-widest">Share to Pulse Feed</span>
                       </div>
-                      <div className="flex-1 text-white/40 text-sm font-medium">Share an event recap, member highlight, or behind-the-scenes photo...</div>
-                    </div>
-                 </div>
+                      <div className="flex gap-4 items-center text-left">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                          {organization.logo_url ? (
+                            <img src={organization.logo_url} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <Landmark size={18} className="text-emerald-400" strokeWidth={2} />
+                          )}
+                        </div>
+                        <div className="flex-1 text-white/40 text-[14.5px] font-medium">Share an event recap, member highlight, or behind-the-scenes photo...</div>
+                      </div>
+                   </button>
+                 )}
 
-                 {/* Pulse Social Empty State */}
-                 <div className="wac-card bg-[var(--surface)]/50 border border-[var(--border)] rounded-2xl p-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-20 h-20 rounded-full bg-white/5 text-white/40 flex items-center justify-center mb-6 border border-white/10">
-                       <Activity size={32} />
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-3 tracking-tight">No Pulse updates yet.</h3>
-                    <p className="text-white/50 text-base max-w-md mx-auto leading-relaxed">
-                      Recaps, community highlights, photos, and live social updates from this organization will appear here.
-                    </p>
-                 </div>
+                 <EntityFeed
+                   entityType="organization"
+                   entityId={organization.id}
+                   emptyStateTitle="No Pulse updates yet."
+                   emptyStateDesc="Recaps, community highlights, photos, and live social updates from this organization will appear here."
+                   refreshKey={feedRefreshKey}
+                 />
                </div>
              )}
 

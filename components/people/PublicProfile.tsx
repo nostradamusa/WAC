@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
 import FollowButton from "@/components/ui/FollowButton";
+import CommunityUtilityBadge from "@/components/ui/CommunityUtilityBadge";
 
 export default function PublicProfile({ profile }: { profile: EnrichedDirectoryPerson }) {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -419,6 +420,11 @@ export default function PublicProfile({ profile }: { profile: EnrichedDirectoryP
              </div>
           </div>
         </aside>
+      </div>
+
+      {/* ── COMMUNITY UTILITY — only renders if a real record exists ────────── */}
+      <div className="mt-8">
+        <CommunityUtilityBadge entityType="person" entityId={profile.id} variant="full" />
       </div>
 
       {/* ── FOOTER / PLATFORM CONTEXT ───────────────────────────────────────────── */}

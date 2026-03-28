@@ -10,15 +10,31 @@ import Image from "next/image";
 import Link from "next/link";
 import { Send, Loader2, MoreHorizontal, X, Plus } from "lucide-react";
 import VerifiedBadge from "@/components/ui/VerifiedBadge";
+import { useActor } from "@/components/providers/ActorProvider";
 
 // Long-press duration for showing reaction picker on touch
 const LONG_PRESS_MS = 400;
 
-export default function PostComments({ postId }: { postId: string }) {
+const COMMENT_PAGE_SIZE = 20;
+
+export default function PostComments({
+  postId,
+  onCommentAdded,
+  onCommentDeleted,
+  isAskPost = false,
+}: {
+  postId: string;
+  onCommentAdded?: () => void;
+  onCommentDeleted?: () => void;
+  isAskPost?: boolean;
+}) {
   const [comments, setComments] = useState<NetworkComment[]>([]);
   const [newContent, setNewContent] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [commentOffset, setCommentOffset] = useState(0);
 
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -40,9 +56,13 @@ export default function PostComments({ postId }: { postId: string }) {
   const [mentionStartIdx, setMentionStartIdx] = useState(-1);
   const [cursorPos, setCursorPos] = useState(0);
   const [activeMentions, setActiveMentions] = useState<MentionSuggestion[]>([]);
+  const [replyActiveMentions, setReplyActiveMentions] = useState<MentionSuggestion[]>([]);
+  const [mentionTargetField, setMentionTargetField] = useState<'comment' | 'reply'>('comment');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { currentActor } = useActor();
 
   const adjustTextareaHeight = () => {
     if (textareaRef.current) {
@@ -65,22 +85,30 @@ export default function PostComments({ postId }: { postId: string }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setCurrentUserId(data.session?.user.id || null));
 
-    async function fetchComments() {
-      setIsLoading(true);
+    async function fetchComments(offset: number, append: boolean) {
+      if (append) setIsLoadingMore(true);
+      else setIsLoading(true);
+
       const { data, error } = await supabase
         .from("feed_comments")
         .select(`
           *,
           author_profile:profiles!author_profile_id(full_name, username, avatar_url, is_verified),
-          author_business:businesses(name, slug, logo_url, is_verified),
-          author_organization:organizations(name, slug, logo_url, is_verified)
+          author_business:businesses!author_business_id(name, slug, logo_url, is_verified),
+          author_organization:organizations!author_organization_id(name, slug, logo_url, is_verified)
         `)
         .eq("post_id", postId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .range(offset, offset + COMMENT_PAGE_SIZE); // fetch one extra to detect more
 
       if (!error && data) {
-        setComments(data as any[]);
-        const ids = data.map((c: any) => c.id);
+        const page = data.slice(0, COMMENT_PAGE_SIZE) as any[];
+        const more = data.length > COMMENT_PAGE_SIZE;
+        setHasMoreComments(more);
+        setCommentOffset(offset + page.length);
+        setComments(prev => append ? [...prev, ...page] : page);
+
+        const ids = page.map((c: any) => c.id);
         if (ids.length > 0) {
           const { data: rxns } = await supabase
             .from("comment_reactions")
@@ -92,15 +120,40 @@ export default function PostComments({ postId }: { postId: string }) {
               if (!counts[r.comment_id]) counts[r.comment_id] = {};
               counts[r.comment_id][r.reaction_type] = (counts[r.comment_id][r.reaction_type] || 0) + 1;
             });
-            setCommentReactionCounts(counts);
+            setCommentReactionCounts(prev => append ? { ...prev, ...counts } : counts);
           }
         }
       }
-      setIsLoading(false);
+      if (append) setIsLoadingMore(false);
+      else setIsLoading(false);
     }
 
-    fetchComments();
+    fetchComments(0, false);
   }, [postId]);
+
+  const handleLoadMoreComments = async () => {
+    if (isLoadingMore || !hasMoreComments) return;
+    setIsLoadingMore(true);
+    const { data, error } = await supabase
+      .from("feed_comments")
+      .select(`
+        *,
+        author_profile:profiles!author_profile_id(full_name, username, avatar_url, is_verified),
+        author_business:businesses!author_business_id(name, slug, logo_url, is_verified),
+        author_organization:organizations!author_organization_id(name, slug, logo_url, is_verified)
+      `)
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true })
+      .range(commentOffset, commentOffset + COMMENT_PAGE_SIZE);
+
+    if (!error && data) {
+      const page = data.slice(0, COMMENT_PAGE_SIZE) as any[];
+      setHasMoreComments(data.length > COMMENT_PAGE_SIZE);
+      setCommentOffset(prev => prev + page.length);
+      setComments(prev => [...prev, ...page]);
+    }
+    setIsLoadingMore(false);
+  };
 
   // Top-level comment submit (bottom composer — no parent_id)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,6 +177,7 @@ export default function PostComments({ postId }: { postId: string }) {
       setComments((prev) => [...prev, data as any]);
       setNewContent("");
       setActiveMentions([]);
+      onCommentAdded?.();
     }
     setIsSubmitting(false);
   };
@@ -134,12 +188,25 @@ export default function PostComments({ postId }: { postId: string }) {
     if (!replyContent.trim() || isSubmitting || !replyingToId) return;
 
     setIsSubmitting(true);
-    const { success, data } = await addPostComment(postId, replyContent.trim(), replyingToId);
+
+    let finalReplyContent = replyContent.trim();
+    const sortedMentions = [...replyActiveMentions].sort((a, b) => b.name.length - a.name.length);
+    sortedMentions.forEach(m => {
+      const linkPath = m.type === 'profile' ? `/people/${m.username_or_slug || m.id}`
+                     : m.type === 'business' ? `/businesses/${m.username_or_slug || m.id}`
+                     : `/organizations/${m.username_or_slug || m.id}`;
+      const regex = new RegExp(`@${m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+      finalReplyContent = finalReplyContent.replace(regex, `[@${m.name}](${linkPath})`);
+    });
+
+    const { success, data } = await addPostComment(postId, finalReplyContent, replyingToId);
     if (success && data && !Array.isArray(data)) {
       setComments(prev => [...prev, data as any]);
       setReplyContent("");
+      setReplyActiveMentions([]);
       setReplyingToId(null);
       setReplyingToName(null);
+      onCommentAdded?.();
     }
     setIsSubmitting(false);
   };
@@ -149,6 +216,7 @@ export default function PostComments({ postId }: { postId: string }) {
       const { success } = await deleteComment(commentId);
       if (success) {
         setComments(prev => prev.filter(c => c.id !== commentId));
+        onCommentDeleted?.();
       } else {
         alert("Failed to delete comment");
       }
@@ -183,6 +251,7 @@ export default function PostComments({ postId }: { postId: string }) {
   };
 
   const handleTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMentionTargetField('comment');
     const val = e.target.value;
     setNewContent(val);
 
@@ -214,22 +283,74 @@ export default function PostComments({ postId }: { postId: string }) {
     setShowMentions(false);
   };
 
+  const handleReplyTextChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMentionTargetField('reply');
+    const val = e.target.value;
+    setReplyContent(val);
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+
+    const pos = e.target.selectionStart;
+    setCursorPos(pos);
+
+    const textBeforeCursor = val.slice(0, pos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+      const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+      if (/[\s\n]/.test(charBeforeAt)) {
+        const queryCandidate = textBeforeCursor.slice(lastAtIndex + 1);
+        if (queryCandidate.length <= 50 && !queryCandidate.includes('\n')) {
+          setMentionStartIdx(lastAtIndex);
+          if (queryCandidate.length >= 2) {
+            const results = await searchMentionSuggestions(queryCandidate);
+            setMentionSuggestions(results);
+            setSelectedIndex(0);
+            setShowMentions(results.length > 0);
+          } else {
+            setShowMentions(false);
+            setMentionSuggestions([]);
+          }
+          return;
+        }
+      }
+    }
+    setShowMentions(false);
+  };
+
   const handleMentionSelect = (suggestion: MentionSuggestion) => {
     const mentionText = `@${suggestion.name} `;
-    const textBeforeMention = newContent.slice(0, mentionStartIdx);
-    const textAfterCursor = newContent.slice(cursorPos);
-    setNewContent(textBeforeMention + mentionText + textAfterCursor);
     setShowMentions(false);
-    if (!activeMentions.find(m => m.id === suggestion.id)) {
-      setActiveMentions(prev => [...prev, suggestion]);
-    }
-    setTimeout(() => {
-      if (textareaRef.current) {
-        const nextPos = textBeforeMention.length + mentionText.length;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextPos, nextPos);
+
+    if (mentionTargetField === 'reply') {
+      const textBeforeMention = replyContent.slice(0, mentionStartIdx);
+      const textAfterCursor = replyContent.slice(cursorPos);
+      setReplyContent(textBeforeMention + mentionText + textAfterCursor);
+      if (!replyActiveMentions.find(m => m.id === suggestion.id)) {
+        setReplyActiveMentions(prev => [...prev, suggestion]);
       }
-    }, 0);
+      setTimeout(() => {
+        if (replyTextareaRef.current) {
+          const nextPos = textBeforeMention.length + mentionText.length;
+          replyTextareaRef.current.focus();
+          replyTextareaRef.current.setSelectionRange(nextPos, nextPos);
+        }
+      }, 0);
+    } else {
+      const textBeforeMention = newContent.slice(0, mentionStartIdx);
+      const textAfterCursor = newContent.slice(cursorPos);
+      setNewContent(textBeforeMention + mentionText + textAfterCursor);
+      if (!activeMentions.find(m => m.id === suggestion.id)) {
+        setActiveMentions(prev => [...prev, suggestion]);
+      }
+      setTimeout(() => {
+        if (textareaRef.current) {
+          const nextPos = textBeforeMention.length + mentionText.length;
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(nextPos, nextPos);
+        }
+      }, 0);
+    }
   };
 
   const handleCommentReaction = async (commentId: string, type: ReactionType) => {
@@ -529,7 +650,7 @@ export default function PostComments({ postId }: { postId: string }) {
               </span>
               <button
                 type="button"
-                onClick={() => { setReplyingToId(null); setReplyingToName(null); setReplyContent(""); }}
+                onClick={() => { setReplyingToId(null); setReplyingToName(null); setReplyContent(""); setReplyActiveMentions([]); }}
                 className="w-5 h-5 rounded-full flex items-center justify-center text-white/25 hover:text-white/60 hover:bg-white/[0.06] transition"
                 aria-label="Cancel reply"
               >
@@ -537,35 +658,93 @@ export default function PostComments({ postId }: { postId: string }) {
               </button>
             </div>
 
-            {/* Composer row */}
-            <form onSubmit={handleReplySubmit} className="flex items-end gap-2">
-              {/* Current user avatar */}
-              <div className="w-6 h-6 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-[10px] font-bold shrink-0 mb-[3px]">
-                {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
-              </div>
+            {/* Mention dropdown for reply */}
+            <div className="relative">
+              {showMentions && mentionSuggestions.length > 0 && mentionTargetField === 'reply' && (
+                <div className="absolute bottom-full left-0 mb-1.5 w-full max-w-xs bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl overflow-hidden z-[50]">
+                  <div className="max-h-48 overflow-y-auto">
+                    {mentionSuggestions.map((suggestion, idx) => {
+                      const isOrg = suggestion.type === 'organization';
+                      const isBiz = suggestion.type === 'business';
+                      const typeColor = isOrg ? 'text-green-400' : isBiz ? 'text-blue-400' : 'text-[#b08d57]';
+                      const bgBorderColor = isOrg ? 'border-green-500/30' : isBiz ? 'border-blue-500/30' : 'border-[#b08d57]/30';
+                      return (
+                        <button
+                          key={`reply-${suggestion.id}-${idx}`}
+                          type="button"
+                          onClick={() => handleMentionSelect(suggestion)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={`w-full text-left px-3 py-2 flex items-center gap-2.5 transition border-b border-white/5 last:border-0 ${idx === selectedIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        >
+                          <div className={`relative w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-black/40 border ${bgBorderColor}`}>
+                            {suggestion.avatar_url ? (
+                              <Image src={suggestion.avatar_url} alt={suggestion.name} fill sizes="28px" className="object-cover" />
+                            ) : (
+                              <div className={`w-full h-full flex items-center justify-center font-bold text-xs ${typeColor}`}>
+                                {suggestion.name.charAt(0)}
+                              </div>
+                            )}
+                          </div>
+                          <span className="font-semibold text-sm truncate">{suggestion.name}</span>
+                          <span className={`ml-auto flex-shrink-0 text-[10px] capitalize px-1.5 py-0.5 rounded-full bg-black/40 border ${bgBorderColor} ${typeColor}`}>
+                            {suggestion.type}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-              {/* Unified input + send shell */}
-              <div className="flex-1 flex items-end bg-black/25 border border-white/[0.07] rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]/30 focus-within:bg-black/30">
-                <textarea
-                  ref={replyTextareaRef}
-                  value={replyContent}
-                  onChange={(e) => {
-                    setReplyContent(e.target.value);
-                    e.target.style.height = "auto";
-                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                  }}
-                  placeholder="Write a reply…"
-                  rows={1}
-                  style={{ minHeight: "36px", fontSize: "16px" }}
-                  className="flex-1 bg-transparent px-3 py-[7px] text-sm md:text-xs resize-none outline-none placeholder:text-white/20 leading-[1.45] overflow-hidden"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (replyContent.trim() && !isSubmitting) handleReplySubmit(e as any);
-                    } else if (e.key === "Escape") {
-                      setReplyingToId(null);
-                      setReplyingToName(null);
-                      setReplyContent("");
+              {/* Composer row */}
+              <form onSubmit={handleReplySubmit} className="flex items-end gap-2">
+                {/* Active actor avatar */}
+                <div className="w-6 h-6 rounded-full overflow-hidden bg-white/[0.08] border border-white/[0.12] shrink-0 mb-[3px] relative">
+                  {currentActor?.avatar_url ? (
+                    <Image src={currentActor.avatar_url} alt={currentActor.name} fill sizes="24px" className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-bold text-[#b08d57] text-[9px]">
+                      {currentActor?.name?.charAt(0)?.toUpperCase() ?? "?"}
+                    </div>
+                  )}
+                </div>
+
+                {/* Unified input + send shell */}
+                <div className="flex-1 flex items-end bg-black/25 border border-transparent rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]/35 focus-within:bg-black/30">
+                  <textarea
+                    ref={replyTextareaRef}
+                    value={replyContent}
+                    onChange={handleReplyTextChange}
+                    placeholder="Write a reply… (@ to mention)"
+                    rows={1}
+                    style={{ minHeight: "36px", fontSize: "16px" }}
+                    className="flex-1 bg-transparent px-3 py-[7px] text-sm md:text-xs resize-none outline-none ring-0 placeholder:text-white/20 leading-[1.45] overflow-hidden"
+                    onKeyDown={(e) => {
+                      if (showMentions && mentionTargetField === 'reply') {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          setSelectedIndex(prev => (prev < mentionSuggestions.length - 1 ? prev + 1 : prev));
+                          return;
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setSelectedIndex(prev => (prev > 0 ? prev - 1 : prev));
+                          return;
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (mentionSuggestions[selectedIndex]) handleMentionSelect(mentionSuggestions[selectedIndex]);
+                          return;
+                        } else if (e.key === 'Escape') {
+                          setShowMentions(false);
+                          return;
+                        }
+                      }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (replyContent.trim() && !isSubmitting) handleReplySubmit(e as any);
+                      } else if (e.key === "Escape") {
+                        setReplyingToId(null);
+                        setReplyingToName(null);
+                        setReplyContent("");
                     }
                   }}
                 />
@@ -582,6 +761,7 @@ export default function PostComments({ postId }: { postId: string }) {
                 </button>
               </div>
             </form>
+          </div>
           </div>
         )}
 
@@ -605,14 +785,23 @@ export default function PostComments({ postId }: { postId: string }) {
       ) : comments.length > 0 ? (
         <div className="space-y-3 mb-3">
           {topLevelComments.map((comment) => renderCommentThread(comment))}
+          {hasMoreComments && (
+            <button
+              onClick={handleLoadMoreComments}
+              disabled={isLoadingMore}
+              className="w-full text-center text-[11px] text-white/35 hover:text-white/55 py-2 transition-colors disabled:opacity-40"
+            >
+              {isLoadingMore ? "Loading…" : "Load more comments"}
+            </button>
+          )}
         </div>
       ) : (
-        <p className="text-[12px] text-white/25 py-1 mb-3">No comments yet.</p>
+        <p className="text-[12px] text-white/25 py-1 mb-3">{isAskPost ? "No responses yet. Be the first to help." : "No comments yet."}</p>
       )}
 
       {/* ── Top-level comment composer ───────────────────────────────────── */}
       <div className="flex items-end gap-2.5">
-        {showMentions && mentionSuggestions.length > 0 && (
+        {showMentions && mentionSuggestions.length > 0 && mentionTargetField === 'comment' && (
           <div className="absolute bottom-full left-0 mb-2 w-full max-w-sm bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl overflow-hidden z-[50] animate-in fade-in slide-in-from-bottom-2 pointer-events-auto">
             <div className="max-h-[40vh] md:max-h-96 overflow-y-auto custom-scrollbar pb-1" style={{ overscrollBehavior: 'contain' }}>
               {mentionSuggestions.map((suggestion, idx) => {
@@ -651,23 +840,29 @@ export default function PostComments({ postId }: { postId: string }) {
           </div>
         )}
 
-        {/* Current user avatar */}
-        <div className="w-8 h-8 rounded-full bg-[#b08d57]/20 border border-[#b08d57]/30 flex items-center justify-center text-[#b08d57] text-xs font-bold shrink-0 mb-[5px]">
-          {currentUserId ? currentUserId.charAt(0).toUpperCase() : "?"}
+        {/* Active actor avatar */}
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-white/[0.08] border border-white/[0.12] shrink-0 mb-[5px] relative">
+          {currentActor?.avatar_url ? (
+            <Image src={currentActor.avatar_url} alt={currentActor.name} fill sizes="32px" className="object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center font-bold text-[#b08d57] text-xs">
+              {currentActor?.name?.charAt(0)?.toUpperCase() ?? "?"}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1">
-          <div className="flex items-end bg-black/20 border border-[var(--border)] rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]">
+          <div className="flex items-end bg-black/20 border border-transparent rounded-2xl overflow-hidden transition-colors focus-within:border-[var(--accent)]/50">
             <textarea
               id={`comment-textarea-${postId}`}
               name={`comment-textarea-${postId}`}
               ref={textareaRef}
               value={newContent}
               onChange={handleTextChange}
-              placeholder="Write a comment… (Type @ to mention)"
+              placeholder={isAskPost ? "Write a response… (Type @ to mention)" : "Write a comment… (Type @ to mention)"}
               rows={1}
               style={{ fontSize: "16px" }}
-              className="flex-1 bg-transparent pl-4 pr-2 py-3 text-sm focus:outline-none resize-none overflow-hidden placeholder:text-white/30 leading-snug"
+              className="flex-1 bg-transparent pl-4 pr-2 py-3 text-sm focus:outline-none focus:ring-0 resize-none overflow-hidden placeholder:text-white/30 leading-snug"
               onKeyDown={(e) => {
                 if (showMentions) {
                   if (e.key === 'ArrowDown') {

@@ -8,6 +8,7 @@ import {
   PostMediaItem,
   PostAuthorProfile,
 } from "@/lib/types/network-feed";
+import { getIntentDef } from "@/lib/constants/intentConstants";
 import {
   MessageCircle,
   Share2,
@@ -39,13 +40,15 @@ import { supabase } from "@/lib/supabase";
 
 // ─── V1 Intent config ─────────────────────────────────────────────────────────
 
-const INTENT_CONFIG: Record<string, { label: string; cls: string }> = {
-  announcement: { label: "Announcement", cls: "text-[#b08d57]/80 bg-[#b08d57]/10 border-[#b08d57]/20" },
-  opportunity: { label: "Opportunity", cls: "text-sky-400/80 bg-sky-500/10 border-sky-500/20" },
-  job: { label: "Hiring", cls: "text-violet-400/80 bg-violet-500/10 border-violet-500/20" },
-  volunteer: { label: "Volunteer", cls: "text-emerald-400/80 bg-emerald-500/10 border-emerald-500/20" },
-  fundraiser: { label: "Fundraiser", cls: "text-rose-400/80 bg-rose-500/10 border-rose-500/20" },
-};
+// Intent badge lookup — uses shared constants, falls back for legacy "job" → "hiring"
+function getIntentBadge(slug: string | null): { label: string; cls: string; icon: any } | null {
+  if (!slug || slug === "update") return null;
+  // Legacy "job" maps to "hiring"
+  const lookupSlug = slug === "job" ? "hiring" : slug;
+  const def = getIntentDef(lookupSlug);
+  if (!def || !def.badgeCls) return null;
+  return { label: def.label, cls: def.badgeCls, icon: def.icon };
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -277,7 +280,15 @@ function PostMediaGallery({
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
-export default function PostCard({ post }: { post: NetworkPost }) {
+export default function PostCard({
+  post,
+  initialIsFollowed = false,
+  onFollowChange,
+}: {
+  post: NetworkPost;
+  initialIsFollowed?: boolean;
+  onFollowChange?: () => void;
+}) {
   const contentType: ContentType = post.content_type ?? "post";
   const postIntent: PostIntent = post.post_intent ?? null;
   const sourceType: SourceType =
@@ -289,14 +300,12 @@ export default function PostCard({ post }: { post: NetworkPost }) {
   const isEvent = contentType === "event";
   const isDiscussion = contentType === "discussion";
   const hasCTA = !!(post.cta_url && post.cta_label);
-  const showIntent =
-    contentType === "post" &&
-    postIntent &&
-    postIntent !== "update" &&
-    !!INTENT_CONFIG[postIntent];
+  const intentBadge = getIntentBadge(postIntent);
+  const showIntent = contentType === "post" && !!intentBadge;
 
   const [activeReaction, setActiveReaction] = useState<ReactionType | null>(post.user_reaction_type || null);
   const [reactionCount, setReactionCount] = useState(post.likes_count || 0);
+  const [localCommentCount, setLocalCommentCount] = useState(post.comments_count ?? 0);
   const [isReacting, setIsReacting] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showComments, setShowComments] = useState(isDiscussion);
@@ -324,8 +333,14 @@ export default function PostCard({ post }: { post: NetworkPost }) {
   const isLongPress = useRef(false);
   const [showOptions, setShowOptions] = useState(false);
 
-  // Quick-Follow State Check
-  const [isFollowed, setIsFollowed] = useState(false); // In real implementation, this would sync with author network state
+  // Follow state — initialized from parent batch hydration, not hardcoded false
+  const [isFollowed, setIsFollowed] = useState(initialIsFollowed);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+
+  // Sync when parent refreshes the follow set (e.g. after sibling card follow/unfollow)
+  useEffect(() => {
+    setIsFollowed(initialIsFollowed);
+  }, [initialIsFollowed]);
   const repostOptionsRef = useRef<HTMLDivElement>(null);
   const shareOptionsRef = useRef<HTMLDivElement>(null);
 
@@ -417,7 +432,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
   const isExpandable =
     hasMedia ||
     isDiscussion ||
-    post.comments_count > 0 ||
+    localCommentCount > 0 ||
     post.content.length > 120;
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -730,15 +745,35 @@ export default function PostCard({ post }: { post: NetworkPost }) {
             
             {/* Quick Follow Affordance Overlay */}
             {!isOwner && !isFollowed && (
-               <button 
-                  onClick={(e) => { 
-                     e.preventDefault(); 
-                     e.stopPropagation(); 
-                     setIsFollowed(true); 
-                     showToast(`You are now following ${authorName}`); 
+               <button
+                  disabled={isFollowLoading}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isFollowLoading) return;
+                    setIsFollowLoading(true);
+                    const followingType = post.author_business_id
+                      ? "business"
+                      : post.author_organization_id
+                      ? "organization"
+                      : "person";
+                    const followingId =
+                      post.author_business_id ??
+                      post.author_organization_id ??
+                      post.author_profile_id;
+                    if (!followingId) { setIsFollowLoading(false); return; }
+                    const { data } = await supabase.rpc("toggle_follow", {
+                      p_following_type: followingType,
+                      p_following_id: followingId,
+                    });
+                    const nowFollowing = data === true;
+                    setIsFollowed(nowFollowing);
+                    if (nowFollowing) showToast(`Following ${authorName}`);
+                    onFollowChange?.();
+                    setIsFollowLoading(false);
                   }}
                   title={`Follow ${authorName}`}
-                  className={`absolute -bottom-1 -right-0.5 bg-[#b08d57] text-[#151311] w-4 h-4 flex items-center justify-center border-2 border-[#161513] hover:bg-white hover:text-black hover:scale-110 active:scale-95 transition-all shadow-sm z-10 ${isEntityPost ? "rounded-md" : "rounded-full"}`}
+                  className={`absolute -bottom-1 -right-0.5 bg-[#b08d57] text-[#151311] w-4 h-4 flex items-center justify-center border-2 border-[#161513] hover:bg-white hover:text-black hover:scale-110 active:scale-95 transition-all shadow-sm z-10 disabled:opacity-50 ${isEntityPost ? "rounded-md" : "rounded-full"}`}
                >
                   <Plus size={10} strokeWidth={4} />
                </button>
@@ -795,10 +830,11 @@ export default function PostCard({ post }: { post: NetworkPost }) {
           </div>
 
           {/* Intent badge */}
-          {showIntent && (
+          {showIntent && intentBadge && (
             <div className="mb-2">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${INTENT_CONFIG[postIntent!].cls}`}>
-                {INTENT_CONFIG[postIntent!].label}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${intentBadge.cls}`}>
+                <intentBadge.icon size={9} strokeWidth={2} />
+                {intentBadge.label}
               </span>
             </div>
           )}
@@ -919,7 +955,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
               {reactionCount > 0 && (
                 <button
                   onClick={() => setShowReactionsModal(true)}
-                  className="text-[11px] text-white/35 -ml-0.5 mr-2 hover:text-[var(--accent)] transition tabular-nums"
+                  className="text-[11px] text-white/35 leading-none p-0 -ml-0.5 mr-2 hover:text-[var(--accent)] transition tabular-nums"
                 >
                   {reactionCount.toLocaleString()}
                 </button>
@@ -953,8 +989,8 @@ export default function PostCard({ post }: { post: NetworkPost }) {
             >
               <MessageCircle size={18} strokeWidth={showComments ? 2.2 : 1.6} className={showComments ? "drop-shadow-[0_0_6px_rgba(176,141,87,0.4)]" : ""} />
             </button>
-            {post.comments_count > 0 && (
-              <span className="text-[11px] text-white/35 -ml-0.5 mr-2 tabular-nums">{post.comments_count.toLocaleString()}</span>
+            {localCommentCount > 0 && (
+              <span className="text-[11px] text-white/35 leading-none -ml-0.5 mr-2 tabular-nums">{localCommentCount.toLocaleString()}</span>
             )}
 
             {/* Repost */}
@@ -967,7 +1003,7 @@ export default function PostCard({ post }: { post: NetworkPost }) {
                 <Repeat size={18} strokeWidth={1.6} />
               </button>
               {(post.repost_count ?? 0) > 0 && (
-                <span className="text-[11px] text-white/35 -ml-0.5 mr-2 tabular-nums">{post.repost_count!.toLocaleString()}</span>
+                <span className="text-[11px] text-white/35 leading-none -ml-0.5 mr-2 tabular-nums">{post.repost_count!.toLocaleString()}</span>
               )}
               {showRepostOptions && (
                 <div className="absolute left-0 bottom-[calc(100%+4px)] min-w-[180px] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20">
@@ -985,42 +1021,27 @@ export default function PostCard({ post }: { post: NetworkPost }) {
               )}
             </div>
 
-            {/* Share */}
+            {/* Share — tap to copy link or open native share sheet */}
             <div className="relative flex items-center ml-auto" ref={shareOptionsRef}>
               <button
                 aria-label="Share"
-                onClick={() => setShowShareOptions(!showShareOptions)}
+                onClick={handleNativeShare}
                 className="flex items-center justify-center w-9 h-9 rounded-full text-white/35 hover:text-white/70 hover:bg-white/[0.05] transition"
               >
                 <Share2 size={18} strokeWidth={1.6} />
               </button>
-              {showShareOptions && (
-                <div className="absolute right-0 bottom-[calc(100%+4px)] min-w-[200px] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20">
-                  <button
-                    onClick={() => {
-                      setShowShareOptions(false);
-                      window.dispatchEvent(new CustomEvent("open-mini-chat", { detail: { text: "Check out this post: " + `${window.location.origin}/post/${post.id}` } }));
-                      showToast("Opening WAC Messages...");
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition flex items-center gap-3 text-[#b08d57] font-semibold"
-                  >
-                    <MessageCircle size={15} strokeWidth={2} className="text-[#b08d57]" /><span>Send in WAC Message</span>
-                  </button>
-                  <div className="h-px bg-white/5" />
-                  <button onClick={handleCopyLink} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition flex items-center gap-3">
-                    <ExternalLink size={15} strokeWidth={1.5} /><span>Copy Link</span>
-                  </button>
-                  <button onClick={handleNativeShare} className="w-full text-left px-4 py-3 text-sm hover:bg-white/5 transition flex items-center gap-3">
-                    <Share2 size={15} strokeWidth={1.5} /><span>Share via…</span>
-                  </button>
-                </div>
-              )}
             </div>
 
           </div>
 
           {/* Comments — inside right column so thread line spans through */}
-          {showComments && <PostComments postId={post.id} />}
+          {showComments && (
+            <PostComments
+              postId={post.id}
+              onCommentAdded={() => setLocalCommentCount((n) => n + 1)}
+              onCommentDeleted={() => setLocalCommentCount((n) => Math.max(0, n - 1))}
+            />
+          )}
 
         </div>{/* end right column */}
       </div>{/* end two-column */}
