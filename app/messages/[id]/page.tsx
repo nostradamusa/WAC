@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, Smile, Reply, X } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
+import type { ActorIdentity } from "@/components/providers/ActorProvider";
 import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import {
   ConversationOverview,
@@ -12,6 +13,7 @@ import {
   getUserConversations,
   markConversationRead,
   MessageInterface,
+  MessageMetadata,
   MessagingActorType,
   sendMessage,
   toggleMessageReactionDB,
@@ -47,7 +49,7 @@ export default function ActiveChatPage({
 }) {
   const resolvedParams = use(params);
   const conversationId = resolvedParams.id;
-  const { currentActor, isLoading } = useActor();
+  const { currentActor, ownedEntities, setCurrentActor, isLoading } = useActor();
   const [conversation, setConversation] = useState<ConversationOverview | null>(null);
   const [messages, setMessages] = useState<MessageInterface[]>([]);
   const [inputText, setInputText] = useState("");
@@ -55,6 +57,7 @@ export default function ActiveChatPage({
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageInterface | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
+  const [identitySwitcherOpen, setIdentitySwitcherOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -300,21 +303,73 @@ export default function ActiveChatPage({
                     )}
 
                     {/* Message bubble */}
-                    <div
-                      className={`rounded-2xl px-4 py-3 ${
-                        isMine
-                          ? "bg-[#b08d57] text-black rounded-br-md"
-                          : "bg-[#1b1b1b] border border-white/[0.06] text-white rounded-bl-md"
-                      }`}
-                    >
-                      {!isMine && conversation.type === "group" && (
-                        <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
-                      )}
-                      <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
-                      <div className={`mt-1.5 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
-                        {formatTimestamp(message.created_at)}
+                    {message.metadata?.type === "entity_card" ? (
+                      /* ── Entity card message ─────────────────────── */
+                      <Link
+                        href={message.metadata.url}
+                        className={`block rounded-2xl overflow-hidden border ${
+                          isMine
+                            ? "bg-[#b08d57]/90 border-[#9a7545] rounded-br-md"
+                            : "bg-[#1b1b1b] border-white/[0.06] rounded-bl-md"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 p-3">
+                          <div className="w-11 h-11 rounded-full bg-white/[0.1] border border-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center">
+                            {message.metadata.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={message.metadata.avatar_url} alt={message.metadata.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className={`text-sm font-bold ${isMine ? "text-black/50" : "text-[#b08d57]"}`}>
+                                {message.metadata.name.charAt(0)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`font-semibold text-sm truncate ${isMine ? "text-black" : "text-white"}`}>
+                                {message.metadata.name}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full capitalize shrink-0 ${
+                                isMine ? "bg-black/10 text-black/60" : "bg-white/[0.06] text-white/40"
+                              }`}>
+                                {message.metadata.entity_type}
+                              </span>
+                            </div>
+                            {message.metadata.headline && (
+                              <p className={`text-xs truncate mt-0.5 ${isMine ? "text-black/60" : "text-white/40"}`}>
+                                {message.metadata.headline}
+                              </p>
+                            )}
+                          </div>
+                          <ExternalLink size={14} className={isMine ? "text-black/40" : "text-white/20"} />
+                        </div>
+                        {message.content && (
+                          <div className={`px-3 pb-2.5 text-sm ${isMine ? "text-black/70" : "text-white/60"}`}>
+                            {message.content}
+                          </div>
+                        )}
+                        <div className={`px-3 pb-2 text-[11px] ${isMine ? "text-black/40" : "text-white/25"}`}>
+                          {formatTimestamp(message.created_at)}
+                        </div>
+                      </Link>
+                    ) : (
+                      /* ── Regular text message ────────────────────── */
+                      <div
+                        className={`rounded-2xl px-4 py-3 ${
+                          isMine
+                            ? "bg-[#b08d57] text-black rounded-br-md"
+                            : "bg-[#1b1b1b] border border-white/[0.06] text-white rounded-bl-md"
+                        }`}
+                      >
+                        {!isMine && conversation.type === "group" && (
+                          <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
+                        )}
+                        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
+                        <div className={`mt-1.5 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
+                          {formatTimestamp(message.created_at)}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Reaction badges below bubble */}
                     {hasReactions && (
@@ -401,6 +456,59 @@ export default function ActiveChatPage({
       )}
 
       <div className={`border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3 ${replyTo ? "border-t-0" : ""}`}>
+        {/* Identity switcher — only show when user has multiple identities */}
+        {ownedEntities.length > 1 && (
+          <div className="max-w-3xl mx-auto mb-2 relative">
+            <button
+              type="button"
+              onClick={() => setIdentitySwitcherOpen(!identitySwitcherOpen)}
+              className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-colors text-[11px]"
+            >
+              <div className="w-5 h-5 rounded-full bg-white/[0.08] overflow-hidden flex items-center justify-center shrink-0">
+                {currentActor?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentActor.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[9px] font-bold text-[#b08d57]">{currentActor?.name?.charAt(0)}</span>
+                )}
+              </div>
+              <span className="text-white/50">Messaging as</span>
+              <span className="font-semibold text-white/80 truncate max-w-[120px]">{currentActor?.name}</span>
+              <ChevronDown size={12} className={`text-white/30 transition-transform ${identitySwitcherOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {identitySwitcherOpen && (
+              <div className="absolute bottom-full left-0 mb-1 bg-[#151515] border border-white/[0.08] rounded-xl shadow-xl overflow-hidden z-50 min-w-[200px] animate-in slide-in-from-bottom-2 duration-150">
+                {ownedEntities.map((entity) => (
+                  <button
+                    key={entity.id}
+                    onClick={() => { setCurrentActor(entity); setIdentitySwitcherOpen(false); }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/[0.04] transition-colors ${
+                      currentActor?.id === entity.id ? "bg-[#b08d57]/[0.06]" : ""
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-white/[0.06] overflow-hidden flex items-center justify-center shrink-0 border border-white/[0.06]">
+                      {entity.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={entity.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-bold text-[#b08d57]">{entity.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-white truncate">{entity.name}</p>
+                      <p className="text-[10px] text-white/30 capitalize">{entity.type}</p>
+                    </div>
+                    {currentActor?.id === entity.id && (
+                      <div className="w-2 h-2 rounded-full bg-[#b08d57] shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <form
           onSubmit={async (event) => {
             event.preventDefault();

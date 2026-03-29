@@ -347,6 +347,16 @@ export async function getUserConversations(
   }
 }
 
+export type MessageMetadata = {
+  type: "entity_card";
+  entity_type: "person" | "business" | "organization";
+  entity_id: string;
+  name: string;
+  avatar_url?: string;
+  headline?: string;
+  url: string;
+} | null;
+
 export interface MessageInterface {
   id: string;
   conversation_id: string;
@@ -355,6 +365,7 @@ export interface MessageInterface {
   content: string;
   reactions: string[];
   reply_to_id: string | null;
+  metadata: MessageMetadata;
   created_at: string;
 }
 
@@ -395,6 +406,7 @@ export async function sendMessage(
   senderType: MessagingActorType,
   content: string,
   replyToId?: string,
+  metadata?: MessageMetadata,
 ): Promise<MessageInterface | null> {
   const { data, error } = await supabase
     .from('messages')
@@ -405,6 +417,7 @@ export async function sendMessage(
       content,
       reactions: [],
       ...(replyToId ? { reply_to_id: replyToId } : {}),
+      ...(metadata ? { metadata } : {}),
     }])
     .select()
     .single();
