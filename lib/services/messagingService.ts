@@ -354,6 +354,7 @@ export interface MessageInterface {
   sender_type: MessagingActorType;
   content: string;
   reactions: string[];
+  reply_to_id: string | null;
   created_at: string;
 }
 
@@ -392,7 +393,8 @@ export async function sendMessage(
   conversationId: string,
   senderId: string,
   senderType: MessagingActorType,
-  content: string
+  content: string,
+  replyToId?: string,
 ): Promise<MessageInterface | null> {
   const { data, error } = await supabase
     .from('messages')
@@ -401,7 +403,8 @@ export async function sendMessage(
       sender_id: senderId,
       sender_type: senderType,
       content,
-      reactions: []
+      reactions: [],
+      ...(replyToId ? { reply_to_id: replyToId } : {}),
     }])
     .select()
     .single();

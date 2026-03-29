@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, Smile } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
+import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import {
   ConversationOverview,
   getMessages,
@@ -13,6 +14,7 @@ import {
   MessageInterface,
   MessagingActorType,
   sendMessage,
+  toggleMessageReactionDB,
 } from "@/lib/services/messagingService";
 
 function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
@@ -51,7 +53,10 @@ export default function ActiveChatPage({
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<MessageInterface | null>(null);
+  const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,13 +155,16 @@ export default function ActiveChatPage({
 
     setSending(true);
     const content = inputText.trim();
+    const replyId = replyTo?.id;
     setInputText("");
+    setReplyTo(null);
 
     await sendMessage(
       conversation.id,
       currentActor.id,
       toMessagingActorType(currentActor.type),
       content,
+      replyId,
     );
 
     await markConversationRead(
@@ -166,6 +174,26 @@ export default function ActiveChatPage({
     );
 
     setSending(false);
+  }
+
+  async function handleReaction(msgId: string, reactionType: string) {
+    const msg = messages.find((m) => m.id === msgId);
+    if (!msg) return;
+    // Optimistic update
+    const hasReacted = msg.reactions.includes(reactionType);
+    const newReactions = hasReacted
+      ? msg.reactions.filter((r) => r !== reactionType)
+      : [...msg.reactions, reactionType];
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, reactions: newReactions } : m)),
+    );
+    setActiveReactionMsgId(null);
+    await toggleMessageReactionDB(msgId, reactionType, msg.reactions);
+  }
+
+  function handleReply(message: MessageInterface) {
+    setReplyTo(message);
+    inputRef.current?.focus();
   }
 
   if (loading || isLoading) {
@@ -230,8 +258,8 @@ export default function ActiveChatPage({
         )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto wac-scrollbar px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto wac-scrollbar px-4 py-6" onClick={() => setActiveReactionMsgId(null)}>
+        <div className="max-w-3xl mx-auto space-y-3">
           {messages.length === 0 ? (
             <div className="text-center text-white/40 py-16">No messages yet. Start the conversation.</div>
           ) : (
@@ -244,22 +272,107 @@ export default function ActiveChatPage({
                 senderNameMap.get(`${message.sender_id}:${message.sender_type}`) ??
                 (message.sender_type === "user" ? "Member" : message.sender_type);
 
+              // Find quoted message
+              const quotedMsg = message.reply_to_id
+                ? messages.find((m) => m.id === message.reply_to_id)
+                : null;
+              const quotedSender = quotedMsg
+                ? senderNameMap.get(`${quotedMsg.sender_id}:${quotedMsg.sender_type}`) ?? "Member"
+                : null;
+
+              const hasReactions = message.reactions && message.reactions.length > 0;
+
               return (
-                <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      isMine
-                        ? "bg-[#b08d57] text-black rounded-br-md"
-                        : "bg-[#1b1b1b] border border-white/8 text-white rounded-bl-md"
-                    }`}
-                  >
-                    {!isMine && conversation.type === "group" && (
-                      <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
+                <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"} group/msg relative`}>
+                  <div className={`max-w-[80%] relative ${hasReactions ? "mb-3" : ""}`}>
+                    {/* Quoted reply preview */}
+                    {quotedMsg && (
+                      <div
+                        className={`mb-1 rounded-xl px-3 py-2 text-[12px] border-l-2 ${
+                          isMine
+                            ? "bg-[#9a7a45]/30 border-black/30 text-black/60"
+                            : "bg-white/[0.04] border-[#b08d57]/40 text-white/50"
+                        }`}
+                      >
+                        <span className="font-semibold">{quotedSender}</span>
+                        <p className="truncate mt-0.5 opacity-70">{quotedMsg.content}</p>
+                      </div>
                     )}
-                    <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
-                    <div className={`mt-2 text-[11px] ${isMine ? "text-black/60" : "text-white/35"}`}>
-                      {formatTimestamp(message.created_at)}
+
+                    {/* Message bubble */}
+                    <div
+                      className={`rounded-2xl px-4 py-3 ${
+                        isMine
+                          ? "bg-[#b08d57] text-black rounded-br-md"
+                          : "bg-[#1b1b1b] border border-white/[0.06] text-white rounded-bl-md"
+                      }`}
+                    >
+                      {!isMine && conversation.type === "group" && (
+                        <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
+                      )}
+                      <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
+                      <div className={`mt-1.5 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
+                        {formatTimestamp(message.created_at)}
+                      </div>
                     </div>
+
+                    {/* Reaction badges below bubble */}
+                    {hasReactions && (
+                      <div className={`absolute -bottom-2.5 ${isMine ? "right-2" : "left-2"} flex items-center gap-0.5`}>
+                        <div className="flex items-center bg-[#1a1a1a] border border-white/[0.08] rounded-full px-1.5 py-0.5 shadow-lg">
+                          {[...new Set(message.reactions)].map((r) => {
+                            const found = SUPPORTED_REACTIONS.find((sr) => sr.type === r);
+                            return found ? (
+                              <span key={r} className="text-[13px] leading-none">{found.emoji}</span>
+                            ) : null;
+                          })}
+                          {message.reactions.length > 1 && (
+                            <span className="text-[10px] font-bold text-white/50 ml-0.5">{message.reactions.length}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hover action bar */}
+                    <div
+                      className={`absolute ${isMine ? "left-0 -translate-x-full pr-1.5" : "right-0 translate-x-full pl-1.5"} top-1/2 -translate-y-1/2 opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-0.5`}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveReactionMsgId(activeReactionMsgId === message.id ? null : message.id); }}
+                        className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.1] transition-colors text-[13px]"
+                        title="React"
+                      >
+                        😊
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleReply(message); }}
+                        className="w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.1] transition-colors"
+                        title="Reply"
+                      >
+                        <Reply size={13} />
+                      </button>
+                    </div>
+
+                    {/* Reaction picker popup */}
+                    {activeReactionMsgId === message.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute ${isMine ? "right-0" : "left-0"} -top-10 z-50 flex items-center gap-1 bg-[#1a1a1a] border border-white/[0.1] rounded-full px-2 py-1.5 shadow-xl animate-in zoom-in-95 duration-150`}
+                      >
+                        {SUPPORTED_REACTIONS.map((r) => (
+                          <button
+                            key={r.type}
+                            onClick={() => handleReaction(message.id, r.type)}
+                            className={`text-[18px] hover:scale-125 transition-transform px-0.5 ${
+                              message.reactions.includes(r.type) ? "scale-110 drop-shadow-[0_0_6px_rgba(255,255,255,0.3)]" : ""
+                            }`}
+                            title={r.label}
+                          >
+                            {r.emoji}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -268,7 +381,26 @@ export default function ActiveChatPage({
         </div>
       </div>
 
-      <div className="border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3">
+      {/* Reply preview bar */}
+      {replyTo && (
+        <div className="border-t border-white/[0.06] bg-[#0d0d0d] px-4 py-2.5 flex items-center gap-3">
+          <div className="w-1 h-8 rounded-full bg-[#b08d57]/60 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-[#b08d57]">
+              Replying to {senderNameMap.get(`${replyTo.sender_id}:${replyTo.sender_type}`) ?? "Member"}
+            </p>
+            <p className="text-[12px] text-white/40 truncate">{replyTo.content}</p>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            className="p-1 rounded-full hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      <div className={`border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3 ${replyTo ? "border-t-0" : ""}`}>
         <form
           onSubmit={async (event) => {
             event.preventDefault();
@@ -285,6 +417,7 @@ export default function ActiveChatPage({
           </button>
           <div className="flex-1 relative">
             <textarea
+              ref={inputRef}
               rows={1}
               value={inputText}
               onChange={(event) => setInputText(event.target.value)}
