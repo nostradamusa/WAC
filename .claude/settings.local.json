@@ -42,7 +42,22 @@
       "Bash(node -e \"const d=require\\(''''/dev/stdin''''\\); console.log\\(d.version, d.peerDependencies\\)\")",
       "Bash(node -p \"require\\(''./node_modules/react-map-gl/package.json''\\).version\")",
       "Bash(node -p \"Object.keys\\(require\\(''./node_modules/react-map-gl/package.json''\\).exports || {}\\).join\\('', ''\\)\")",
-      "Bash(node -e \"const p=require\\(''./node_modules/react-map-gl/package.json''\\); console.log\\(JSON.stringify\\(p.exports[''./mapbox''], null, 2\\)\\)\")"
+      "Bash(node -e \"const p=require\\(''./node_modules/react-map-gl/package.json''\\); console.log\\(JSON.stringify\\(p.exports[''./mapbox''], null, 2\\)\\)\")",
+      "mcp__de46e320-c029-4deb-9068-579d8e3ab664__execute_sql",
+      "Bash(curl -s \"https://raw.githubusercontent.com/lutangar/cities.json/master/cities.json\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/lutangar/cities.json/master/cities.json\" -o /tmp/cities_check.json)",
+      "Bash(npx tsx:*)",
+      "Bash(grep -E \"\\\\.\\(tsx?|js\\)$\")",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(grep -r \"profession\\\\|specialty\\\\|field\\\\|industry\" /c/Users/Admin/Desktop/wac/lib/types/*.ts)",
+      "Bash(grep -l \"profession\\\\|industry\\\\|specialty\\\\|skill\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(grep -l \"CREATE TABLE.*profile\\\\|profiles\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(node -e \"const m = require\\(''react-map-gl/mapbox''\\); console.log\\(''Popup'' in m ? ''Popup exported ✓'' : ''Popup NOT found''\\)\")",
+      "Bash(grep -r \"linked_property\\\\|property_id.*feed\\\\|feed.*property_id\" /c/Users/Admin/Desktop/wac/lib --include=*.ts --include=*.tsx)",
+      "Bash(grep -l \"feed_posts\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

@@ -10,12 +10,14 @@
 DROP FUNCTION IF EXISTS public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN);
 DROP FUNCTION IF EXISTS public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT);
 DROP FUNCTION IF EXISTS public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, TEXT[]);
+DROP FUNCTION IF EXISTS public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, TEXT[]);
 
 CREATE OR REPLACE FUNCTION get_people_directory_scored(
   p_user_id UUID,
   p_country TEXT DEFAULT NULL,
   p_industry TEXT DEFAULT NULL,
   p_specialty TEXT DEFAULT NULL,
+  p_profession TEXT DEFAULT NULL,
   p_mentor_only BOOLEAN DEFAULT FALSE,
   p_open_to_work BOOLEAN DEFAULT FALSE,
   p_open_to_hire BOOLEAN DEFAULT FALSE,
@@ -125,6 +127,7 @@ BEGIN
     (p_country IS NULL OR p_country = '' OR v.country ILIKE '%' || p_country || '%')
     AND (p_industry IS NULL OR p_industry = '' OR v.industry_name ILIKE '%' || p_industry || '%' OR v.industry_slug ILIKE '%' || p_industry || '%')
     AND (p_specialty IS NULL OR p_specialty = '' OR v.specialty_name ILIKE '%' || p_specialty || '%' OR v.specialty_slug ILIKE '%' || p_specialty || '%')
+    AND (p_profession IS NULL OR p_profession = '' OR v.profession_name ILIKE '%' || p_profession || '%' OR v.profession_slug ILIKE '%' || p_profession || '%')
     AND (p_mentor_only = FALSE OR v.open_to_mentor = TRUE)
     AND (p_open_to_work = FALSE OR v.open_to_work = TRUE)
     AND (p_open_to_hire = FALSE OR v.open_to_hire = TRUE)
@@ -139,4 +142,4 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-GRANT EXECUTE ON FUNCTION public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, TEXT[]) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_people_directory_scored(UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, BOOLEAN, TEXT, TEXT[]) TO anon, authenticated;
