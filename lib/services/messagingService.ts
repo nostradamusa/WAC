@@ -351,15 +351,8 @@ export async function getUserConversations(
   }
 }
 
-export type MessageMetadata = {
-  type: "entity_card";
-  entity_type: "person" | "business" | "organization";
-  entity_id: string;
-  name: string;
-  avatar_url?: string;
-  headline?: string;
-  url: string;
-} | null;
+import type { MessageMetadata as _MessageMetadata } from "@/lib/messaging/metadata";
+export type MessageMetadata = _MessageMetadata | null;
 
 export interface MessageInterface {
   id: string;

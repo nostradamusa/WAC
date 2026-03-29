@@ -1,0 +1,340 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useEffect, useMemo } from "react";
+import {
+  X,
+  ExternalLink,
+  BellOff,
+  Bell,
+  Ban,
+  Flag,
+  LogOut,
+  Image as ImageIcon,
+  FileText,
+  LinkIcon,
+  CreditCard,
+  Users,
+  ChevronRight,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import type { ConversationOverview, MessageInterface } from "@/lib/services/messagingService";
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+type SharedContent = {
+  links: { url: string; domain: string; messageId: string; senderName: string; createdAt: string }[];
+  cards: { metadata: NonNullable<MessageInterface["metadata"]>; messageId: string; senderName: string; createdAt: string }[];
+  mediaCount: number;
+  fileCount: number;
+};
+
+type Props = {
+  conversation: ConversationOverview;
+  messages: MessageInterface[];
+  senderNameMap: Map<string, string>;
+  onClose: () => void;
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+function extractLinks(content: string): string[] {
+  return content.match(URL_REGEX) ?? [];
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+export default function ThreadDetailPanel({ conversation, messages, senderNameMap, onClose }: Props) {
+  const [muted, setMuted] = useState(false);
+  const [activeSection, setActiveSection] = useState<"links" | "cards" | null>(null);
+
+  const isGroup = conversation.type === "group";
+  const other = conversation.other_participant;
+
+  // Compute shared content from messages
+  const shared = useMemo<SharedContent>(() => {
+    const links: SharedContent["links"] = [];
+    const cards: SharedContent["cards"] = [];
+    let mediaCount = 0;
+    let fileCount = 0;
+
+    for (const msg of messages) {
+      // Extract links from message content
+      const urls = extractLinks(msg.content);
+      for (const url of urls) {
+        const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
+        links.push({ url, domain: extractDomain(url), messageId: msg.id, senderName, createdAt: msg.created_at });
+      }
+
+      // Entity cards
+      if (msg.metadata?.type === "entity_card") {
+        const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
+        cards.push({ metadata: msg.metadata, messageId: msg.id, senderName, createdAt: msg.created_at });
+      }
+    }
+
+    return { links: links.reverse(), cards: cards.reverse(), mediaCount, fileCount };
+  }, [messages, senderNameMap]);
+
+  // Profile URL for the other participant
+  const profileUrl = other?.profile_url;
+  const profileType = other?.type === "user" ? "Person" : other?.type === "business" ? "Business" : other?.type === "organization" ? "Organization" : "";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex justify-end">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-[380px] h-full bg-[#0A0A0A] border-l border-white/[0.06] overflow-y-auto wac-scrollbar animate-in slide-in-from-right duration-200">
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.06]">
+          <h2 className="text-[16px] font-serif font-bold">Details</h2>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* ── Profile section ──────────────────────────────────── */}
+        <div className="flex flex-col items-center px-6 py-8">
+          {/* Avatar */}
+          <div className="w-20 h-20 rounded-full bg-[#1A1A1A] border border-white/[0.08] overflow-hidden flex items-center justify-center mb-4">
+            {!isGroup && other?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={other.avatar_url} alt={other.name} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl font-serif font-bold text-white/30">
+                {isGroup
+                  ? (conversation.title?.charAt(0) ?? "G")
+                  : (other?.name?.charAt(0) ?? "?")}
+              </span>
+            )}
+          </div>
+
+          {/* Name */}
+          <h3 className="text-[18px] font-serif font-bold text-white text-center mb-1">
+            {isGroup
+              ? (conversation.title || conversation.participants?.map((p) => p.name).slice(0, 3).join(", ") || "Group")
+              : (other?.name ?? "Conversation")}
+          </h3>
+
+          {/* Type badge */}
+          {!isGroup && profileType && (
+            <span className="text-[11px] text-white/35 capitalize mb-3">{profileType}</span>
+          )}
+
+          {/* Group member count */}
+          {isGroup && conversation.participants && (
+            <span className="text-[12px] text-white/35 mb-3">
+              {conversation.participants.length} member{conversation.participants.length !== 1 ? "s" : ""}
+            </span>
+          )}
+
+          {/* View profile button */}
+          {!isGroup && profileUrl && (
+            <Link
+              href={profileUrl}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57] text-[13px] font-semibold hover:bg-[#b08d57]/20 transition-colors"
+            >
+              View Profile
+              <ExternalLink size={13} />
+            </Link>
+          )}
+        </div>
+
+        <div className="h-px bg-white/[0.05] mx-5" />
+
+        {/* ── Group members ─────────────────────────────────────── */}
+        {isGroup && conversation.participants && conversation.participants.length > 0 && (
+          <div className="px-5 py-5">
+            <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/25 mb-3">Members</h4>
+            <div className="space-y-1">
+              {conversation.participants.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-[#1A1A1A] border border-white/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+                    {p.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.avatar_url} alt={p.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[11px] font-bold text-[#b08d57]">{p.name.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-white/80 truncate">{p.name}</p>
+                    <p className="text-[10px] text-white/30 capitalize">{p.type}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {isGroup && <div className="h-px bg-white/[0.05] mx-5" />}
+
+        {/* ── Shared content sections ──────────────────────────── */}
+        <div className="px-5 py-5">
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/25 mb-3">Shared Content</h4>
+
+          {/* Links */}
+          <button
+            onClick={() => setActiveSection(activeSection === "links" ? null : "links")}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              <LinkIcon size={16} className="text-white/40" />
+            </div>
+            <span className="flex-1 text-left text-[14px] text-white/70">Links</span>
+            <span className="text-[12px] text-white/25 mr-1">{shared.links.length}</span>
+            <ChevronRight size={14} className={`text-white/20 transition-transform ${activeSection === "links" ? "rotate-90" : ""}`} />
+          </button>
+
+          {activeSection === "links" && (
+            <div className="ml-2 mb-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+              {shared.links.length === 0 ? (
+                <p className="py-3 px-2 text-[12px] text-white/25">No shared links yet</p>
+              ) : (
+                shared.links.slice(0, 10).map((link, i) => (
+                  <a
+                    key={`${link.messageId}-${i}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col gap-0.5 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                  >
+                    <span className="text-[12px] text-[#b08d57] truncate">{link.domain}</span>
+                    <span className="text-[11px] text-white/30 truncate">{link.url}</span>
+                    <span className="text-[10px] text-white/20">{link.senderName} &middot; {formatDate(link.createdAt)}</span>
+                  </a>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Cards */}
+          <button
+            onClick={() => setActiveSection(activeSection === "cards" ? null : "cards")}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              <CreditCard size={16} className="text-white/40" />
+            </div>
+            <span className="flex-1 text-left text-[14px] text-white/70">WAC Cards</span>
+            <span className="text-[12px] text-white/25 mr-1">{shared.cards.length}</span>
+            <ChevronRight size={14} className={`text-white/20 transition-transform ${activeSection === "cards" ? "rotate-90" : ""}`} />
+          </button>
+
+          {activeSection === "cards" && (
+            <div className="ml-2 mb-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+              {shared.cards.length === 0 ? (
+                <p className="py-3 px-2 text-[12px] text-white/25">No shared cards yet</p>
+              ) : (
+                shared.cards.slice(0, 10).map((card, i) => (
+                  <Link
+                    key={`${card.messageId}-${i}`}
+                    href={card.metadata.url}
+                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-white/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+                      {card.metadata.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={card.metadata.avatar_url} alt={card.metadata.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-bold text-[#b08d57]">{card.metadata.name.charAt(0)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-white/70 truncate">{card.metadata.name}</p>
+                      <p className="text-[10px] text-white/25 capitalize">{card.metadata.entity_type} &middot; {formatDate(card.createdAt)}</p>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Media placeholder */}
+          <div className="flex items-center gap-3 py-3 px-2 rounded-xl opacity-40">
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              <ImageIcon size={16} className="text-white/40" />
+            </div>
+            <span className="flex-1 text-left text-[14px] text-white/70">Media</span>
+            <span className="text-[10px] text-white/20 mr-1">Coming soon</span>
+          </div>
+
+          {/* Files placeholder */}
+          <div className="flex items-center gap-3 py-3 px-2 rounded-xl opacity-40">
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              <FileText size={16} className="text-white/40" />
+            </div>
+            <span className="flex-1 text-left text-[14px] text-white/70">Files</span>
+            <span className="text-[10px] text-white/20 mr-1">Coming soon</span>
+          </div>
+        </div>
+
+        <div className="h-px bg-white/[0.05] mx-5" />
+
+        {/* ── Actions ──────────────────────────────────────────── */}
+        <div className="px-5 py-5">
+          <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/25 mb-3">Actions</h4>
+
+          <button
+            onClick={() => setMuted(!muted)}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              {muted ? <Bell size={16} className="text-white/40" /> : <BellOff size={16} className="text-white/40" />}
+            </div>
+            <span className="text-[14px] text-white/70">{muted ? "Unmute Conversation" : "Mute Conversation"}</span>
+          </button>
+
+          {isGroup && (
+            <button className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+              <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+                <LogOut size={16} className="text-white/40" />
+              </div>
+              <span className="text-[14px] text-white/70">Leave Group</span>
+            </button>
+          )}
+
+          {!isGroup && (
+            <>
+              <button className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+                <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+                  <Ban size={16} className="text-red-400/60" />
+                </div>
+                <span className="text-[14px] text-red-400/60">Block Account</span>
+              </button>
+
+              <button className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+                <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+                  <Flag size={16} className="text-red-400/60" />
+                </div>
+                <span className="text-[14px] text-red-400/60">Report Account</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Bottom padding */}
+        <div className="h-10" />
+      </div>
+    </div>
+  );
+}

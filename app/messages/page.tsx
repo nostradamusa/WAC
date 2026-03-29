@@ -36,6 +36,19 @@ function formatConversationSubtitle(conversation: ConversationOverview) {
   return conversation.type === "group" ? "No messages yet" : "Start the conversation";
 }
 
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-[#b08d57]/25 text-white/80 rounded-sm px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 function formatConversationTime(updatedAt: string) {
   if (!updatedAt) return "";
   const date = new Date(updatedAt);
@@ -208,7 +221,7 @@ export default function MessagesInboxPage() {
               <input
                 id="messages-search"
                 type="text"
-                placeholder="Search conversations..."
+                placeholder="Search conversations and messages..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent py-2.5 pr-4 text-[14.5px] font-medium text-white placeholder:text-white/30 outline-none"
@@ -242,6 +255,15 @@ export default function MessagesInboxPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto wac-scrollbar pb-32 md:pb-6 px-2">
+          {/* Section header when searching */}
+          {searchQuery.trim().length >= 2 && filteredConversations.length > 0 && !loading && (
+            <div className="flex items-center gap-3 px-3 py-2">
+              <div className="h-px flex-1 bg-white/[0.04]" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/20 shrink-0">Conversations</span>
+              <div className="h-px flex-1 bg-white/[0.04]" />
+            </div>
+          )}
+
           {loading || isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 px-6 text-center animate-in fade-in">
               <div className="w-16 h-16 bg-white/[0.02] border border-white/5 rounded-full flex items-center justify-center mb-4 animate-pulse">
@@ -266,32 +288,55 @@ export default function MessagesInboxPage() {
                     <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-1 h-8 bg-[#b08d57] rounded-r-lg shadow-[0_0_8px_rgba(176,141,87,0.6)]" />
                   )}
 
-                  <div
-                    className={`relative w-14 h-14 rounded-full shrink-0 flex items-center justify-center ${
-                      conversation.type === "group"
-                        ? "bg-[#1A1A1A] border border-white/10 text-white/60"
-                        : "bg-[#1A1A1A] border border-white/10 overflow-hidden"
-                    }`}
-                  >
-                    {conversation.type === "direct" && conversation.other_participant?.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={conversation.other_participant.avatar_url}
-                        alt={title}
-                        className="w-full h-full object-cover"
-                      />
+                  <div className="relative w-14 h-14 shrink-0">
+                    {conversation.type === "group" && conversation.participants ? (
+                      /* Stacked group avatars (2 overlapping circles) */
+                      <div className="relative w-14 h-14">
+                        <div className="absolute top-0 left-0 w-10 h-10 rounded-full bg-[#1A1A1A] border-2 border-[#0A0A0A] overflow-hidden flex items-center justify-center z-[1]">
+                          {conversation.participants[0]?.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={conversation.participants[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[12px] font-bold text-[#b08d57]">{conversation.participants[0]?.name?.charAt(0) ?? "?"}</span>
+                          )}
+                        </div>
+                        <div className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-[#1A1A1A] border-2 border-[#0A0A0A] overflow-hidden flex items-center justify-center z-[2]">
+                          {conversation.participants[1]?.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={conversation.participants[1].avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-[12px] font-bold text-white/30">{conversation.participants[1]?.name?.charAt(0) ?? "+"}</span>
+                          )}
+                        </div>
+                      </div>
                     ) : (
-                      <span className={`text-[20px] font-serif font-bold ${isUnread ? "text-[#b08d57]" : "text-white/40"}`}>
-                        {title.charAt(0)}
-                      </span>
+                      <div className="w-14 h-14 rounded-full bg-[#1A1A1A] border border-white/10 overflow-hidden flex items-center justify-center">
+                        {conversation.type === "direct" && conversation.other_participant?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={conversation.other_participant.avatar_url}
+                            alt={title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className={`text-[20px] font-serif font-bold ${isUnread ? "text-[#b08d57]" : "text-white/40"}`}>
+                            {title.charAt(0)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <div className="flex justify-between items-center mb-0.5">
-                      <h3 className={`text-[15px] truncate pr-2 ${isUnread ? "font-bold text-white" : "font-semibold text-white/80"}`}>
-                        {title}
-                      </h3>
+                      <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                        <h3 className={`text-[15px] truncate ${isUnread ? "font-bold text-white" : "font-semibold text-white/80"}`}>
+                          {title}
+                        </h3>
+                        {conversation.type === "group" && conversation.participants && (
+                          <span className="text-[10px] text-white/25 shrink-0">{conversation.participants.length}</span>
+                        )}
+                      </div>
                       <span className={`text-[11px] shrink-0 font-medium ${isUnread ? "text-[#b08d57]" : "text-white/30"}`}>
                         {formatConversationTime(conversation.updated_at)}
                       </span>
@@ -328,15 +373,19 @@ export default function MessagesInboxPage() {
 
           {/* ── Message search results ──────────────────────────── */}
           {searchQuery.trim().length >= 2 && (
-            <div className="mt-2 px-1">
-              <div className="flex items-center gap-2 px-3 py-2">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Messages</span>
-                {messageSearching && (
-                  <Loader2 size={12} className="animate-spin text-white/20" />
-                )}
+            <div className="mt-1 px-1">
+              {/* Section divider */}
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <div className="h-px flex-1 bg-white/[0.04]" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/20 shrink-0 flex items-center gap-2">
+                  In Messages
+                  {messageSearching && <Loader2 size={10} className="animate-spin text-white/15" />}
+                </span>
+                <div className="h-px flex-1 bg-white/[0.04]" />
               </div>
+
               {!messageSearching && messageResults.length === 0 && (
-                <p className="px-3 py-2 text-[12px] text-white/30">No messages matching &quot;{searchQuery}&quot;</p>
+                <p className="px-3 py-3 text-[12px] text-white/25 text-center">No messages matching &quot;{searchQuery}&quot;</p>
               )}
               {messageResults.map((result) => {
                 const conv = conversations.find((c) => c.id === result.conversation_id);
@@ -345,14 +394,19 @@ export default function MessagesInboxPage() {
                   <Link
                     key={result.message_id}
                     href={`/messages/${result.conversation_id}`}
-                    className="flex flex-col gap-0.5 p-3 mx-1 mb-0.5 rounded-xl hover:bg-white/[0.04] transition-colors"
+                    className="flex items-start gap-3 p-3 mx-1 mb-0.5 rounded-xl hover:bg-white/[0.04] transition-colors"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] font-semibold text-white/60 truncate">{convTitle}</span>
-                      <span className="text-[10px] text-white/25">&middot;</span>
-                      <span className="text-[10px] text-white/25">{result.sender_name}</span>
+                    <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0 mt-0.5">
+                      <Search size={13} className="text-white/20" />
                     </div>
-                    <p className="text-[13px] text-white/40 truncate">{result.content}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[12px] font-semibold text-white/50 truncate">{convTitle}</span>
+                        <span className="text-[10px] text-white/20">&middot;</span>
+                        <span className="text-[10px] text-white/20 shrink-0">{result.sender_name}</span>
+                      </div>
+                      <p className="text-[13px] text-white/40 truncate">{highlightMatch(result.content, searchQuery)}</p>
+                    </div>
                   </Link>
                 );
               })}

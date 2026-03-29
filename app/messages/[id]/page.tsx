@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users } from "lucide-react";
+import ThreadDetailPanel from "@/components/messages/ThreadDetailPanel";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
 import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
@@ -57,6 +58,7 @@ export default function ActiveChatPage({
   const [replyTo, setReplyTo] = useState<MessageInterface | null>(null);
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const [identitySwitcherOpen, setIdentitySwitcherOpen] = useState(false);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,6 +263,8 @@ export default function ActiveChatPage({
                 alt={formatConversationTitle(conversation)}
                 className="w-full h-full object-cover"
               />
+            ) : conversation.type === "group" ? (
+              <Users size={18} className="text-white/30" />
             ) : (
               <span className="text-sm font-serif font-bold text-white/40">
                 {formatConversationTitle(conversation).charAt(0)}
@@ -298,6 +302,15 @@ export default function ActiveChatPage({
             </p>
           </div>
         )}
+
+        {/* Info button */}
+        <button
+          onClick={() => setDetailPanelOpen(true)}
+          className="ml-auto w-9 h-9 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors shrink-0"
+          title="Thread details"
+        >
+          <Info size={16} strokeWidth={1.8} />
+        </button>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto wac-scrollbar px-4 py-6" onClick={() => setActiveReactionMsgId(null)}>
@@ -619,6 +632,16 @@ export default function ActiveChatPage({
           </button>
         </form>
       </div>
+
+      {/* Thread detail panel */}
+      {detailPanelOpen && (
+        <ThreadDetailPanel
+          conversation={conversation}
+          messages={messages}
+          senderNameMap={senderNameMap}
+          onClose={() => setDetailPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }
