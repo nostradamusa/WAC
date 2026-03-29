@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Settings, CheckCircle2, Plus } from "lucide-react";
+import { Search, Settings, CheckCircle2, Plus, PenSquare, X, Loader2 } from "lucide-react";
 import { useActor } from "@/components/providers/ActorProvider";
-import NewMessageFAB from "@/components/messages/NewMessageFAB";
+import { useRouter } from "next/navigation";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 import {
   ConversationOverview,
   getUserConversations,
   MessagingActorType,
+  MessagingContact,
+  searchMessagingContacts,
+  getOrCreateConversation,
 } from "@/lib/services/messagingService";
 
 function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
@@ -44,11 +48,52 @@ function formatConversationTime(updatedAt: string) {
 
 export default function MessagesInboxPage() {
   const { currentActor, isLoading } = useActor();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"all" | "unread" | "requests">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [conversations, setConversations] = useState<ConversationOverview[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Compose modal state ──
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeQuery, setComposeQuery] = useState("");
+  const [composeSearching, setComposeSearching] = useState(false);
+  const [composeCreating, setComposeCreating] = useState(false);
+  const [composeContacts, setComposeContacts] = useState<MessagingContact[]>([]);
+  const debouncedComposeQuery = useDebounce(composeQuery, 300);
+
+  useEffect(() => {
+    if (!debouncedComposeQuery || debouncedComposeQuery.length < 2) {
+      setComposeContacts([]);
+      return;
+    }
+    async function search() {
+      setComposeSearching(true);
+      const results = await searchMessagingContacts(debouncedComposeQuery);
+      setComposeContacts(results);
+      setComposeSearching(false);
+    }
+    search();
+  }, [debouncedComposeQuery]);
+
+  async function handleStartChat(contact: MessagingContact) {
+    if (!currentActor) return;
+    setComposeCreating(true);
+    const { success, conversationId } = await getOrCreateConversation(
+      currentActor.id,
+      toMessagingActorType(currentActor.type),
+      contact.id,
+      contact.type,
+    );
+    setComposeCreating(false);
+    if (success && conversationId) {
+      setComposeOpen(false);
+      setComposeQuery("");
+      setComposeContacts([]);
+      router.push(`/messages/${conversationId}`);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +147,13 @@ export default function MessagesInboxPage() {
               Messages
             </h1>
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setComposeOpen(true)}
+                className="w-9 h-9 flex items-center justify-center rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57] hover:bg-[#b08d57]/20 active:scale-95 transition-all"
+                title="New message"
+              >
+                <PenSquare size={16} strokeWidth={2} />
+              </button>
               <Link
                 href="/messages/settings"
                 className="w-9 h-9 flex items-center justify-center rounded-full bg-white/[0.03] border border-white/5 text-white/50 hover:text-white hover:bg-white/10 active:scale-95 transition-all"
@@ -268,7 +320,88 @@ export default function MessagesInboxPage() {
         </div>
       </div>
 
-      <NewMessageFAB />
+      {/* ── Compose Modal ──────────────────────────────────────────── */}
+      {composeOpen && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4 animate-in fade-in duration-200"
+          onClick={() => { setComposeOpen(false); setComposeQuery(""); setComposeContacts([]); }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#111] border border-white/[0.06] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 h-[600px] max-h-[90vh]"
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <h2 className="text-xl font-bold font-serif tracking-tight">New Message</h2>
+              <button
+                onClick={() => { setComposeOpen(false); setComposeQuery(""); setComposeContacts([]); }}
+                className="p-1.5 opacity-60 hover:opacity-100 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-white/[0.06]">
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Search people, businesses, or organizations..."
+                  value={composeQuery}
+                  onChange={(e) => setComposeQuery(e.target.value)}
+                  className="w-full bg-white/[0.04] border border-white/[0.06] rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none focus:border-[#b08d57]/40 transition text-white placeholder:text-white/30"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto wac-scrollbar">
+              {composeSearching ? (
+                <div className="p-8 flex justify-center">
+                  <Loader2 className="animate-spin text-[#b08d57] opacity-50" size={24} />
+                </div>
+              ) : composeQuery.length < 2 ? (
+                <div className="p-8 text-center text-white/40 text-sm">
+                  Type at least 2 characters to search...
+                </div>
+              ) : composeContacts.length === 0 ? (
+                <div className="p-8 text-center text-white/40 text-sm">
+                  No contacts found matching &quot;{composeQuery}&quot;
+                </div>
+              ) : (
+                <div className="p-2 flex flex-col gap-0.5">
+                  {composeContacts.map((contact) => (
+                    <button
+                      key={contact.id}
+                      disabled={composeCreating}
+                      onClick={() => handleStartChat(contact)}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-white/[0.04] rounded-xl transition text-left disabled:opacity-50"
+                    >
+                      <div className="w-11 h-11 rounded-full bg-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center font-bold text-[#b08d57] text-sm border border-white/[0.06]">
+                        {contact.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={contact.avatar_url} alt={contact.name} className="w-full h-full object-cover" />
+                        ) : (
+                          contact.name.charAt(0)
+                        )}
+                      </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-sm truncate">{contact.name}</span>
+                          {contact.is_verified && <CheckCircle2 size={12} className="text-[#b08d57] shrink-0" />}
+                          <span className="text-[10px] ml-auto px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/40 capitalize shrink-0">{contact.type}</span>
+                        </div>
+                        {contact.headline && (
+                          <span className="text-xs text-white/40 truncate">{contact.headline}</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -197,6 +197,7 @@ export interface ConversationOverview {
     avatar_url: string | null;
     type: MessagingActorType;
     is_online?: boolean;
+    profile_url?: string;
   };
   participants?: {
     id: string;
@@ -273,16 +274,16 @@ export async function getUserConversations(
     const profilesMap = new Map();
 
     if (userIds.size > 0) {
-      const { data: pData } = await supabase.from("profiles").select("id, full_name, avatar_url").in("id", Array.from(userIds));
-      pData?.forEach(p => profilesMap.set(p.id, { name: p.full_name, avatar_url: p.avatar_url, type: 'user' }));
+      const { data: pData } = await supabase.from("profiles").select("id, full_name, avatar_url, username").in("id", Array.from(userIds));
+      pData?.forEach(p => profilesMap.set(p.id, { name: p.full_name, avatar_url: p.avatar_url, type: 'user', username: p.username }));
     }
     if (businessIds.size > 0) {
-      const { data: bData } = await supabase.from("businesses").select("id, name, logo_url").in("id", Array.from(businessIds));
-      bData?.forEach(b => profilesMap.set(b.id, { name: b.name, avatar_url: b.logo_url, type: 'business' }));
+      const { data: bData } = await supabase.from("businesses").select("id, name, logo_url, slug").in("id", Array.from(businessIds));
+      bData?.forEach(b => profilesMap.set(b.id, { name: b.name, avatar_url: b.logo_url, type: 'business', slug: b.slug }));
     }
     if (orgIds.size > 0) {
-      const { data: oData } = await supabase.from("organizations").select("id, name, logo_url").in("id", Array.from(orgIds));
-      oData?.forEach(o => profilesMap.set(o.id, { name: o.name, avatar_url: o.logo_url, type: 'organization' }));
+      const { data: oData } = await supabase.from("organizations").select("id, name, logo_url, slug").in("id", Array.from(orgIds));
+      oData?.forEach(o => profilesMap.set(o.id, { name: o.name, avatar_url: o.logo_url, type: 'organization', slug: o.slug }));
     }
 
     // 5. Assemble the final overview
@@ -323,7 +324,14 @@ export async function getUserConversations(
           id: otherPart.actor_id,
           name: otherPartProfile.name || "Unknown",
           avatar_url: otherPartProfile.avatar_url,
-          type: otherPartProfile.type
+          type: otherPartProfile.type,
+          profile_url: otherPartProfile.type === 'user' && otherPartProfile.username
+            ? `/people/${otherPartProfile.username}`
+            : otherPartProfile.type === 'business' && otherPartProfile.slug
+              ? `/businesses/${otherPartProfile.slug}`
+              : otherPartProfile.type === 'organization' && otherPartProfile.slug
+                ? `/organizations/${otherPartProfile.slug}`
+                : undefined,
         } : undefined,
         participants: conv?.type === 'group' ? groupProfiles : undefined,
         unread_count

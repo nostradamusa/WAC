@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
 import {
@@ -189,18 +189,45 @@ export default function ActiveChatPage({
 
   return (
     <div className="flex-1 flex flex-col bg-[#111] text-white">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 bg-[#0A0A0A]">
-        <Link href="/messages" className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#0A0A0A]">
+        <Link href="/messages" className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors shrink-0">
           <ArrowLeft size={20} />
         </Link>
-        <div className="min-w-0">
-          <h1 className="text-lg font-serif font-bold truncate">{formatConversationTitle(conversation)}</h1>
-          <p className="text-xs text-white/40">
-            {conversation.type === "group"
-              ? `${conversation.participants?.length ?? 0} participant${(conversation.participants?.length ?? 0) === 1 ? "" : "s"}`
-              : conversation.other_participant?.type ?? "direct"}
-          </p>
+
+        {/* Avatar */}
+        <div className="w-10 h-10 rounded-full bg-[#1A1A1A] border border-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center">
+          {conversation.type === "direct" && conversation.other_participant?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={conversation.other_participant.avatar_url}
+              alt={formatConversationTitle(conversation)}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-sm font-serif font-bold text-white/40">
+              {formatConversationTitle(conversation).charAt(0)}
+            </span>
+          )}
         </div>
+
+        {/* Name + status */}
+        {conversation.type === "direct" && conversation.other_participant?.profile_url ? (
+          <Link href={conversation.other_participant.profile_url} className="min-w-0 group">
+            <h1 className="text-[16px] font-serif font-bold truncate group-hover:text-[#b08d57] transition-colors">
+              {formatConversationTitle(conversation)}
+            </h1>
+            <p className="text-[11px] text-white/35 capitalize">{conversation.other_participant?.type ?? "direct"}</p>
+          </Link>
+        ) : (
+          <div className="min-w-0">
+            <h1 className="text-[16px] font-serif font-bold truncate">{formatConversationTitle(conversation)}</h1>
+            <p className="text-[11px] text-white/35">
+              {conversation.type === "group"
+                ? `${conversation.participants?.length ?? 0} participant${(conversation.participants?.length ?? 0) === 1 ? "" : "s"}`
+                : conversation.other_participant?.type ?? "direct"}
+            </p>
+          </div>
+        )}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto wac-scrollbar px-4 py-6">
@@ -241,34 +268,50 @@ export default function ActiveChatPage({
         </div>
       </div>
 
-      <div className="border-t border-white/5 bg-[#0A0A0A] px-4 py-3">
+      <div className="border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3">
         <form
           onSubmit={async (event) => {
             event.preventDefault();
             await handleSend();
           }}
-          className="max-w-3xl mx-auto flex items-end gap-3"
+          className="max-w-3xl mx-auto flex items-end gap-2"
         >
-          <textarea
-            rows={1}
-            value={inputText}
-            onChange={(event) => setInputText(event.target.value)}
-            placeholder="Write a message..."
-            className="flex-1 resize-none rounded-2xl bg-[#1A1A1A] border border-white/8 px-4 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32"
-            style={{ fieldSizing: "content" } as React.CSSProperties}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
+          <button
+            type="button"
+            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors mb-0.5"
+            title="Attach file"
+          >
+            <Paperclip size={18} strokeWidth={1.8} />
+          </button>
+          <div className="flex-1 relative">
+            <textarea
+              rows={1}
+              value={inputText}
+              onChange={(event) => setInputText(event.target.value)}
+              placeholder="Write a message..."
+              className="w-full resize-none rounded-2xl bg-[#1A1A1A] border border-white/[0.06] pl-4 pr-10 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32 transition-colors"
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleSend();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="absolute right-3 bottom-3 text-white/25 hover:text-white/50 transition-colors"
+              title="Emoji"
+            >
+              <Smile size={18} strokeWidth={1.8} />
+            </button>
+          </div>
           <button
             type="submit"
             disabled={!inputText.trim() || sending}
-            className="w-12 h-12 shrink-0 rounded-2xl bg-[#b08d57] text-black flex items-center justify-center font-bold transition disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#9a7545]"
+            className="w-10 h-10 shrink-0 rounded-xl bg-[#b08d57] text-black flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#9a7545] mb-0.5"
           >
-            <Send size={16} />
+            <Send size={15} />
           </button>
         </form>
       </div>
