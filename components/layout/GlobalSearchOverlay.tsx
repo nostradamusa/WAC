@@ -87,7 +87,7 @@ const THE_BRIEF = [
     meta: "1.4k Likes · 145 Comments",
     icon: Flame,
     color: "text-orange-400",
-    href: "/community",
+    href: "/pulse",
   },
   {
     id: 2,
@@ -103,7 +103,7 @@ const THE_BRIEF = [
     meta: "Published 2h ago · 5.2k views",
     icon: Newspaper,
     color: "text-blue-400",
-    href: "/community",
+    href: "/pulse",
   },
 ];
 

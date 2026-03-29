@@ -14,6 +14,7 @@ import {
   Users,
   DollarSign,
   Lightbulb,
+  Home,
 } from "lucide-react";
 
 // ─── Intent definition ───────────────────────────────────────────────────────
@@ -123,6 +124,14 @@ export const POST_INTENTS: IntentDefinition[] = [
     badgeCls: "text-[#b08d57]/80 bg-[#b08d57]/10 border-[#b08d57]/20",
     composerVisible: false, // Event routes to /events/create, not inline
     hasCustomCard: false,
+  },
+  {
+    slug: "property_listing",
+    label: "Property",
+    icon: Home,
+    badgeCls: "text-[#10b981]/80 bg-[#10b981]/10 border-[#10b981]/20",
+    composerVisible: false, // Created via /properties/new, not inline composer
+    hasCustomCard: true,
   },
 ];
 

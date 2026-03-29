@@ -21,13 +21,13 @@ const LinkedInIcon = () => (
   </svg>
 );
 
-const comingSoonItems = [
-  { label: "Job Board", note: "Hiring across the diaspora" },
-  { label: "Mentorship Program", note: "1-on-1 expert connections" },
-  { label: "Investment Funds", note: "Albanian capital network" },
-  { label: "Homeland Travel Guide", note: "Curated regional guides" },
-  { label: "WAC Academy", note: "Courses & certifications" },
-  { label: "Business Accelerator", note: "Scale with the community" },
+const NEXT_LAYERS = [
+  { label: "Properties", note: "Real estate across the diaspora" },
+  { label: "COUSIN Rating", note: "Community utility signal" },
+  { label: "Verified Network", note: "Identity and trust layer" },
+  { label: "Resources & Guides", note: "Civic intelligence for diaspora life" },
+  { label: "Talent & Hiring", note: "Network-native recruitment" },
+  { label: "Community Projects", note: "Coordinated civic action" },
 ];
 
 export default function Footer() {
@@ -57,50 +57,60 @@ export default function Footer() {
               </span>
             </Link>
 
-            <p className="mb-2 max-w-[300px] text-sm leading-relaxed text-white/50">
-              The premier global network built to connect, empower, and unify the Albanian diaspora across all borders and professions.
+            <p className="mb-3 max-w-[320px] text-sm leading-relaxed text-white/50">
+              The digital center of gravity for Albanian professionals, builders, and institutions worldwide.
             </p>
 
-            {/* Beta badge */}
-            <p className="mb-6 text-[11px] font-medium text-[#b08d57]/50 tracking-widest uppercase">
-              Currently in Beta
-            </p>
+            {/* Beta badge + supporting line */}
+            <div className="mb-6">
+              <p className="text-[11px] font-bold text-[#b08d57]/55 tracking-widest uppercase">
+                Currently in Beta
+              </p>
+              <p className="text-[11px] text-white/25 mt-1">
+                The network is live. The next layers are being built.
+              </p>
+            </div>
 
             {/* Social icons */}
-            <div className="flex items-center gap-3">
-              {[
-                { icon: <FacebookIcon />, label: "Facebook" },
-                { icon: <InstagramIcon />, label: "Instagram" },
-                { icon: <LinkedInIcon />, label: "LinkedIn" },
-              ].map(({ icon, label }) => (
-                <a
-                  key={label}
-                  href="#"
-                  aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.05] border border-white/[0.08] text-white/50 transition hover:bg-[#b08d57]/15 hover:border-[#b08d57]/30 hover:text-[#b08d57]"
-                >
-                  {icon}
-                </a>
-              ))}
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/20 mb-2.5">
+                Follow the Build
+              </p>
+              <div className="flex items-center gap-2.5">
+                {[
+                  { icon: <FacebookIcon />, label: "Facebook" },
+                  { icon: <InstagramIcon />, label: "Instagram" },
+                  { icon: <LinkedInIcon />, label: "LinkedIn" },
+                ].map(({ icon, label }) => (
+                  <a
+                    key={label}
+                    href="#"
+                    aria-label={label}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.05] border border-white/[0.08] text-white/50 transition hover:bg-[#b08d57]/15 hover:border-[#b08d57]/30 hover:text-[#b08d57]"
+                  >
+                    {icon}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* ── Links Grid ── */}
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-3">
 
-            {/* Platform */}
+            {/* Network */}
             <div>
               <h3 className="mb-5 text-[11px] font-bold tracking-widest text-white/40 uppercase">
-                Platform
+                Network
               </h3>
               <ul className="flex flex-col gap-3 text-sm">
                 {[
                   { label: "Directory", href: "/directory" },
-                  { label: "Pulse", href: "/community" },
+                  { label: "Pulse", href: "/pulse" },
                   { label: "Events", href: "/events" },
                   { label: "Groups", href: "/groups" },
                   { label: "Vision", href: "/vision" },
-                  { label: "Help & Support", href: "/help" },
+                  { label: "Help", href: "/help" },
                 ].map(({ label, href }) => (
                   <li key={label}>
                     <Link href={href} className="text-white/55 transition hover:text-[#b08d57]">
@@ -119,10 +129,10 @@ export default function Footer() {
               <ul className="flex flex-col gap-3 text-sm">
                 {[
                   { label: "Our Mission", href: "/vision" },
-                  { label: "Leadership Team", href: "/vision" },
-                  { label: "Become a Member", href: "/contact" },
-                  { label: "Contact Us", href: "/contact" },
-                  { label: "Privacy Policy", href: "/privacy" },
+                  { label: "Leadership", href: "/vision" },
+                  { label: "Join", href: "/contact" },
+                  { label: "Contact", href: "/contact" },
+                  { label: "Privacy", href: "/privacy" },
                 ].map(({ label, href }) => (
                   <li key={label}>
                     <Link href={href} className="text-white/55 transition hover:text-[#b08d57]">
@@ -133,23 +143,23 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Coming Soon */}
+            {/* Next Layers */}
             <div className="col-span-2 sm:col-span-1">
               <div className="flex items-center gap-2.5 mb-5">
                 <h3 className="text-[11px] font-bold tracking-widest text-white/40 uppercase">
-                  Coming Soon
+                  Next Layers
                 </h3>
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57]/70">
-                  Pipeline
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider uppercase bg-[#b08d57]/10 border border-[#b08d57]/20 text-[#b08d57]/60">
+                  In Development
                 </span>
               </div>
-              <ul className="grid grid-cols-2 gap-x-4 gap-y-4">
-                {comingSoonItems.map(({ label, note }) => (
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+                {NEXT_LAYERS.map(({ label, note }) => (
                   <li key={label}>
-                    <span className="block text-[13px] italic font-light text-white/30 leading-snug">
+                    <span className="block text-[13px] italic font-light text-white/35 leading-snug">
                       {label}
                     </span>
-                    <span className="block text-[10px] text-white/18 leading-snug mt-0.5">
+                    <span className="block text-[10px] text-white/16 leading-snug mt-0.5">
                       {note}
                     </span>
                   </li>
@@ -160,13 +170,20 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* ── Bottom Bar ── */}
-        <div className="mt-14 flex flex-col items-center justify-between border-t border-white/[0.07] pt-7 text-[11px] text-white/35 md:flex-row gap-4">
-          <p>© {new Date().getFullYear()} World Albanian Congress. All rights reserved.</p>
+        {/* ── Thesis Line ── */}
+        <div className="mt-14 border-t border-white/[0.05] pt-6 pb-4">
+          <p className="text-center font-serif text-[13px] italic font-light tracking-wide text-white/20">
+            Building the network layer for Albanian trust, visibility, and opportunity.
+          </p>
+        </div>
+
+        {/* ── Legal Row ── */}
+        <div className="flex flex-col items-center justify-between text-[11px] text-white/25 sm:flex-row gap-3">
+          <p>&copy; {new Date().getFullYear()} World Albanian Congress</p>
           <div className="flex gap-5">
-            <Link href="/privacy" className="transition hover:text-white/60">Privacy Policy</Link>
-            <Link href="/terms" className="transition hover:text-white/60">Terms of Service</Link>
-            <a href="#" className="transition hover:text-white/60">Cookie Guidelines</a>
+            <Link href="/privacy" className="transition hover:text-white/50">Privacy</Link>
+            <Link href="/terms" className="transition hover:text-white/50">Terms</Link>
+            <a href="#" className="transition hover:text-white/50">Cookies</a>
           </div>
         </div>
 

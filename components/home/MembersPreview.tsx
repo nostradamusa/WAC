@@ -1,67 +1,53 @@
 import Link from "next/link";
+import SectionLabel from "@/components/ui/SectionLabel";
+
+const members = [
+  { name: "Ardit Hoxha",       role: "Construction Business Owner",              location: "New York / New Jersey" },
+  { name: "Liridon Krasniqi",  role: "Software Engineer",                        location: "London" },
+  { name: "Elira Berisha",     role: "Finance Director",                         location: "Zurich" },
+  { name: "Dr. Arben Gashi",   role: "Medical Doctor",                           location: "Detroit" },
+  { name: "Arta Kola",         role: "Founder \u2013 Albanian Cultural Association", location: "Toronto" },
+];
 
 export default function MembersPreview() {
-  const members = [
-    {
-      name: "Ardit Hoxha",
-      role: "Construction Business Owner",
-      location: "New York / New Jersey",
-    },
-    { name: "Liridon Krasniqi", role: "Software Engineer", location: "London" },
-    { name: "Elira Berisha", role: "Finance Director", location: "Zurich" },
-    { name: "Dr. Arben Gashi", role: "Medical Doctor", location: "Detroit" },
-    {
-      name: "Arta Kola",
-      role: "Founder – Albanian Cultural Association",
-      location: "Toronto",
-    },
-  ];
-
   return (
-    <section id="members-preview" className="py-24 px-4 bg-[var(--background)]">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center mb-16 relative z-10">
-          <h2 className="text-4xl font-serif tracking-tight sm:text-6xl mb-4 text-white">
-            <span className="text-[#b08d57] italic font-light opacity-90">
-              Members
-            </span>{" "}
-            of the Network
+    <section className="py-16 md:py-20 px-4 sm:px-6 bg-[var(--background)]">
+      <div className="mx-auto max-w-screen-xl">
+
+        <div className="max-w-3xl mb-10 md:mb-14">
+          <SectionLabel label="Members of the Network" variant="standard" className="mb-5" />
+          <h2 className="font-serif text-[28px] md:text-[38px] leading-[1.2] tracking-tight text-[var(--warm-ivory)]">
+            Built by the people who will shape it.
           </h2>
-          <div className="space-y-4 text-xl opacity-80 max-w-3xl mx-auto leading-relaxed font-medium">
-            <p>
-              The World Albanian Congress platform is built by and for the
-              Albanian diaspora.
-            </p>
-            <p>
-              Professionals, entrepreneurs, and organizations across the world
-              are joining the network to connect and collaborate.
-            </p>
-          </div>
+          <p className="mt-4 text-[15px] leading-[1.8] text-white/45 max-w-2xl">
+            Professionals, founders, operators, and organizations across the diaspora are already entering the network.
+          </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {members.map((member) => (
             <Link
               key={member.name}
               href="/people"
-              className="wac-card group flex flex-col p-6 transition-transform hover:-translate-y-2 block h-full text-center border border-[var(--border)] hover:border-[var(--accent)]/50"
+              className="wac-card group flex flex-col p-5 md:p-6 text-center border border-white/[0.07] hover:border-[#b08d57]/30 transition-all hover:-translate-y-1"
             >
-              <div className="w-16 h-16 mx-auto rounded-full bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center text-[var(--accent)] font-bold text-xl mb-4 group-hover:bg-[var(--accent)] group-hover:text-black transition-colors">
+              <div className="w-14 h-14 mx-auto rounded-full bg-[#b08d57]/10 border border-[#b08d57]/20 flex items-center justify-center text-[#b08d57] font-bold text-lg mb-4 group-hover:bg-[#b08d57] group-hover:text-black transition-colors">
                 {member.name.charAt(0)}
                 {member.name.includes("Dr. ")
                   ? member.name.split(" ")[1].charAt(0)
                   : member.name.split(" ")[1]?.charAt(0)}
               </div>
-              <h3 className="font-bold mb-1 opacity-90">{member.name}</h3>
-              <div className="text-sm opacity-60 mb-3 leading-tight">
+              <h3 className="font-semibold text-[14px] text-white/85 mb-1">{member.name}</h3>
+              <p className="text-[12px] text-white/40 mb-3 leading-snug">
                 {member.role}
-              </div>
-              <div className="mt-auto text-xs font-bold text-[var(--accent)] uppercase tracking-widest bg-[var(--accent)]/5 py-1 px-3 rounded-full inline-block mx-auto">
+              </p>
+              <span className="mt-auto text-[10px] font-bold text-[#b08d57]/70 uppercase tracking-widest bg-[#b08d57]/[0.06] py-1 px-3 rounded-full inline-block mx-auto">
                 {member.location}
-              </div>
+              </span>
             </Link>
           ))}
         </div>
+
       </div>
     </section>
   );

@@ -213,7 +213,7 @@ export default function ComposePostPage() {
       const { error: insertError } = await supabase.from("feed_posts").insert(payload);
       if (insertError) throw insertError;
 
-      router.push("/community");
+      router.push("/pulse");
     } catch (err: any) {
       console.error("Failed to post:", err);
       setError(err.message || "Failed to post");

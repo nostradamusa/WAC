@@ -9,9 +9,11 @@ import {
   Compass,
   FolderOpen,
   Handshake,
+  Home,
   Map,
   Network,
   ShieldCheck,
+  Sparkles,
   UserCheck,
 } from "lucide-react";
 import SectionLabel from "@/components/ui/SectionLabel";
@@ -19,37 +21,23 @@ import SectionLabel from "@/components/ui/SectionLabel";
 export const metadata: Metadata = {
   title: "Vision | World Albanian Congress",
   description:
-    "The long-term thesis behind World Albanian Congress: a high-caliber digital infrastructure for the global Albanian network.",
+    "We are building the operating system for Albanian momentum. A living network designed to turn connection into trust, visibility into opportunity, and scattered diaspora energy into coordinated movement.",
 };
 
-type Status = "live" | "building" | "planned";
+// ── Live Features ────────────────────────────────────────────────────────────
 
 type LiveFeature = {
   icon: React.ElementType;
   name: string;
   strapline: string;
   description: string;
+  detail?: string;
   href: string;
   iconBg: string;
   iconColor: string;
   hoverBorder: string;
   hoverText: string;
   hoverBg: string;
-};
-
-type BuildingFeature = {
-  icon: React.ElementType;
-  name: string;
-  description: string;
-  detail: string;
-  when: string;
-};
-
-type FurtherItem = {
-  icon: React.ElementType;
-  name: string;
-  description: string;
-  when: string;
 };
 
 const LIVE_FEATURES: LiveFeature[] = [
@@ -71,8 +59,8 @@ const LIVE_FEATURES: LiveFeature[] = [
     name: "Pulse",
     strapline: "The civic and social signal",
     description:
-      "A shared stream for updates, milestones, announcements, and the moments that keep a dispersed community synchronized and engaged.",
-    href: "/community",
+      "A shared stream for updates, milestones, opportunities, and the moments that keep a dispersed community synchronized and engaged.",
+    href: "/pulse",
     iconBg: "bg-rose-500/10",
     iconColor: "text-rose-400",
     hoverBorder: "hover:border-rose-500/30",
@@ -97,7 +85,7 @@ const LIVE_FEATURES: LiveFeature[] = [
     name: "Groups",
     strapline: "The durable circles of trust",
     description:
-      "Communities organized around profession, geography, identity, and shared mission so the network can deepen instead of staying diffuse.",
+      "Communities organized around profession, geography, identity, and shared mission\u2014so the network can deepen instead of staying diffuse.",
     href: "/groups",
     iconBg: "bg-amber-500/10",
     iconColor: "text-amber-400",
@@ -105,39 +93,87 @@ const LIVE_FEATURES: LiveFeature[] = [
     hoverText: "group-hover:text-amber-400",
     hoverBg: "bg-gradient-to-br from-amber-500/[0.08] via-amber-500/[0.02] to-transparent",
   },
-];
-
-const BUILDING_FEATURES: BuildingFeature[] = [
   {
     icon: Map,
     name: "Diaspora Map",
+    strapline: "The strategic layer",
     description:
       "A geographic intelligence layer that reveals where Albanians are established, concentrated, and building influence.",
     detail:
-      "This turns the network from a directory into a strategic lens for relocation, employer outreach, local chapter growth, and coordinated community presence.",
-    when: "Q2 2026",
+      "This turns the network from a directory into a strategic lens for relocation, employer outreach, local chapter growth, investment visibility, and coordinated community presence.",
+    href: "/directory?view=map",
+    iconBg: "bg-[#b08d57]/10",
+    iconColor: "text-[#b08d57]",
+    hoverBorder: "hover:border-[#b08d57]/30",
+    hoverText: "group-hover:text-[#b08d57]",
+    hoverBg: "bg-gradient-to-br from-[#b08d57]/[0.08] via-[#b08d57]/[0.02] to-transparent",
+  },
+];
+
+// ── Next Layers ──────────────────────────────────────────────────────────────
+
+type NextFeature = {
+  icon: React.ElementType;
+  name: string;
+  strapline: string;
+  description: string;
+  detail?: string;
+  status: string;
+};
+
+const NEXT_FEATURES: NextFeature[] = [
+  {
+    icon: Home,
+    name: "Properties",
+    strapline: "Strategic layer",
+    description:
+      "A market layer for living, investing, staying, and relocating across the Albanian world.",
+    detail:
+      "Homes, listings, and location-based opportunity tied directly into the network\u2014so people can discover not just who is where, but what is possible there.",
+    status: "Coming Soon",
   },
   {
-    icon: BookOpen,
-    name: "Resources & Guides",
+    icon: Sparkles,
+    name: "CUSI",
+    strapline: "Signal layer",
     description:
-      "Practical operating knowledge for living, working, investing, and relocating across borders, written for the realities of diaspora life.",
+      "A signal for real network utility.",
     detail:
-      "The goal is not content for its own sake, but shared civic intelligence that lowers friction for every move, every return, and every next step.",
-    when: "Q3 2026",
+      "The Community Utility Score surfaces contribution, trust, relevance, and follow-through\u2014so visibility reflects value, not noise.",
+    status: "In Development",
   },
   {
     icon: ShieldCheck,
     name: "Verified Network",
+    strapline: "Trust layer",
     description:
-      "A trust layer for professionals, businesses, and organizations so identity, credibility, and recommendations carry real weight.",
+      "A credibility layer for professionals, businesses, and organizations\u2014so identity, legitimacy, and recommendations carry real weight.",
     detail:
-      "Verification should make introductions safer, partnerships more credible, and the entire network more useful the moment a user arrives.",
-    when: "Q4 2026",
+      "Verification makes introductions safer, partnerships more credible, and the network more useful the moment someone arrives.",
+    status: "Coming Next",
+  },
+  {
+    icon: BookOpen,
+    name: "Resources & Guides",
+    strapline: "Strategic layer",
+    description:
+      "Practical operating knowledge for living, working, investing, and relocating across borders\u2014written for the realities of diaspora life.",
+    detail:
+      "Not content for its own sake, but shared civic intelligence that lowers friction for every move, every return, and every next step.",
+    status: "Planned",
   },
 ];
 
-const FURTHER_AHEAD: FurtherItem[] = [
+// ── Long Horizon ─────────────────────────────────────────────────────────────
+
+type HorizonItem = {
+  icon: React.ElementType;
+  name: string;
+  description: string;
+  when: string;
+};
+
+const HORIZON_ITEMS: HorizonItem[] = [
   {
     icon: Briefcase,
     name: "Talent & Hiring",
@@ -156,7 +192,7 @@ const FURTHER_AHEAD: FurtherItem[] = [
     icon: Handshake,
     name: "Business Opportunities",
     description:
-      "Curated partnerships, investments, and commerce. Introductions surfaced through relationship intelligence instead of chance.",
+      "Curated partnerships, investments, and commerce surfaced through relationship intelligence instead of chance.",
     when: "2027",
   },
   {
@@ -168,32 +204,26 @@ const FURTHER_AHEAD: FurtherItem[] = [
   },
 ];
 
-function StatusBadge({
-  status,
-  when,
-}: {
-  status: Status;
-  when?: string;
-}) {
-  if (status === "live") {
+// ── Shared Components ────────────────────────────────────────────────────────
+
+function StatusBadge({ label, variant = "default" }: { label: string; variant?: "live" | "gold" | "default" }) {
+  if (variant === "live") {
     return (
-      <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-[#b08d57]/[0.08] border border-[#b08d57]/20 text-[#d5bf92]">
-        Available Now
+      <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-[#b08d57]/[0.08] border border-[#b08d57]/20 text-[#d5bf92]">
+        Live Now
       </span>
     );
   }
-
-  if (status === "building") {
+  if (variant === "gold") {
     return (
-      <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-[#d5bf92]/85">
-        {when ? `In Development · ${when}` : "In Development"}
+      <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-[#d5bf92]/85">
+        {label}
       </span>
     );
   }
-
   return (
-    <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-white/35">
-      {when ?? "Planned"}
+    <span className="text-[9px] font-bold uppercase tracking-[0.18em] px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-white/35">
+      {label}
     </span>
   );
 }
@@ -208,6 +238,7 @@ function LiveCard({
   name,
   strapline,
   description,
+  detail,
   href,
 }: LiveFeature) {
   return (
@@ -230,12 +261,18 @@ function LiveCard({
           {name}
         </h3>
 
-        <p className="flex-1 font-serif text-[14px] font-light leading-[1.75] tracking-[0.015em] text-white/56">
+        <p className="font-serif text-[14px] font-light leading-[1.75] tracking-[0.015em] text-white/56">
           {description}
         </p>
 
-        <div className="mt-5 flex items-center justify-between">
-          <StatusBadge status="live" />
+        {detail && (
+          <p className="mt-3 text-[12px] leading-[1.8] text-white/34">
+            {detail}
+          </p>
+        )}
+
+        <div className="mt-auto pt-5 flex items-center justify-between">
+          <StatusBadge label="Live Now" variant="live" />
           <span className={`flex items-center gap-1 text-[11px] font-semibold tracking-[0.08em] uppercase text-white/30 transition-colors ${hoverText}`}>
             Explore <ArrowRight size={12} />
           </span>
@@ -245,7 +282,7 @@ function LiveCard({
   );
 }
 
-function BuildingCard({ icon: Icon, name, description, detail, when }: BuildingFeature) {
+function NextCard({ icon: Icon, name, strapline, description, detail, status }: NextFeature) {
   return (
     <div className="wac-card flex flex-col border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.015))] p-5 md:p-6">
       <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03]">
@@ -253,7 +290,7 @@ function BuildingCard({ icon: Icon, name, description, detail, when }: BuildingF
       </div>
 
       <p className="mb-2 text-[10px] uppercase tracking-[0.28em] text-white/24">
-        Strategic Layer
+        {strapline}
       </p>
 
       <h3 className="mb-3 font-serif text-[25px] leading-none tracking-tight text-[var(--warm-ivory)]">
@@ -264,15 +301,20 @@ function BuildingCard({ icon: Icon, name, description, detail, when }: BuildingF
         {description}
       </p>
 
-      <div className="mt-5 border-t border-white/[0.06] pt-4">
-        <p className="mb-3 text-[12px] leading-[1.75] text-white/34">{detail}</p>
-        <StatusBadge status="building" when={when} />
+      {detail && (
+        <div className="mt-5 border-t border-white/[0.06] pt-4">
+          <p className="mb-3 text-[12px] leading-[1.8] text-white/34">{detail}</p>
+        </div>
+      )}
+
+      <div className="mt-auto pt-4">
+        <StatusBadge label={status} variant={status === "Coming Soon" ? "gold" : "default"} />
       </div>
     </div>
   );
 }
 
-function FurtherAheadList({ items }: { items: FurtherItem[] }) {
+function HorizonList({ items }: { items: HorizonItem[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {items.map((item) => (
@@ -306,124 +348,163 @@ function FurtherAheadList({ items }: { items: FurtherItem[] }) {
   );
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
+
 export default function VisionPage() {
   return (
     <div className="min-h-screen w-full bg-[var(--background)]">
       <div className="mx-auto max-w-screen-xl px-4 pb-24 pt-20 sm:px-6 md:pt-24">
-        {/* ── Page header ─────────────────────────────────────────────────── */}
-        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
-          <span className="italic font-light opacity-90 text-[#d5bf92]">Vision</span>
-        </h1>
-        <p className="mt-2 text-sm text-white/50">
-          The long-term thesis behind World Albanian Congress.
-        </p>
 
-        {/* ── Gentle manifesto ────────────────────────────────────────────── */}
-        <section className="relative mt-10 mb-4 max-w-3xl pl-6 md:pl-8">
-          <div className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-gradient-to-b from-[#d5bf92]/55 via-[#d5bf92]/12 to-transparent" />
+        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        <SectionLabel label="Vision" variant="featured" className="mb-6" />
 
-          <p className="font-serif italic font-light text-[20px] leading-[1.6] tracking-[0.015em] text-[var(--warm-ivory)] md:text-[22px]">
-            We are not building a collection of features.
-            <span className="block text-[#d5bf92]">
-              We are building a home for Albanian momentum.
+        <div className="max-w-3xl">
+          <h1 className="font-serif text-[28px] md:text-[38px] leading-[1.25] tracking-tight text-[var(--warm-ivory)]">
+            We are not building another Albanian app.{" "}
+            <span className="text-[#d5bf92]">
+              We are building the operating system for Albanian momentum.
             </span>
-          </p>
+          </h1>
 
-          <p className="mt-5 text-[13px] leading-[1.9] text-white/44">
-            A high-caliber digital infrastructure where identity, opportunity, and community
-            stop living in fragments and begin operating as one system. Directory, Pulse,
-            Events, and Groups are not standalone utilities — they are the first visible
-            layers of a network designed to make the Albanian diaspora easier to find,
-            easier to trust, and more powerful to activate.
+          <p className="mt-6 max-w-2xl font-serif text-[16px] font-light leading-[1.9] tracking-[0.015em] text-white/50">
+            World Albanian Congress is a living network designed to turn connection into trust,
+            visibility into opportunity, and scattered diaspora energy into coordinated movement.
           </p>
+        </div>
+
+        {/* ── Section 1: Live Now ────────────────────────────────────── */}
+        <section className="mt-20">
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.45fr] lg:items-start">
+            <div className="max-w-md">
+              <SectionLabel label="Live Now" variant="featured" className="mb-5" />
+              <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[42px]">
+                The first layers are already in place.
+              </h2>
+              <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
+                What exists today is not the whole vision. It is the first proof that the network
+                can be structured, searchable, and activated as one system.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {LIVE_FEATURES.slice(0, 4).map((feature) => (
+                <LiveCard key={feature.name} {...feature} />
+              ))}
+              {/* Diaspora Map — horizontal layout spanning both columns */}
+              {(() => {
+                const dm = LIVE_FEATURES[4];
+                return (
+                  <Link
+                    href={dm.href}
+                    className={`sm:col-span-2 relative group wac-card overflow-hidden border border-white/[0.08] p-5 md:p-6 transition-all duration-300 ${dm.hoverBorder}`}
+                  >
+                    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${dm.hoverBg}`} />
+                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-start gap-5">
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${dm.iconBg}`}>
+                        <dm.icon size={18} className={dm.iconColor} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="mb-1.5 text-[10px] uppercase tracking-[0.28em] text-white/28">{dm.strapline}</p>
+                        <h3 className={`mb-2 font-serif italic text-[25px] leading-none tracking-tight text-[var(--warm-ivory)] transition-colors ${dm.hoverText}`}>
+                          {dm.name}
+                        </h3>
+                        <p className="font-serif text-[14px] font-light leading-[1.75] tracking-[0.015em] text-white/56 max-w-2xl">
+                          {dm.description}
+                        </p>
+                        {dm.detail && (
+                          <p className="mt-2 text-[12px] leading-[1.8] text-white/34 max-w-2xl">{dm.detail}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0 sm:self-end">
+                        <StatusBadge label="Live Now" variant="live" />
+                        <span className={`flex items-center gap-1 text-[11px] font-semibold tracking-[0.08em] uppercase text-white/30 transition-colors ${dm.hoverText}`}>
+                          Explore <ArrowRight size={12} />
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })()}
+            </div>
+          </div>
         </section>
 
-        <section className="mt-16 grid gap-10 lg:grid-cols-[0.95fr_1.45fr] lg:items-start">
-          <div className="max-w-md">
-            <SectionLabel label="The Foundation" variant="featured" className="mb-5" />
-            <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[42px]">
-              Four pillars already defining the character of the network.
-            </h2>
-            <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
-              Each surface carries its own identity and purpose, but together they establish
-              the platform’s deeper promise: discovery, signal, gathering, and belonging
-              inside one high-trust ecosystem.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {LIVE_FEATURES.map((feature) => (
-              <LiveCard key={feature.name} {...feature} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-16">
+        {/* ── Section 2: Why This Matters ────────────────────────────── */}
+        <section className="mt-20">
           <div className="relative max-w-4xl pl-6 py-2 md:pl-8 md:py-4">
             <div className="absolute bottom-0 left-0 top-0 w-[2px] rounded-full bg-gradient-to-b from-[#d5bf92]/70 via-[#d5bf92]/18 to-transparent" />
 
-            <SectionLabel label="Why this matters" variant="standard" className="mb-6" />
+            <SectionLabel label="Why This Matters" variant="standard" className="mb-6" />
 
             <div className="space-y-6">
-              <p className="font-serif text-[22px] leading-[1.7] tracking-[0.015em] text-[var(--warm-ivory)] md:text-[25px]">
+              <p className="font-serif text-[22px] leading-[1.6] tracking-[0.015em] text-[var(--warm-ivory)] md:text-[25px]">
+                A global people still lacks a digital center of gravity.
+              </p>
+
+              <p className="max-w-3xl font-serif text-[16px] font-light leading-[1.95] tracking-[0.015em] text-white/54">
                 The Albanian diaspora is global, ambitious, and unusually connected by memory,
-                family, and instinct, yet it still lacks a durable digital center of gravity.
+                family, and instinct. Yet too much of its movement still depends on scattered
+                group chats, word of mouth, and accidental introductions.
               </p>
 
-              <p className="max-w-3xl font-serif text-[16px] font-light leading-[1.95] tracking-[0.015em] text-white/58">
-                Too much of the network still depends on word of mouth, scattered group chats,
-                and accidental introductions. The opportunity is larger than convenience.
-                It is about building a shared operating layer where trust can compound,
-                visibility can scale, and people can move through the diaspora with more
-                continuity than they have ever had before.
+              <p className="max-w-3xl font-serif text-[16px] font-light leading-[1.95] tracking-[0.015em] text-white/54">
+                The opportunity is larger than convenience. This is about building a shared
+                operating layer where trust can compound, visibility can scale, and people can
+                move through the diaspora with more continuity than chance.
               </p>
 
-              <p className="max-w-3xl font-serif text-[16px] font-light leading-[1.95] tracking-[0.015em] text-white/58">
-                That is why this page is not a roadmap. It is a statement of architecture:
-                the present features establish the network, the next layers make it
-                intelligent, and the long horizon turns it into a civic and professional
-                system with real strategic weight.
+              <p className="max-w-3xl font-serif text-[16px] font-light leading-[1.95] tracking-[0.015em] text-white/48">
+                That is why this is not a roadmap page. It is a statement of architecture: the
+                present layers establish the network, the next layers make it more intelligent,
+                and the long horizon turns it into a civic and professional system with real
+                strategic weight.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-16 grid gap-10 lg:grid-cols-[0.9fr_1.5fr] lg:items-start">
-          <div className="max-w-md">
-            <SectionLabel label="In Development" variant="standard" className="mb-5" />
-            <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[40px]">
-              The next layers are about intelligence, trust, and orientation.
-            </h2>
-            <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
-              These are the capabilities that move the platform from a foundational directory
-              into a comprehensive system for diaspora navigation, decision-making, and
-              credibility.
-            </p>
-          </div>
+        {/* ── Section 3: Next Layers ─────────────────────────────────── */}
+        <section className="mt-20">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.5fr] lg:items-start">
+            <div className="max-w-md">
+              <SectionLabel label="Next Layers" variant="standard" className="mb-5" />
+              <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[40px]">
+                The next phase is about intelligence, trust, and orientation.
+              </h2>
+              <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
+                These are the layers that move the platform from a foundational network into a
+                system for diaspora navigation, credibility, and coordinated opportunity.
+              </p>
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {BUILDING_FEATURES.map((feature) => (
-              <BuildingCard key={feature.name} {...feature} />
-            ))}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {NEXT_FEATURES.map((feature) => (
+                <NextCard key={feature.name} {...feature} />
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="mt-14 grid gap-10 lg:grid-cols-[0.9fr_1.5fr] lg:items-start">
-          <div className="max-w-md">
-            <SectionLabel label="Long Horizon" variant="standard" className="mb-5" />
-            <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[40px]">
-              Over time, the network should become more than a place to browse.
-            </h2>
-            <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
-              It should become a place to build careers, coordinate projects, create economic
-              opportunity, and carry a portable reputation across every part of the ecosystem.
-            </p>
-          </div>
+        {/* ── Section 4: Long Horizon ────────────────────────────────── */}
+        <section className="mt-20">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.5fr] lg:items-start">
+            <div className="max-w-md">
+              <SectionLabel label="Long Horizon" variant="standard" className="mb-5" />
+              <h2 className="font-serif text-3xl leading-[1.14] tracking-tight text-[var(--warm-ivory)] md:text-[40px]">
+                Over time, the network should become more than a place to browse.
+              </h2>
+              <p className="mt-4 text-[14px] leading-[1.85] text-white/46">
+                It should become a place to build careers, coordinate projects, create economic
+                opportunity, and carry a portable reputation across every part of the ecosystem.
+              </p>
+            </div>
 
-          <FurtherAheadList items={FURTHER_AHEAD} />
+            <HorizonList items={HORIZON_ITEMS} />
+          </div>
         </section>
 
-        <section className="mt-16">
+        {/* ── Closing Block ──────────────────────────────────────────── */}
+        <section className="mt-20">
           <div className="wac-card border border-white/[0.08] bg-[linear-gradient(180deg,rgba(176,141,87,0.05),rgba(255,255,255,0.02))] p-8 md:p-10">
             <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
               <div className="max-w-2xl">
@@ -432,9 +513,8 @@ export default function VisionPage() {
                   A network built to the exact standard our community has already set.
                 </h2>
                 <p className="mt-4 max-w-xl font-serif text-[16px] font-light leading-[1.85] tracking-[0.015em] text-white/56">
-                  Every meaningful network becomes more valuable when serious people arrive
-                  early, shape its culture, and give the next layer of connection something
-                  real to build on.
+                  Every meaningful network becomes more valuable when serious people arrive early,
+                  shape its culture, and give the next layer of connection something real to build on.
                 </p>
               </div>
 
@@ -455,6 +535,7 @@ export default function VisionPage() {
             </div>
           </div>
         </section>
+
       </div>
     </div>
   );

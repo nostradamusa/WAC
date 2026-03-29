@@ -155,7 +155,7 @@ export default function PremiumSelect({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => !disabled && setOpen((current) => !current)}
-        className={`group flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.09] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] px-3.5 text-left text-sm text-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 hover:border-white/16 hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-[#b08d57]/25 disabled:cursor-not-allowed disabled:opacity-45 ${
+        className={`group flex w-full items-center justify-between gap-3 rounded-xl border border-white/[0.09] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.025))] px-3.5 text-left text-sm text-white/78 transition-all duration-200 hover:border-white/16 hover:bg-white/[0.06] focus:outline-none focus-visible:border-[#b08d57]/50 focus-visible:shadow-[0_0_0_3px_rgba(176,141,87,0.12)] disabled:cursor-not-allowed disabled:opacity-45 ${
           compact ? "min-h-8 py-1.5 text-xs" : "min-h-11 py-2.5"
         } ${triggerClassName}`}
       >

@@ -36,6 +36,10 @@ export function middleware(request: NextRequest) {
     "'self'",
     "'unsafe-inline'",
     isDev ? "'unsafe-eval'" : "",
+    // Vercel Analytics / Speed Insights
+    "https://va.vercel-scripts.com",
+    "https://vitals.vercel-insights.com",
+    // Google Translate
     "translate.google.com",
     "http://www.google.com",
     "https://www.google.com",
@@ -49,13 +53,18 @@ export function middleware(request: NextRequest) {
   const csp = [
     `default-src 'self' ${isDev ? "'unsafe-eval'" : ""}`,
     `script-src ${scriptSrc}`,
-    `script-src-elem 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""} translate.google.com http://www.google.com https://www.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com`,
+    // script-src-elem governs <script> element loading (overrides script-src for tags).
+    // Must include all the same script hosts, plus 'unsafe-eval' in dev for
+    // Vercel Analytics debug script which uses eval() internally.
+    `script-src-elem 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com https://vitals.vercel-insights.com translate.google.com http://www.google.com https://www.google.com https://translate.googleapis.com https://translate-pa.googleapis.com https://*.gstatic.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com translate.google.com https://*.gstatic.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https: http://translate.google.com",
     "media-src 'self' blob: https:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://translate.googleapis.com https://translate-pa.googleapis.com https://translate.google.com",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://translate.googleapis.com https://translate-pa.googleapis.com https://translate.google.com https://vitals.vercel-insights.com https://va.vercel-scripts.com https://api.mapbox.com https://*.tiles.mapbox.com https://events.mapbox.com",
     "frame-src 'self' https://translate.googleapis.com translate.googleapis.com https://*.google.com",
   ].join("; ");
 

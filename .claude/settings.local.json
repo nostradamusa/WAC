@@ -22,7 +22,27 @@
       "Bash(grep -A 20 \"CREATE TABLE.*businesses\\\\|CREATE TABLE.*organizations\" /c/Users/Admin/Desktop/wac/supabase/migrations/*.sql)",
       "Bash(grep -r 'CREATE TABLE.*businesses' /c/Users/Admin/Desktop/wac/ --include=*.sql)",
       "Bash(npx next:*)",
-      "Bash(grep -E \"\\\\.\\(ts|sql\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|sql\\)$\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -r \"favicon\\\\|icon.*href\\\\|manifest\" C:/Users/Admin/Desktop/wac/app --include=*.tsx --include=*.ts)",
+      "Bash(grep -r \"metadata\\\\|icon\\\\|favicon\" C:/Users/Admin/Desktop/wac/app --include=*.tsx)",
+      "Bash(timeout 15 tail -f C:UsersAdminAppDataLocalTempclaudec--Users-Admin-Desktop-wac4ff43ab6-51b9-4fa8-89b2-927f7b5caa40tasksb48mvbac4.output)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(find /c/Users/Admin/Desktop/wac/components -type f \\\\\\(-name *select* -o -name *dropdown* \\\\\\) -not -path */node_modules/*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(npx tsx -e \":*)",
+      "Bash(node -e \":*)",
+      "Bash(ls \"C:\\\\Users\\\\Admin\\\\Desktop\\\\wac\\\\components\\\\directory\"\" 2>/dev/null || echo \"check path \")",
+      "Bash(grep -v \"^$\")",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\(''mapbox-gl''\\); console.log\\(''mapbox-gl ok:'', require\\(''mapbox-gl/package.json''\\).version\\)\")",
+      "Bash(node -e \"require\\(''react-map-gl''\\); console.log\\(''react-map-gl ok:'', require\\(''react-map-gl/package.json''\\).version\\)\")",
+      "Bash(node -e \"const d=require\\(''''/dev/stdin''''\\); console.log\\(d.version, d.peerDependencies\\)\")",
+      "Bash(node -p \"require\\(''./node_modules/react-map-gl/package.json''\\).version\")",
+      "Bash(node -p \"Object.keys\\(require\\(''./node_modules/react-map-gl/package.json''\\).exports || {}\\).join\\('', ''\\)\")",
+      "Bash(node -e \"const p=require\\(''./node_modules/react-map-gl/package.json''\\); console.log\\(JSON.stringify\\(p.exports[''./mapbox''], null, 2\\)\\)\")"
     ]
   }
 }

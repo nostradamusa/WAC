@@ -6,16 +6,44 @@ import { supabase } from "@/lib/supabase";
 import GlobalSearchOverlay from "@/components/layout/GlobalSearchOverlay";
 import {
   Activity,
-  Search,
   Compass,
   CalendarDays,
-  Users,
   Network,
+  Map,
   Briefcase,
-  HeartHandshake,
   Building2,
+  HeartHandshake,
   ArrowRight,
 } from "lucide-react";
+
+// ── Proof strip data ─────────────────────────────────────────────────────────
+
+const LIVE_ITEMS = [
+  { label: "Directory" },
+  { label: "Pulse" },
+  { label: "Events" },
+  { label: "Groups" },
+  { label: "Diaspora Map" },
+];
+
+const COMING_ITEMS = [
+  { label: "Properties" },
+  { label: "COUSIN" },
+  { label: "Verified" },
+  { label: "Resources" },
+];
+
+// ── Mobile quick-nav data ────────────────────────────────────────────────────
+
+const MOBILE_NAV_ITEMS = [
+  { href: "/directory",          icon: Compass,      label: "Directory",    color: "text-[#b08d57]" },
+  { href: "/pulse",              icon: Activity,     label: "Pulse",        color: "text-rose-400" },
+  { href: "/events",             icon: CalendarDays,  label: "Events",       color: "text-teal-400" },
+  { href: "/groups",             icon: Network,       label: "Groups",       color: "text-violet-400" },
+  { href: "/directory?view=map", icon: Map,           label: "Map",          color: "text-[#b08d57]" },
+];
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function Hero() {
   const [isSignCheckComplete, setIsSignCheckComplete] = useState(false);
@@ -41,128 +69,82 @@ export default function Hero() {
     <>
       <GlobalSearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
-      {/* ── Mobile: Compact Launchpad ──────────────────────────────────── */}
-      <section className="md:hidden px-4 pt-5 pb-6 space-y-3.5">
+      {/* ── Mobile Hero ──────────────────────────────────────────────────── */}
+      <section className="md:hidden px-4 pt-6 pb-5 space-y-6">
 
-        {/* 1. Brand mark */}
-        <div className="flex items-center gap-3 py-1">
-          <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 bg-[var(--accent)] flex items-center justify-center shadow-[0_0_14px_rgba(176,141,87,0.28)] border-2 border-[#b08d57]/60">
-            <img
-              src="/images/wac-logo.jpg"
-              alt="WAC"
-              className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
-            />
-          </div>
-          <div>
-            <h1 className="font-serif text-[17px] leading-none text-white mb-[3px]">
-              World{" "}
-              <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
-              Congress
-            </h1>
-            <p className="text-[8.5px] tracking-[0.38em] text-white/28 uppercase">
-              Connect · Build · Rise
-            </p>
-          </div>
+        {/* ── 1. Hero headline ──────────────────────────────────────── */}
+        <div className="space-y-3 pt-1">
+          <p className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-400/70">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-40" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400/80" />
+            </span>
+            Live Now
+          </p>
+
+          <h1 className="font-serif text-[26px] leading-[1.15] tracking-tight text-white">
+            The operating system for{" "}
+            <span className="text-[#b08d57] italic font-light">Albanian</span>{" "}
+            momentum.
+          </h1>
+
+          <p className="text-[13px] font-light text-white/38 leading-relaxed max-w-[320px]">
+            A network for Albanian trust, visibility, opportunity, and coordination across borders.
+          </p>
         </div>
 
-        {/* 2. Primary CTA — The Pulse */}
-        <Link
-          href="/community"
-          className="flex items-center gap-4 p-4 rounded-2xl bg-rose-500/[0.07] border border-rose-500/[0.14] transition-colors active:scale-[0.98] group"
-        >
-          <div className="w-10 h-10 rounded-full bg-rose-500/[0.14] flex items-center justify-center shrink-0">
-            <Activity className="w-5 h-5 text-rose-400" strokeWidth={1.8} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm text-white leading-none mb-1">The Pulse</p>
-            <p className="text-[11px] text-white/38 truncate">Community feed · latest from the diaspora</p>
-          </div>
-          <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-rose-400/50 transition shrink-0" />
-        </Link>
+        {/* ── 2. Dual CTAs ──────────────────────────────────────────── */}
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/directory"
+            className="flex-1 flex items-center justify-center py-3 rounded-xl bg-[#b08d57] text-black text-[13px] font-bold tracking-wide transition-colors hover:bg-[#9a7545] active:scale-[0.97]"
+          >
+            Explore Directory
+          </Link>
+          <Link
+            href="/directory?view=map"
+            className="flex-1 flex items-center justify-center py-3 rounded-xl border border-[#b08d57]/30 text-[#d5bf92] text-[13px] font-semibold tracking-wide transition-colors hover:bg-[#b08d57]/10 active:scale-[0.97]"
+          >
+            Diaspora Map
+          </Link>
+        </div>
 
-        {/* 3. Quick-access grid — Directory · Events · People */}
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            {
-              href: "/directory",
-              icon: Compass,
-              label: "Directory",
-              iconColor: "text-[#b08d57]",
-              bg: "bg-[#b08d57]/[0.08]",
-              border: "border-[#b08d57]/[0.13]",
-            },
-            {
-              href: "/events",
-              icon: CalendarDays,
-              label: "Events",
-              iconColor: "text-emerald-400",
-              bg: "bg-emerald-400/[0.08]",
-              border: "border-emerald-400/[0.13]",
-            },
-            {
-              href: "/people",
-              icon: Users,
-              label: "People",
-              iconColor: "text-sky-400",
-              bg: "bg-sky-400/[0.08]",
-              border: "border-sky-400/[0.13]",
-            },
-          ].map(({ href, icon: Icon, label, iconColor, bg, border }) => (
+        {/* ── 3. Compact quick-nav strip ─────────────────────────────── */}
+        <div className="flex items-center justify-between px-1">
+          {MOBILE_NAV_ITEMS.map(({ href, icon: Icon, label, color }) => (
             <Link
-              key={href}
+              key={label}
               href={href}
-              className={`flex flex-col items-center gap-2.5 py-4 px-2 rounded-2xl ${bg} border ${border} transition-colors active:scale-95`}
+              className="flex flex-col items-center gap-1.5 py-1 group"
             >
-              <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center`}>
-                <Icon className={`w-4 h-4 ${iconColor}`} strokeWidth={1.8} />
+              <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center group-active:scale-90 transition-transform">
+                <Icon className={`w-[18px] h-[18px] ${color} opacity-70`} strokeWidth={1.6} />
               </div>
-              <span className={`text-[11px] font-semibold ${iconColor} leading-none`}>
-                {label}
-              </span>
+              <span className="text-[10px] font-medium text-white/35">{label}</span>
             </Link>
           ))}
         </div>
 
-        {/* 4. Discovery pills — horizontal scroll */}
-        <div
-          className="flex gap-2 overflow-x-auto"
-          style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
-        >
-          {[
-            { href: "/jobs", icon: Briefcase, label: "Jobs" },
-            { href: "/businesses", icon: Building2, label: "Businesses" },
-            { href: "/organizations", icon: HeartHandshake, label: "Organizations" },
-            { href: "/groups", icon: Network, label: "Groups" },
-          ].map(({ href, icon: Icon, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/[0.04] border border-white/[0.07] text-[11px] text-white/45 hover:text-white/70 hover:border-white/[0.13] transition-colors whitespace-nowrap"
-            >
-              <Icon className="w-3 h-3 opacity-60" strokeWidth={1.7} />
-              {label}
-            </Link>
-          ))}
-        </div>
-
-        {/* 5. Join CTA — only when logged out */}
+        {/* ── 4. Join CTA — only when logged out ─────────────────────── */}
         {isSignCheckComplete && !isLoggedIn && (
           <Link
             href="/login"
-            className="flex items-center justify-center w-full py-3 rounded-2xl bg-[var(--accent)] text-black text-sm font-bold tracking-wide transition hover:bg-[#F2D06B] active:scale-[0.98]"
+            className="flex items-center justify-center w-full py-3 rounded-xl bg-white/[0.04] border border-white/[0.07] text-white/50 text-[12px] font-semibold tracking-wide transition hover:bg-white/[0.07] active:scale-[0.98]"
           >
             Join the Network
           </Link>
         )}
+
       </section>
 
       {/* ── Desktop: Full Editorial Hero ──────────────────────────────── */}
-      <section className="relative hidden md:flex flex-col items-center justify-center pt-32 pb-24 text-center px-4 min-h-0">
+      <section className="relative hidden md:flex flex-col items-center justify-center pt-28 pb-20 text-center px-4 min-h-0">
         <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(176,141,87,0.12)_0%,transparent_60%)] pointer-events-none" />
 
-        <div className="relative z-10 max-w-5xl">
-          <div className="flex justify-center mb-8">
-            <div className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(176,141,87,0.25)] animate-in zoom-in duration-700 relative border-[3px] border-[#b08d57]/60">
+        <div className="relative z-10 max-w-5xl w-full">
+          {/* Logo */}
+          <div className="flex justify-center mb-7">
+            <div className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] drop-shadow-[0_0_20px_rgba(176,141,87,0.25)] animate-in zoom-in duration-700 relative border-[3px] border-[#b08d57]/60">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.3)_0%,transparent_60%)] mix-blend-overlay pointer-events-none" />
               <img
                 src="/images/wac-logo.jpg"
@@ -172,24 +154,20 @@ export default function Hero() {
             </div>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-serif tracking-tight mb-12 leading-tight text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
-            World{" "}
+          {/* Headline */}
+          <h1 className="text-[42px] md:text-[52px] lg:text-[58px] font-serif tracking-tight mb-5 leading-[1.1] text-white animate-in slide-in-from-bottom-4 duration-700 delay-100">
+            The operating system for{" "}
             <span className="text-[#b08d57] italic font-light opacity-90">Albanian</span>{" "}
-            Congress
+            momentum.
           </h1>
 
-          <div className="mx-auto max-w-3xl px-2 mb-16">
-            <p className="text-lg md:text-xl font-serif font-light text-white/55 mb-5 leading-relaxed tracking-wide">
-              The global network for{" "}
-              <span className="text-[#b08d57] italic font-light opacity-90">Albanians</span>.
-            </p>
-            <p className="text-[10px] tracking-[0.45em] font-sans font-light text-white/35 uppercase">
-              Connect&nbsp;&nbsp;·&nbsp;&nbsp;Build&nbsp;&nbsp;·&nbsp;&nbsp;Rise
-            </p>
-          </div>
+          {/* Support line */}
+          <p className="mx-auto max-w-2xl text-[16px] md:text-[18px] font-serif font-light text-white/48 leading-relaxed tracking-wide mb-10">
+            A network built for Albanian trust, visibility, opportunity, and coordination across borders.
+          </p>
 
-          {/* Desktop search bar */}
-          <div className="mx-auto max-w-2xl w-full">
+          {/* Search bar */}
+          <div className="mx-auto max-w-2xl w-full mb-6">
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
@@ -210,9 +188,63 @@ export default function Hero() {
             </button>
           </div>
 
-          <div className="h-8 mt-6">
+          {/* Search helper text */}
+          <p className="text-[11px] text-white/22 mb-10 tracking-wide">
+            Find people, businesses, and organizations across the global Albanian network.
+          </p>
+
+          {/* Dual CTAs */}
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <Link
+              href="/directory"
+              className="rounded-full bg-[#b08d57] px-6 py-3 text-[14px] font-semibold text-black tracking-wide transition-colors hover:bg-[#9a7545] whitespace-nowrap"
+            >
+              Explore the Directory
+            </Link>
+            <Link
+              href="/directory?view=map"
+              className="rounded-full border border-[#b08d57]/35 px-6 py-3 text-[14px] font-semibold text-[#d5bf92] tracking-wide transition-colors hover:bg-[#b08d57]/10 whitespace-nowrap"
+            >
+              Open Diaspora Map
+            </Link>
+          </div>
+
+          {/* ── Proof strip ─────────────────────────────────────────────── */}
+          <div className="mx-auto max-w-3xl flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-10 py-5 px-6 rounded-2xl bg-white/[0.02] border border-white/[0.05]">
+            {/* Live now */}
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-400/60 shrink-0">
+                Live Now
+              </span>
+              {LIVE_ITEMS.map((item) => (
+                <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-white/40 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400/50" />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+
+            {/* Divider */}
+            <span className="hidden sm:block w-px h-5 bg-white/[0.08]" />
+
+            {/* Coming next */}
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/25 shrink-0">
+                Coming
+              </span>
+              {COMING_ITEMS.map((item) => (
+                <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-white/22 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/15" />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Sign-in prompt */}
+          <div className="h-7 mt-6">
             {isSignCheckComplete && !isLoggedIn && (
-              <div className="text-sm text-white/50 animate-in fade-in duration-500">
+              <div className="text-sm text-white/40 animate-in fade-in duration-500">
                 Not part of the network yet?{" "}
                 <Link href="/login" className="text-[#b08d57] hover:underline opacity-90 transition font-medium">
                   Create your profile

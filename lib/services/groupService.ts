@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { GroupData } from "@/lib/types/group";
+import { legacyCategoryToPath, getPath } from "@/lib/constants/taxonomy";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -195,30 +196,18 @@ export async function getGroupBySlug(slug: string): Promise<GroupData | null> {
 
 // ── Utility maps ──────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated Use legacyCategoryToPath from @/lib/constants/taxonomy instead.
+ * Kept for backward compatibility with getGroupBySlug + GroupData.pathway.
+ */
 export function categoryToPathway(
   category: string,
-): "family" | "career" | "industry" | "travel" {
-  const map: Record<string, "family" | "career" | "industry" | "travel"> = {
-    "Parenting & Family":    "family",
-    "Culture & Identity":    "family",
-    "Career & Professional": "career",
-    "Education & Mentorship":"career",
-    "Business & Founder":    "industry",
-    "Industry Circles":      "industry",
-    "Travel & Lifestyle":    "travel",
-    "City / Region":         "travel",
-    "Special Interest":      "travel",
-  };
-  return map[category] ?? "travel";
+): string {
+  return legacyCategoryToPath(category);
 }
 
+/** Maps a DB category string to Path-based avatar colors via the taxonomy. */
 function categoryToColors(category: string): { avatarBg: string; avatarColor: string } {
-  const pathway = categoryToPathway(category);
-  const map: Record<string, { avatarBg: string; avatarColor: string }> = {
-    family:   { avatarBg: "bg-purple-500/15",    avatarColor: "text-purple-400" },
-    career:   { avatarBg: "bg-sky-500/15",        avatarColor: "text-sky-400" },
-    industry: { avatarBg: "bg-[#b08d57]/15",      avatarColor: "text-[#b08d57]" },
-    travel:   { avatarBg: "bg-emerald-500/15",    avatarColor: "text-emerald-400" },
-  };
-  return map[pathway];
+  const path = getPath(legacyCategoryToPath(category));
+  return { avatarBg: path.bg, avatarColor: path.color };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import EventsResults from "@/components/events/EventsResults";
@@ -34,12 +35,14 @@ import {
   Loader2,
   CheckCircle2,
   SlidersHorizontal,
+  Check,
+  Search,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Lens        = "my-network" | "browse" | "calendar";
-type CalViewMode = "month" | "week" | "agenda";
+type Lens        = "discover" | "calendar";
+type CalViewMode = "month" | "agenda";
 type TabId       = "basics" | "hosting" | "publishing" | "advanced";
 
 interface EventDraft {
@@ -71,9 +74,26 @@ type CalendarSourcePreferences = Record<CalendarSourceFilter, boolean>;
 type SavedCalendarEntity = {
   id: string;
   name: string;
-  entityType: "organization" | "business";
+  entityType: "organization" | "business" | "group";
 };
 
+// ── Two-level source bucket model ────────────────────────────────────────────
+type SourceBucketMode = "off" | "all" | "custom";
+type SourceBucketState = {
+  mode: SourceBucketMode;
+  selected: Set<string>; // entity IDs when mode === "custom"
+};
+type SourceBucketPreferences = Record<CalendarSourceFilter, SourceBucketState>;
+
+const DEFAULT_BUCKET_STATE: SourceBucketState = { mode: "all", selected: new Set() };
+const DEFAULT_SOURCE_BUCKETS: SourceBucketPreferences = {
+  wac:      { mode: "all", selected: new Set() },
+  org:      { mode: "all", selected: new Set() },
+  group:    { mode: "all", selected: new Set() },
+  business: { mode: "all", selected: new Set() },
+};
+
+// Legacy flat preferences (still used for DB persistence format)
 const DEFAULT_CALENDAR_SOURCE_PREFERENCES: CalendarSourcePreferences = {
   wac: true,
   org: true,
@@ -82,6 +102,54 @@ const DEFAULT_CALENDAR_SOURCE_PREFERENCES: CalendarSourcePreferences = {
 };
 
 const CORE_CALENDAR_SOURCE_IDS: CalendarSourceFilter[] = ["wac", "org", "group", "business"];
+
+// Convert bucket preferences → legacy flat format for DB save (backward compat)
+function bucketsToLegacyPreferences(buckets: SourceBucketPreferences): CalendarSourcePreferences {
+  return {
+    wac:      buckets.wac.mode !== "off",
+    org:      buckets.org.mode !== "off",
+    group:    buckets.group.mode !== "off",
+    business: buckets.business.mode !== "off",
+  };
+}
+
+// Convert bucket preferences → flat Set<string> for backward-compat with activeSources consumers
+function bucketsToActiveSourceSet(buckets: SourceBucketPreferences): Set<string> {
+  return new Set(CORE_CALENDAR_SOURCE_IDS.filter((id) => buckets[id].mode !== "off"));
+}
+
+// Serializable form of bucket preferences for localStorage persistence
+type SerializedBucketPreferences = Record<CalendarSourceFilter, { mode: SourceBucketMode; selected: string[] }>;
+
+function serializeBuckets(buckets: SourceBucketPreferences): SerializedBucketPreferences {
+  const result = {} as SerializedBucketPreferences;
+  for (const key of CORE_CALENDAR_SOURCE_IDS) {
+    result[key] = { mode: buckets[key].mode, selected: Array.from(buckets[key].selected) };
+  }
+  return result;
+}
+
+function deserializeBuckets(raw: unknown): SourceBucketPreferences | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const record = raw as Partial<SerializedBucketPreferences>;
+  const result = { ...DEFAULT_SOURCE_BUCKETS };
+  for (const key of CORE_CALENDAR_SOURCE_IDS) {
+    const entry = record[key];
+    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+      const mode = (entry as { mode?: string }).mode;
+      const selected = (entry as { selected?: string[] }).selected;
+      if (mode === "off" || mode === "all" || mode === "custom") {
+        result[key] = {
+          mode,
+          selected: new Set(Array.isArray(selected) ? selected : []),
+        };
+      }
+    }
+  }
+  return result;
+}
+
+const LS_BUCKET_KEY = "wac_source_buckets";
 
 const WAC_EVENT_COLORS: {
   bg: string; text: string; border: string; dot: string; rule: string; hover: string;
@@ -338,15 +406,77 @@ const FEATURED: {
   },
 ];
 
-const EVENT_TYPES = [
-  "All", "Networking", "Professional", "Family", "Youth",
-  "Business", "Social", "Volunteer", "Education",
+const FILTER_CATEGORIES = [
+  "Professional", "Community", "Cultural", "Family",
+  "Social", "Education", "Fundraising", "Faith",
 ];
+const FILTER_FORMATS   = ["In Person", "Online", "Hybrid"];
+const FILTER_DATES     = ["Today", "This Week", "This Weekend", "This Month"];
+const EVENT_SOURCES: Array<{
+  id: string; label: string; description: string; dot: string; hierarchical: boolean;
+}> = [
+  { id: "people",        label: "People",        description: "Events posted by people you follow.",        dot: "bg-white/55",    hierarchical: false },
+  { id: "groups",        label: "Groups",        description: "Events from groups you follow.",             dot: "bg-amber-400",   hierarchical: true  },
+  { id: "organizations", label: "Organizations", description: "Events from organizations you follow.",      dot: "bg-emerald-400", hierarchical: true  },
+  { id: "businesses",    label: "Businesses",    description: "Events from businesses you follow.",         dot: "bg-blue-400",    hierarchical: true  },
+];
+const FILTER_PATHS = [
+  { id: "Roots", dot: "bg-amber-400" },
+  { id: "Growth", dot: "bg-teal-400" },
+  { id: "Living", dot: "bg-purple-400" },
+  { id: "Leadership", dot: "bg-rose-400" },
+];
+const FILTER_SORTS     = ["Relevant", "Soonest", "Closest", "Popular"];
+const QUICK_FILTERS    = ["Near Me", "This Week", "My Network", "Online", "Popular"] as const;
+
+type HierarchicalSourceId = "groups" | "organizations" | "businesses";
+type HierarchicalSourceMode = "off" | "all" | "custom";
+interface HierarchicalSourceState {
+  mode: HierarchicalSourceMode;
+  selected: string[]; // entity IDs when mode === "custom"
+}
+const DEFAULT_HIER: HierarchicalSourceState = { mode: "off", selected: [] };
+
+// Mock followed-entity data (replace with Supabase query in production)
+const MOCK_FOLLOWED: Record<HierarchicalSourceId, Array<{ id: string; name: string }>> = {
+  groups: [
+    { id: "g1", name: "Albanian Professionals NYC" },
+    { id: "g2", name: "Balkan Tech Network" },
+    { id: "g3", name: "WAC Youth Chapter" },
+  ],
+  organizations: [
+    { id: "o1", name: "Albanian American League" },
+    { id: "o2", name: "NAAAP" },
+  ],
+  businesses: [
+    { id: "b1", name: "Shkodra Coffee Co." },
+    { id: "b2", name: "Adriatic Capital Group" },
+  ],
+};
+
+interface EventFilters {
+  categories:    string[];
+  formats:       string[];
+  date:          string | null;
+  sources:       string[];   // for "people" only (simple toggle)
+  groups:        HierarchicalSourceState;
+  organizations: HierarchicalSourceState;
+  businesses:    HierarchicalSourceState;
+  paths:         string[];
+  lifeStages:    string[];
+  sort:          string;
+  quick:         string[];
+}
+
+const DEFAULT_FILTERS: EventFilters = {
+  categories: [], formats: [], date: null, sources: [],
+  groups: DEFAULT_HIER, organizations: DEFAULT_HIER, businesses: DEFAULT_HIER,
+  paths: [], lifeStages: [], sort: "Relevant", quick: [],
+};
 
 const LENSES: { id: Lens; label: string; icon: React.ElementType }[] = [
-  { id: "my-network", label: "Highlights", icon: Network      },
-  { id: "browse",     label: "Explore",    icon: LayoutGrid   },
-  { id: "calendar",   label: "Calendar",   icon: CalendarDays },
+  { id: "discover", label: "Discover",  icon: LayoutGrid   },
+  { id: "calendar", label: "Calendar",  icon: CalendarDays },
 ];
 
 // ── Calendar constants ────────────────────────────────────────────────────────
@@ -375,17 +505,10 @@ const CAL_SOURCES: Array<{ id: CalendarSourceFilter | "imported"; label: string;
 
 const CAL_VIEW_TABS: { id: CalViewMode; label: string; icon: React.ElementType }[] = [
   { id: "month",  label: "Month",  icon: LayoutGrid   },
-  { id: "week",   label: "Week",   icon: CalendarRange },
   { id: "agenda", label: "Agenda", icon: AlignJustify  },
 ];
 
-function sourceLabelForChip(id: string, fallback: string): string {
-  if (id === "wac") return "WAC";
-  if (id === "org") return "Orgs";
-  if (id === "business") return "Businesses";
-  if (id === "group") return "Groups";
-  return fallback;
-}
+
 
 // ── Event composer constants ──────────────────────────────────────────────────
 
@@ -460,15 +583,15 @@ function Toggle({
     <button
       type="button"
       onClick={onChange}
-      className={`relative w-9 h-[18px] rounded-full transition-colors shrink-0 ${
+      className={`relative w-[44px] h-[26px] rounded-full transition-colors duration-200 shrink-0 ${
         checked
-          ? color === "rose" ? "bg-rose-500/40" : "bg-teal-500/40"
-          : "bg-white/[0.1]"
+          ? color === "rose" ? "bg-rose-500" : "bg-teal-500"
+          : "bg-white/[0.12]"
       }`}
     >
       <span
-        className={`absolute top-[3px] w-3 h-3 rounded-full bg-white/75 shadow-sm transition-transform ${
-          checked ? "translate-x-[21px]" : "translate-x-[3px]"
+        className={`absolute top-1/2 left-[3px] w-5 h-5 rounded-full shadow-sm transition-transform duration-200 ${
+          checked ? "-translate-y-1/2 translate-x-[18px] bg-white" : "-translate-y-1/2 translate-x-0 bg-white/50"
         }`}
       />
     </button>
@@ -1687,6 +1810,7 @@ function ImportCalendarModal({
   const [icsUrl,   setIcsUrl]   = useState("");
   const [colorDot, setColorDot] = useState(IMPORT_COLORS[0].dot);
   const [error,    setError]    = useState("");
+  const [openGuide, setOpenGuide] = useState<string | null>(null);
 
   function handleSave() {
     if (!name.trim())   { setError("Give this calendar a name."); return; }
@@ -1699,95 +1823,158 @@ function ImportCalendarModal({
     onSave({ id: `imp_${Date.now()}`, name: name.trim(), icsUrl: url, colorDot });
   }
 
-  return (
-    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
-      <div className="relative z-10 w-full sm:max-w-md bg-[#0f0f0f] border border-white/[0.10] rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+  const providerGuides = [
+    { id: "google", label: "Google Calendar", steps: "Open Google Calendar → Settings → select your calendar → scroll to \"Secret address in iCal format\" → copy the URL." },
+    { id: "outlook", label: "Outlook / Microsoft 365", steps: "Settings → Calendar → Shared calendars → Publish a calendar → select the calendar → copy the ICS link." },
+    { id: "apple", label: "Apple Calendar / ICS", steps: "Right-click a calendar → Share Calendar → copy the webcal:// URL and paste it above." },
+  ];
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.06] shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold text-white/85">Import Calendar</h2>
-            <p className="text-[11px] text-white/35 mt-0.5">Add a Google Calendar or ICS feed</p>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/[0.05] text-white/35 hover:text-white/65 transition-colors">
-            <X size={14} />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-[#0c0c0e] flex flex-col" style={{ height: "100dvh" }}>
+
+      {/* ── Header ── */}
+      <div className="shrink-0 bg-[#0c0c0e]">
+        <div className="flex items-center gap-3 px-4 h-[56px]">
+          <button onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-white/50 hover:text-white/80 transition-all">
+            <X size={18} />
           </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-
-          {/* Name */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2">Calendar Name</label>
+            <h2 className="text-[16px] font-semibold text-white/95 tracking-tight">Connect Calendar</h2>
+          </div>
+        </div>
+        <div className="h-px bg-white/[0.07]" />
+        <div className="px-5 py-3">
+          <p className="text-[12px] text-white/35 leading-relaxed">
+            Sync a Google Calendar, Outlook, Apple Calendar, or ICS feed into WAC.
+          </p>
+        </div>
+        <div className="h-px bg-white/[0.05]" />
+      </div>
+
+      {/* ── Scrollable body ── */}
+      <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.06)_transparent]">
+        <div className="px-5 pt-6 pb-8 space-y-7">
+
+          {/* Calendar Name */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-2.5">Calendar Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => { setName(e.target.value); setError(""); }}
-              placeholder="e.g. My Google Calendar, Work, Family"
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/22 outline-none focus:border-teal-400/30 transition-colors"
+              placeholder="e.g. Work, Family, Team Events"
+              className="w-full h-[48px] bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 text-[15px] text-white placeholder:text-white/20 outline-none focus:border-teal-400/30 focus:bg-white/[0.05] transition-colors"
             />
           </div>
 
-          {/* ICS URL */}
+          {/* Calendar Feed URL */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2">ICS Feed URL</label>
-            <div className="relative">
-              <Link2 size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-              <input
-                type="url"
-                value={icsUrl}
-                onChange={(e) => { setIcsUrl(e.target.value); setError(""); }}
-                placeholder="https://calendar.google.com/…/basic.ics"
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white placeholder:text-white/22 outline-none focus:border-teal-400/30 transition-colors"
-              />
-            </div>
-            <div className="mt-2.5 p-3 rounded-xl bg-white/[0.025] border border-white/[0.05]">
-              <p className="text-[10px] text-white/35 leading-relaxed">
-                <span className="text-white/50 font-medium">How to get your Google Calendar ICS URL:</span><br />
-                In Google Calendar → Settings → your calendar → "Secret address in iCal format"
-              </p>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-2.5">Calendar Feed URL</label>
+            <input
+              type="url"
+              value={icsUrl}
+              onChange={(e) => { setIcsUrl(e.target.value); setError(""); }}
+              placeholder="https://calendar.google.com/…/basic.ics"
+              className="w-full h-[48px] bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 text-[15px] text-white placeholder:text-white/20 outline-none focus:border-teal-400/30 focus:bg-white/[0.05] transition-colors"
+            />
+          </div>
+
+          {/* Provider guides — collapsible */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-2.5">Where to find your URL</label>
+            <div className="rounded-xl border border-white/[0.06] overflow-hidden">
+              {providerGuides.map(({ id, label, steps }, i) => {
+                const isOpen = openGuide === id;
+                return (
+                  <div key={id}>
+                    {i > 0 && <div className="h-px bg-white/[0.05]" />}
+                    <button
+                      onClick={() => setOpenGuide(isOpen ? null : id)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors text-left"
+                    >
+                      <span className="text-[13px] font-medium text-white/55">{label}</span>
+                      <ChevronDown size={14} className={`text-white/25 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 pb-4 -mt-1">
+                        <p className="text-[12px] text-white/35 leading-relaxed">{steps}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Color */}
+          {/* Calendar Color */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35 mb-2.5">Calendar Color</label>
-            <div className="flex gap-2.5">
+            <label className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/30 mb-3">Calendar Color</label>
+            <div className="flex gap-3">
               {IMPORT_COLORS.map(({ dot, label }) => (
                 <button
                   key={dot}
                   onClick={() => setColorDot(dot)}
                   title={label}
-                  className={`w-7 h-7 rounded-full transition-all ${dot} ${colorDot === dot ? "ring-2 ring-white/50 ring-offset-2 ring-offset-[#0f0f0f] scale-110" : "opacity-55 hover:opacity-80"}`}
+                  className={`w-8 h-8 rounded-full transition-all ${dot} ${colorDot === dot ? "ring-2 ring-white/50 ring-offset-2 ring-offset-[#0c0c0e] scale-110" : "opacity-45 hover:opacity-75"}`}
                 />
               ))}
             </div>
           </div>
 
-          {/* Note: read-only */}
-          <p className="text-[10px] text-white/28 leading-relaxed">
-            Imported calendars are <span className="text-white/42">read-only</span> — events will appear in your WAC calendar but are managed in the original app.
-          </p>
+          {/* Sync behavior */}
+          <div className="rounded-xl bg-white/[0.025] border border-white/[0.06] p-4">
+            <div className="flex items-start gap-3">
+              <RotateCcw size={14} className="text-teal-400/50 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[12px] font-medium text-white/50 mb-1">One-way sync</p>
+                <p className="text-[11px] text-white/30 leading-relaxed">
+                  WAC periodically re-fetches your calendar feed. Changes in the source app appear in WAC automatically. Connected calendars are read-only — events are managed in the source app.
+                </p>
+              </div>
+            </div>
+          </div>
 
-          {error && <p className="text-[11px] text-red-400/80">{error}</p>}
+          {/* Error */}
+          {error && (
+            <div className="rounded-xl bg-red-500/[0.06] border border-red-400/15 px-4 py-3">
+              <p className="text-[12px] text-red-400/80">{error}</p>
+            </div>
+          )}
         </div>
+      </div>
 
-        <div className="px-5 pb-6 pt-3 shrink-0 border-t border-white/[0.05]">
+      {/* ── Sticky footer ── */}
+      <div className="shrink-0 border-t border-white/[0.07] bg-[#0c0c0e] px-5 py-3 pb-[max(env(safe-area-inset-bottom,0px),12px)]">
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-[46px] rounded-xl bg-white/[0.06] hover:bg-white/[0.10] active:bg-white/[0.13] text-[14px] font-medium text-white/50 transition-colors"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSave}
-            className="w-full py-3 rounded-full bg-teal-500/[0.14] border border-teal-400/20 text-teal-400/90 text-sm font-semibold hover:bg-teal-500/[0.22] transition-colors">
-            Import Calendar
+            className="flex-[2] h-[46px] rounded-xl bg-teal-500/90 hover:bg-teal-500 active:bg-teal-400 text-[14px] font-semibold text-white transition-colors"
+          >
+            Connect Calendar
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ── CalendarModeView ──────────────────────────────────────────────────────────
 
-function CalendarModeView() {
+function CalendarModeView({
+  registerFilterTrigger,
+  onActiveSourceCountChange,
+}: {
+  registerFilterTrigger?: (fn: () => void) => void;
+  onActiveSourceCountChange?: (n: number) => void;
+}) {
   const router = useRouter();
   const today = new Date();
 
@@ -1805,34 +1992,55 @@ function CalendarModeView() {
   }, []);
 
   function switchCalView(v: CalViewMode) {
-    if (v === "week" && calView !== "week") {
+    if (v === "agenda" && calView !== "agenda") {
       setNavDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
-    } else if (v !== "week" && calView === "week") {
+    } else if (v === "month" && calView !== "month") {
       setNavDate(new Date(navDate.getFullYear(), navDate.getMonth(), 1));
     }
     setCalView(v);
     setSelectedDay(null);
     setSelDayIdx(null); setSelStartH(null); setSelEndH(null);
+    setMobileWeekDayIdx(null);
   }
 
   function prevPeriod() {
-    if (calView === "week") {
+    if (calView === "agenda") {
       setNavDate((d) => { const n = new Date(d); n.setDate(n.getDate() - 7); return n; });
+      setMobileWeekDayIdx(null);
     } else {
       setNavDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1));
     }
   }
   function nextPeriod() {
-    if (calView === "week") {
+    if (calView === "agenda") {
       setNavDate((d) => { const n = new Date(d); n.setDate(n.getDate() + 7); return n; });
+      setMobileWeekDayIdx(null);
     } else {
       setNavDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
     }
   }
 
-  const [activeSources, setActiveSources] = useState<Set<string>>(
-    buildCalendarSourceSet(DEFAULT_CALENDAR_SOURCE_PREFERENCES)
-  );
+  // ── Two-level source bucket state ──────────────────────────────────────────
+  const [sourceBuckets, setSourceBuckets] = useState<SourceBucketPreferences>(() => {
+    // Try loading from localStorage first
+    if (typeof window !== "undefined") {
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_BUCKET_KEY) || "null");
+        const parsed = deserializeBuckets(raw);
+        if (parsed) return parsed;
+      } catch { /* fallback to default */ }
+    }
+    return { ...DEFAULT_SOURCE_BUCKETS };
+  });
+
+  // Persist bucket preferences to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(LS_BUCKET_KEY, JSON.stringify(serializeBuckets(sourceBuckets)));
+  }, [sourceBuckets]);
+
+  // Derived: flat Set<string> for backward compat with all existing consumers
+  const activeSources = useMemo(() => bucketsToActiveSourceSet(sourceBuckets), [sourceBuckets]);
+
   const [calendarPrefsUserId, setCalendarPrefsUserId] = useState<string | null>(null);
   const [calendarPrefsReady, setCalendarPrefsReady] = useState(false);
   const [calendarEntitySubscriptions, setCalendarEntitySubscriptions] = useState<{
@@ -1849,12 +2057,37 @@ function CalendarModeView() {
     organizations: [],
     businesses: [],
   });
+  // Groups the user has joined (for calendar source drill-down)
+  const [savedGroupEntities, setSavedGroupEntities] = useState<SavedCalendarEntity[]>([]);
+
   const lastSavedCalendarPreferencesRef = useRef<string | null>(null);
+
+  // Toggle a core source bucket between all/off (simple toggle for desktop chips and quick controls)
   function toggleSource(id: string) {
-    setActiveSources((prev) => {
-      const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-    });
+    if (CORE_CALENDAR_SOURCE_IDS.includes(id as CalendarSourceFilter)) {
+      const key = id as CalendarSourceFilter;
+      setSourceBuckets((prev) => ({
+        ...prev,
+        [key]: { ...prev[key], mode: prev[key].mode === "off" ? (prev[key].selected.size > 0 ? "custom" : "all") : "off" },
+      }));
+    }
   }
+
+  // Set a specific bucket mode
+  function setBucketMode(key: CalendarSourceFilter, mode: SourceBucketMode) {
+    setSourceBuckets((prev) => ({ ...prev, [key]: { ...prev[key], mode } }));
+  }
+
+  // Update custom selection for a bucket
+  function setBucketCustomSelection(key: CalendarSourceFilter, selected: Set<string>) {
+    setSourceBuckets((prev) => ({
+      ...prev,
+      [key]: { mode: selected.size === 0 ? "off" : "custom", selected },
+    }));
+  }
+
+  // Drill-down state: which source bucket is being configured
+  const [drillDownSource, setDrillDownSource] = useState<CalendarSourceFilter | null>(null);
 
   const [showSourceSheet,  setShowSourceSheet]  = useState(false);
   const [showImportModal,  setShowImportModal]  = useState(false);
@@ -1871,11 +2104,8 @@ function CalendarModeView() {
 
       if (!userId) {
         lastSavedCalendarPreferencesRef.current = null;
-        setActiveSources((prev) => {
-          const next = new Set([...prev].filter((id) => !CORE_CALENDAR_SOURCE_IDS.includes(id as CalendarSourceFilter)));
-          buildCalendarSourceSet(DEFAULT_CALENDAR_SOURCE_PREFERENCES).forEach((id) => next.add(id));
-          return next;
-        });
+        // Reset to defaults for logged-out users
+        setSourceBuckets({ ...DEFAULT_SOURCE_BUCKETS });
         setCalendarPrefsReady(true);
         return;
       }
@@ -1892,13 +2122,22 @@ function CalendarModeView() {
         console.error("Failed to load calendar source preferences", error);
       }
 
+      // Load legacy flat prefs from DB and reconcile with local bucket state
       const preferences = normalizeCalendarSourcePreferences(data?.calendar_source_preferences);
       lastSavedCalendarPreferencesRef.current = data?.calendar_source_preferences
         ? JSON.stringify(preferences)
         : null;
-      setActiveSources((prev) => {
-        const next = new Set([...prev].filter((id) => !CORE_CALENDAR_SOURCE_IDS.includes(id as CalendarSourceFilter)));
-        buildCalendarSourceSet(preferences).forEach((id) => next.add(id));
+
+      // Merge DB on/off with local bucket modes — DB "off" → bucket off, DB "on" → keep existing bucket mode
+      setSourceBuckets((prev) => {
+        const next = { ...prev };
+        for (const key of CORE_CALENDAR_SOURCE_IDS) {
+          if (!preferences[key]) {
+            next[key] = { ...prev[key], mode: "off" };
+          } else if (prev[key].mode === "off") {
+            next[key] = { ...prev[key], mode: prev[key].selected.size > 0 ? "custom" : "all" };
+          }
+        }
         return next;
       });
       setCalendarPrefsReady(true);
@@ -1922,10 +2161,11 @@ function CalendarModeView() {
     };
   }, []);
 
+  // Persist bucket on/off state to Supabase as legacy flat preferences
   useEffect(() => {
     if (!calendarPrefsReady || !calendarPrefsUserId) return;
 
-    const calendarSourcePreferences = getCalendarSourcePreferencesFromSet(activeSources);
+    const calendarSourcePreferences = bucketsToLegacyPreferences(sourceBuckets);
     const serializedPreferences = JSON.stringify(calendarSourcePreferences);
     if (lastSavedCalendarPreferencesRef.current === serializedPreferences) return;
     lastSavedCalendarPreferencesRef.current = serializedPreferences;
@@ -1945,7 +2185,7 @@ function CalendarModeView() {
           console.error("Failed to save calendar source preferences", error);
         }
       });
-  }, [activeSources, calendarPrefsReady, calendarPrefsUserId]);
+  }, [sourceBuckets, calendarPrefsReady, calendarPrefsUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1960,39 +2200,44 @@ function CalendarModeView() {
           organizations: [],
           businesses: [],
         });
+        setSavedGroupEntities([]);
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_calendar_entity_subscriptions")
-        .select("entity_type, entity_id")
-        .eq("user_id", calendarPrefsUserId)
-        .in("entity_type", ["organization", "business"]);
+      // Fetch org/business subscriptions + group membership IDs in parallel
+      const [subsResult, groupMembersResult] = await Promise.all([
+        supabase
+          .from("user_calendar_entity_subscriptions")
+          .select("entity_type, entity_id")
+          .eq("user_id", calendarPrefsUserId)
+          .in("entity_type", ["organization", "business"]),
+        supabase
+          .from("group_members")
+          .select("group_id")
+          .eq("profile_id", calendarPrefsUserId),
+      ]);
 
       if (cancelled) return;
 
-      if (error) {
-        console.error("Failed to load calendar entity subscriptions", error);
-        setCalendarEntitySubscriptions({
-          organization: new Set(),
-          business: new Set(),
-        });
-        setSavedCalendarEntities({
-          organizations: [],
-          businesses: [],
-        });
-        return;
+      if (subsResult.error) {
+        console.error("Failed to load calendar entity subscriptions", subsResult.error);
+      }
+      if (groupMembersResult.error) {
+        console.error("Failed to load group memberships", groupMembersResult.error);
       }
 
       const organization = new Set<string>();
       const business = new Set<string>();
 
-      for (const row of data ?? []) {
+      for (const row of subsResult.data ?? []) {
         if (row.entity_type === "organization") organization.add(row.entity_id);
         if (row.entity_type === "business") business.add(row.entity_id);
       }
 
-      const [organizationDirectory, businessDirectory] = await Promise.all([
+      const groupIds = (groupMembersResult.data ?? []).map((r) => r.group_id).filter(Boolean);
+
+      // Fetch entity names for orgs, businesses, and groups
+      const [organizationDirectory, businessDirectory, groupsDirectory] = await Promise.all([
         organization.size > 0
           ? supabase
               .from("organizations_directory_v1")
@@ -2005,6 +2250,12 @@ function CalendarModeView() {
               .select("id, name")
               .in("id", Array.from(business))
           : Promise.resolve({ data: [], error: null }),
+        groupIds.length > 0
+          ? supabase
+              .from("groups")
+              .select("id, name")
+              .in("id", groupIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
       if (organizationDirectory.error) {
@@ -2012,6 +2263,9 @@ function CalendarModeView() {
       }
       if (businessDirectory.error) {
         console.error("Failed to load saved business calendars", businessDirectory.error);
+      }
+      if (groupsDirectory.error) {
+        console.error("Failed to load saved group calendars", groupsDirectory.error);
       }
 
       setCalendarEntitySubscriptions({ organization, business });
@@ -2027,6 +2281,9 @@ function CalendarModeView() {
           entityType: "business",
         })),
       });
+      setSavedGroupEntities(
+        (groupsDirectory.data ?? []).map((g) => ({ id: g.id, name: g.name, entityType: "group" as const }))
+      );
     }
 
     loadCalendarEntitySubscriptions();
@@ -2079,7 +2336,6 @@ function CalendarModeView() {
     const next = [...importedCals, cal];
     setImportedCals(next);
     saveImportedCals(next);
-    setActiveSources((prev) => { const s = new Set(prev); s.add(cal.id); return s; });
     setShowImportModal(false);
   }
 
@@ -2087,33 +2343,71 @@ function CalendarModeView() {
     const next = importedCals.filter((c) => c.id !== id);
     setImportedCals(next);
     saveImportedCals(next);
-    setActiveSources((prev) => { const s = new Set(prev); s.delete(id); return s; });
   }
 
-  const availableSourceIds = useMemo(
-    () => [
-      ...CORE_CALENDAR_SOURCE_IDS,
-      ...importedCals.map((calendar) => calendar.id),
-    ],
-    [importedCals]
-  );
-  const activeSourceCount = availableSourceIds.filter((id) => activeSources.has(id)).length;
-  const allSourcesActive = availableSourceIds.length > 0 && activeSourceCount === availableSourceIds.length;
+  // Counts for the source control panel
+  const activeSourceCount = CORE_CALENDAR_SOURCE_IDS.filter((id) => sourceBuckets[id].mode !== "off").length;
+  const allSourcesActive = activeSourceCount === CORE_CALENDAR_SOURCE_IDS.length;
   const anySourcesActive = activeSourceCount > 0;
 
+  // Register the filter sheet trigger so EventsPage's top-row button can open it
+  useEffect(() => {
+    registerFilterTrigger?.(() => setShowSourceSheet(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerFilterTrigger]);
+
+  // Report active source count upward so top-row button can show badge
+  useEffect(() => {
+    onActiveSourceCountChange?.(activeSourceCount);
+  }, [activeSourceCount, onActiveSourceCountChange]);
+
+  // Helper: get entity list for a given source bucket
+  function getEntitiesForBucket(key: CalendarSourceFilter): SavedCalendarEntity[] {
+    if (key === "org") return savedCalendarEntities.organizations;
+    if (key === "business") return savedCalendarEntities.businesses;
+    if (key === "group") return savedGroupEntities;
+    return []; // WAC has no sub-entities
+  }
+
+  // Summary label for a bucket row on the main screen
+  function bucketSummaryLabel(key: CalendarSourceFilter): string {
+    const bucket = sourceBuckets[key];
+    if (bucket.mode === "off") return "Off";
+    if (bucket.mode === "all") return "All";
+    if (key === "wac") return "On"; // WAC has no sub-entities
+    const entities = getEntitiesForBucket(key);
+    const total = entities.length;
+    if (total === 0) return "All";
+    const activeCount = entities.filter((e) => bucket.selected.has(e.id)).length;
+    return `${activeCount} of ${total}`;
+  }
+
   function showAllSources() {
-    setActiveSources(new Set(availableSourceIds));
+    setSourceBuckets((prev) => {
+      const next = { ...prev };
+      for (const key of CORE_CALENDAR_SOURCE_IDS) {
+        next[key] = { ...prev[key], mode: "all" };
+      }
+      return next;
+    });
   }
 
   function hideAllSources() {
-    setActiveSources(new Set());
+    setSourceBuckets((prev) => {
+      const next = { ...prev };
+      for (const key of CORE_CALENDAR_SOURCE_IDS) {
+        next[key] = { ...prev[key], mode: "off" };
+      }
+      return next;
+    });
   }
 
   // Navbar `+` in Calendar mode → open Quick Create
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [selDayIdx,   setSelDayIdx]   = useState<number | null>(null);
-  const [selStartH,   setSelStartH]   = useState<number | null>(null);
-  const [selEndH,     setSelEndH]     = useState<number | null>(null);
+  const [selectedDay,      setSelectedDay]      = useState<number | null>(null);
+  const [selDayIdx,        setSelDayIdx]        = useState<number | null>(null);
+  const [selStartH,        setSelStartH]        = useState<number | null>(null);
+  const [selEndH,          setSelEndH]          = useState<number | null>(null);
+  const [mobileWeekDayIdx, setMobileWeekDayIdx] = useState<number | null>(null);
   const isSelectingRef                = useRef(false);
 
   useEffect(() => {
@@ -2131,14 +2425,11 @@ function CalendarModeView() {
     let cancelled = false;
     async function fetchVisibleEvents() {
       let start: Date, end: Date;
-      if (calView === "week") {
+      if (calView === "agenda") {
+        // Agenda follows week context — fetch the current week's events
         const dow = navDate.getDay();
         start = new Date(navDate.getFullYear(), navDate.getMonth(), navDate.getDate() - dow, 0, 0, 0);
         end   = new Date(navDate.getFullYear(), navDate.getMonth(), navDate.getDate() - dow + 6, 23, 59, 59);
-      } else if (calView === "agenda") {
-        // Agenda follows the same month context as the nav header — not a fixed rolling window
-        start = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
-        end   = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 0, 23, 59, 59);
       } else {
         start = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
         end   = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 0, 23, 59, 59);
@@ -2395,24 +2686,33 @@ function CalendarModeView() {
     [weekStart]
   );
 
-  // Filter events by active calendar sources so toggles actually hide events
+  // Reset mobile week day selection when the week changes
+  useEffect(() => { setMobileWeekDayIdx(null); }, [weekStart.getTime()]);
+
+  // Filter events by two-level source bucket model
   const filteredCalEvents = useMemo(
     () =>
       calEvents.filter((ev) => {
-        if (!activeSources.has(sourceFilterId(ev.source))) return false;
-        if (!calendarPrefsUserId) return true;
-
-        if (ev.source_type === "organization") {
-          return !!ev.source_id && calendarEntitySubscriptions.organization.has(ev.source_id);
+        const bucketKey = sourceFilterId(ev.source);
+        const bucket = sourceBuckets[bucketKey];
+        // Level 1: bucket off → hide everything in this source
+        if (bucket.mode === "off") return false;
+        // Level 1: bucket all → show (with entity subscription check for logged-in users)
+        if (bucket.mode === "all") {
+          if (!calendarPrefsUserId) return true;
+          if (ev.source_type === "organization") {
+            return !!ev.source_id && calendarEntitySubscriptions.organization.has(ev.source_id);
+          }
+          if (ev.source_type === "business") {
+            return !!ev.source_id && calendarEntitySubscriptions.business.has(ev.source_id);
+          }
+          return true;
         }
-
-        if (ev.source_type === "business") {
-          return !!ev.source_id && calendarEntitySubscriptions.business.has(ev.source_id);
-        }
-
-        return true;
+        // Level 2: bucket custom → only show selected entity IDs
+        if (!ev.source_id) return false;
+        return bucket.selected.has(ev.source_id);
       }),
-    [calEvents, activeSources, calendarEntitySubscriptions, calendarPrefsUserId]
+    [calEvents, sourceBuckets, calendarEntitySubscriptions, calendarPrefsUserId]
   );
 
   // Map "YYYY-MM-DD" (local) → CalEvent[] for O(1) lookup in month + week cells
@@ -2430,21 +2730,12 @@ function CalendarModeView() {
   const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 
   const periodLabel =
-    calView === "week"
+    calView === "agenda"
       ? weekStart.getMonth() === weekEnd.getMonth()
         ? `${MONTH_NAMES[weekStart.getMonth()]} ${weekStart.getDate()}–${weekEnd.getDate()}, ${weekStart.getFullYear()}`
         : `${MONTH_NAMES[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTH_NAMES[weekEnd.getMonth()].slice(0,3)} ${weekEnd.getDate()}`
       : `${MONTH_NAMES[navDate.getMonth()]} ${navDate.getFullYear()}`;
 
-  const quickSourceControls = [
-    ...CAL_SOURCES.filter((source) => source.id !== "imported" && !source.disabled),
-    ...importedCals.map((calendar) => ({
-      id: calendar.id,
-      label: calendar.name,
-      dot: calendar.colorDot,
-      disabled: false,
-    })),
-  ];
   const visibleMonthLineCount = isCompactCalendar ? 5 : 7;
   const selectedDayAgenda = useMemo(() => {
     if (calView !== "month" || agendaDay === null) return null;
@@ -2466,96 +2757,54 @@ function CalendarModeView() {
   }
 
   return (
+    <>
     <div ref={calendarRegionRef} className="mt-2 md:mt-4 flex flex-col lg:flex-row gap-4 lg:gap-6 xl:gap-8 min-h-[calc(100vh-240px)] scroll-mt-24">
 
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Toolbar */}
-        <div className="sticky top-[64px] sm:top-[72px] z-20 mb-3 space-y-3 rounded-2xl border border-white/[0.06] bg-[var(--background)]/92 px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3">
-          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <button onClick={prevPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
-                  <ChevronLeft size={15} />
-                </button>
-                <span className="text-[15px] font-semibold text-white/85 min-w-0 sm:min-w-[170px] text-center tracking-tight truncate">{periodLabel}</span>
-                <button onClick={nextPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 xl:hidden" />}
-            </div>
+        <div className="sticky top-[64px] sm:top-[72px] z-20 mb-3 space-y-2 rounded-2xl border border-white/[0.06] bg-[var(--background)]/92 px-3 py-2.5 backdrop-blur-xl sm:px-4 sm:py-3">
 
-            <div className="flex items-center gap-2">
-              {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 hidden xl:block" />}
-              {/* Mobile source filter — sidebar is hidden on mobile */}
-              <button
-                onClick={() => setShowSourceSheet(true)}
-                className={`lg:hidden relative w-9 h-9 flex items-center justify-center rounded-xl border transition-colors shrink-0 ${
-                  activeSourceCount < availableSourceIds.length
-                    ? "bg-teal-500/[0.12] border-teal-400/20 text-teal-400/80"
-                    : "border-white/[0.09] text-white/35 hover:text-white/65 hover:border-white/18"
-                }`}>
-                <SlidersHorizontal size={13} />
-                <span className="absolute -right-1 -top-1 min-w-[16px] rounded-full border border-[var(--background)] bg-white/[0.14] px-1 py-[1px] text-[8px] font-semibold leading-none text-white/70">
-                  {activeSourceCount}
-                </span>
+          {/* ── Nav row: prev / period label / next + filter button (mobile) ── */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <button onClick={prevPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
+                <ChevronLeft size={15} />
               </button>
-              <div className="grid flex-1 grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-1 min-w-0">
-                {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
-                  const active = calView === id;
-                  return (
-                    <button key={id} onClick={() => switchCalView(id)}
-                      className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] sm:text-xs font-medium transition-all ${
-                        active ? "bg-white/[0.09] text-white/85 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" : "text-white/38 hover:text-white/65"
-                      }`}>
-                      <Icon size={11} className="shrink-0" />
-                      <span className="truncate">{label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <span className="flex-1 text-[14px] font-semibold text-white/85 text-center tracking-tight truncate">{periodLabel}</span>
+              <button onClick={nextPeriod} className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/[0.09] text-white/40 hover:text-white/75 hover:border-white/[0.18] transition-colors shrink-0">
+                <ChevronRight size={15} />
+              </button>
             </div>
+            {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 hidden lg:block" />}
+            {/* Filter button moved to top-row mode selector in EventsPage */}
+            {eventsLoading && <Loader2 size={12} className="animate-spin text-[var(--accent)] shrink-0 lg:hidden" />}
           </div>
 
-          <div className="space-y-2">
-            <div className="hidden sm:flex items-center justify-between gap-3">
-              <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-white/28">
-                {activeSourceCount}/{availableSourceIds.length} sources active
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={showAllSources}
-                  disabled={allSourcesActive}
-                  className="rounded-full border border-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/42 transition-colors hover:text-white/68 hover:border-white/[0.14] disabled:cursor-default disabled:opacity-35"
-                >
-                  All
+          {/* ── View switcher — full-width segmented control ── */}
+          <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/[0.07] bg-white/[0.04] p-1">
+            {CAL_VIEW_TABS.map(({ id, label, icon: Icon }) => {
+              const active = calView === id;
+              return (
+                <button key={id} onClick={() => switchCalView(id)}
+                  className={`flex min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] sm:text-xs font-medium transition-all ${
+                    active ? "bg-white/[0.09] text-white/85 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" : "text-white/38 hover:text-white/65"
+                  }`}>
+                  <Icon size={11} className="shrink-0" />
+                  <span className="truncate">{label}</span>
                 </button>
-                <button
-                  onClick={hideAllSources}
-                  disabled={!anySourcesActive}
-                  className="rounded-full border border-white/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/42 transition-colors hover:text-white/68 hover:border-white/[0.14] disabled:cursor-default disabled:opacity-35"
-                >
-                  None
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {quickSourceControls.map(({ id, label, dot }) => {
-                const active = activeSources.has(id);
-                return (
-                  <button
-                    key={id}
-                    onClick={() => toggleSource(id)}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                      active
-                        ? "border-white/[0.14] bg-white/[0.08] text-white/75"
-                        : "border-white/[0.08] bg-transparent text-white/32 hover:text-white/55 hover:border-white/[0.14]"
-                    }`}
-                  >
-                    <span className={`h-2 w-2 rounded-full shrink-0 ${dot} ${active ? "opacity-80" : "opacity-35"}`} />
-                    <span className="truncate max-w-[88px] sm:max-w-[110px]">{sourceLabelForChip(id, label)}</span>
-                  </button>
-                );
+              );
+            })}
+          </div>
+
+          {/* ── Compact source summary — desktop only ── */}
+          <div className="hidden lg:flex items-center gap-2 pt-0.5">
+            <span className="text-[10px] text-white/28">
+              Sources: {activeSourceCount} active
+            </span>
+            <div className="flex items-center gap-1">
+              {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, dot }) => {
+                const isActive = sourceBuckets[id as CalendarSourceFilter].mode !== "off";
+                return <span key={id} className={`w-1.5 h-1.5 rounded-full ${dot} ${isActive ? "opacity-65" : "opacity-15"} transition-opacity`} />;
               })}
             </div>
           </div>
@@ -2718,205 +2967,139 @@ function CalendarModeView() {
           </>
         )}
 
-        {/* Week */}
-        {calView === "week" && (
-          <>
-            <div className="wac-card p-0 overflow-hidden select-none"
-              onMouseUp={handleGridMouseUp} onMouseLeave={handleGridMouseUp}>
-              <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="min-w-[720px]">
-                  <div className="grid border-b border-white/[0.05]" style={{ gridTemplateColumns: "3.5rem repeat(7, minmax(5.75rem, 1fr))" }}>
-                    <div className="sticky left-0 z-10 bg-[var(--background)]" />
-                    {weekDays.map((d, i) => {
-                      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                      const isToday = key === todayKey;
-                      return (
-                        <div key={i} className="py-2 text-center">
-                          <div className="text-[9px] font-semibold tracking-wider text-white/25 uppercase">{DAY_ABBREVS[d.getDay()]}</div>
-                          <div className={`text-sm font-semibold mt-0.5 ${isToday ? "text-teal-400" : "text-white/45"}`}>{d.getDate()}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="overflow-y-auto max-h-[470px] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    {WEEK_HOURS.map((hour) => (
-                      <div key={hour} className="grid border-b border-white/[0.03] last:border-0" style={{ gridTemplateColumns: "3.5rem repeat(7, minmax(5.75rem, 1fr))" }}>
-                        <div className="sticky left-0 z-10 bg-[var(--background)] px-2 pt-1.5 text-right text-[10px] text-white/20 leading-none shrink-0">{formatHour(hour)}</div>
-                        {weekDays.map((d, dayIdx) => {
-                          const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                          const slotEvs = (eventsMap.get(dk) ?? []).filter(
-                            (ev) => new Date(ev.start_time).getHours() === hour
-                          );
-                          return (
-                            <div key={dayIdx}
-                              onMouseDown={(e) => handleSlotMouseDown(dayIdx, hour, e)}
-                              onMouseEnter={() => handleSlotMouseEnter(dayIdx, hour)}
-                              className={`relative h-11 border-l border-white/[0.03] cursor-pointer transition-colors overflow-hidden ${
-                                isSlotSelected(dayIdx, hour) ? "bg-teal-500/[0.14]" : "hover:bg-white/[0.04]"
-                              }`}
-                            >
-                              {slotEvs.map((ev) => {
-                                const c = eventColors(ev.source);
-                                const badge = getEventMetaBadge(ev);
-                                return (
-                                  <button key={ev.id}
-                                    onClick={(e) => { e.stopPropagation(); openEventDetail(ev); }}
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    className={`absolute inset-x-[2px] top-[2px] bottom-[2px] ${c.bg} border ${c.border} rounded px-1 flex items-center ${c.hover} transition-colors z-10`}>
-                                    <span className={`mr-1 h-1.5 w-1.5 shrink-0 rounded-full ${c.dot} opacity-85`} />
-                                    <span className={`text-[8px] font-semibold ${c.text} truncate leading-none`}>{ev.title}</span>
-                                    {badge && (
-                                      <span className={`ml-1 shrink-0 rounded px-1 py-[1px] text-[7px] leading-none ${badge.className}`}>
-                                        {badge.label}
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-2 px-1 sm:hidden">
-              <p className="text-[10px] text-white/22">Swipe sideways to browse the full week without squeezing each day.</p>
-            </div>
-            <div className="mt-2 py-2 px-3 rounded-xl border border-dashed border-white/[0.06] hidden sm:block">
-              <p className="text-xs text-white/28">Click and drag on any column to select a time range and create an event.</p>
-            </div>
+        {/* Agenda — weekly day selector + selected day agenda */}
+        {calView === "agenda" && (
+          <div className="space-y-3">
+            {/* ── Horizontal week day selector strip ── */}
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+              {weekDays.map((d, i) => {
+                const dayKey   = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                const evMapKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                const isToday  = dayKey === todayKey;
+                const todayInWeek = weekDays.some((wd) => `${wd.getFullYear()}-${wd.getMonth()}-${wd.getDate()}` === todayKey);
+                const isSelected = mobileWeekDayIdx === i || (mobileWeekDayIdx === null && isToday) || (mobileWeekDayIdx === null && !todayInWeek && i === 0);
+                const dayEvs = eventsMap.get(evMapKey) ?? [];
 
-            {/* Mobile: compact event summary strip */}
-            <MobileEventStrip
-              label="This Week"
-              events={filteredCalEvents}
-              loading={eventsLoading}
-              onOpen={openEventDetail}
-            />
-          </>
-        )}
-
-        {/* Agenda — grouped by date, follows navDate month range */}
-        {calView === "agenda" && (() => {
-          if (eventsLoading) return (
-            <div className="wac-card p-14 flex items-center justify-center">
-              <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
-            </div>
-          );
-
-          // Group events by local date key, preserving chronological order
-          const dayGroups = new Map<string, CalEvent[]>();
-          for (const ev of filteredCalEvents) {
-            const dk = localDateKey(ev.start_time);
-            if (!dayGroups.has(dk)) dayGroups.set(dk, []);
-            dayGroups.get(dk)!.push(ev);
-          }
-
-          if (dayGroups.size === 0) return (
-            <div className="wac-card p-14 text-center">
-              <AlignJustify size={20} className="text-white/15 mx-auto mb-3" />
-              <p className="text-white/35 text-sm font-medium">
-                No events in {MONTH_NAMES[navDate.getMonth()]} {navDate.getFullYear()}
-              </p>
-              <p className="text-white/20 text-xs mt-1">
-                Create an event or navigate to another month.
-              </p>
-            </div>
-          );
-
-          const _today = new Date();
-          const p2 = (n: number) => String(n).padStart(2, "0");
-          const todayKey = `${_today.getFullYear()}-${p2(_today.getMonth() + 1)}-${p2(_today.getDate())}`;
-
-          return (
-            <div className="space-y-3 sm:space-y-4">
-              {[...dayGroups.entries()].map(([dk, dayEvs]) => {
-                const dayDate   = new Date(dayEvs[0].start_time);
-                const isToday   = dk === todayKey;
-                const isPast    = dk < todayKey;
-                const dayLabel  = dayDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+                // Build source dots (max 3, deduplicated by source type)
+                const sourceDots: string[] = [];
+                const seenSources = new Set<string>();
+                for (const ev of dayEvs) {
+                  const src = ev.source ?? "wac";
+                  if (!seenSources.has(src) && sourceDots.length < 3) {
+                    seenSources.add(src);
+                    const c = eventColors(ev.source);
+                    sourceDots.push(c.dot);
+                  }
+                }
 
                 return (
-                  <div key={dk} className="mb-4">
-
-                    {/* Date divider header */}
-                    <div className="flex items-center gap-3 mb-2">
-                      {isToday ? (
-                        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-teal-400 px-2 py-0.5 bg-teal-500/10 border border-teal-400/20 rounded-full">
-                          Today · {dayLabel}
-                        </span>
-                      ) : (
-                        <span className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${isPast ? "text-white/22" : "text-white/35"}`}>
-                          {dayLabel}
-                        </span>
-                      )}
-                      <div className={`flex-1 h-px ${isPast ? "bg-white/[0.04]" : "bg-white/[0.07]"}`} />
+                  <button key={i} onClick={() => setMobileWeekDayIdx(i)}
+                    className={`flex flex-col items-center gap-1.5 pt-3 pb-2.5 sm:pt-3.5 sm:pb-3 rounded-xl border transition-all ${
+                      isSelected
+                        ? "bg-teal-500/[0.10] border-teal-400/25 shadow-[0_0_12px_rgba(20,184,166,0.06)]"
+                        : isToday
+                        ? "border-teal-400/20 bg-teal-500/[0.03]"
+                        : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12]"
+                    }`}>
+                    <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider leading-none ${isSelected ? "text-teal-400/80" : isToday ? "text-teal-400/55" : "text-white/30"}`}>
+                      {DAY_ABBREVS[d.getDay()]}
+                    </span>
+                    <span className={`text-[20px] sm:text-[22px] font-semibold leading-tight ${isSelected ? "text-teal-300" : isToday ? "text-teal-400" : "text-white/55"}`}>
+                      {d.getDate()}
+                    </span>
+                    {/* Source-colored event dots (max 3) */}
+                    <div className="flex items-center gap-1 h-2.5">
+                      {sourceDots.length > 0
+                        ? sourceDots.map((dotClass, di) => (
+                            <span key={di} className={`w-[6px] h-[6px] rounded-full ${dotClass} ${isSelected ? "opacity-80" : "opacity-45"} transition-opacity`} />
+                          ))
+                        : <span className="w-[6px] h-[6px] rounded-full bg-transparent" />
+                      }
                     </div>
+                  </button>
+                );
+              })}
+            </div>
 
-                    {/* Events for this day */}
-                    <div className="space-y-2 pl-0">
+            {/* ── Selected day agenda ── */}
+            {(() => {
+              const todayInWeek = weekDays.findIndex((wd) => `${wd.getFullYear()}-${wd.getMonth()}-${wd.getDate()}` === todayKey);
+              const safeIdx     = mobileWeekDayIdx !== null ? mobileWeekDayIdx : todayInWeek >= 0 ? todayInWeek : 0;
+              const selDay      = weekDays[safeIdx];
+              const dayKey      = `${selDay.getFullYear()}-${selDay.getMonth()}-${selDay.getDate()}`;
+              const evMapKey    = `${selDay.getFullYear()}-${String(selDay.getMonth() + 1).padStart(2, "0")}-${String(selDay.getDate()).padStart(2, "0")}`;
+              const isToday     = dayKey === todayKey;
+              const dayEvs      = eventsMap.get(evMapKey) ?? [];
+              const dayLabel    = selDay.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+              return (
+                <div className="wac-card p-0 overflow-hidden min-h-[280px] flex flex-col">
+                  {/* Day header */}
+                  <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.05] shrink-0">
+                    <div>
+                      <p className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${isToday ? "text-teal-400" : "text-white/38"}`}>
+                        {isToday ? "Today" : DAY_ABBREVS[selDay.getDay()]}
+                      </p>
+                      <p className="text-[13px] font-medium text-white/60 mt-0.5">{dayLabel}</p>
+                    </div>
+                    <button
+                      onClick={() => openCreateEventPage(makeDraft(selDay))}
+                      className="flex items-center gap-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-2.5 py-1 text-[11px] text-white/45 hover:text-white/75 transition-colors"
+                    >
+                      <Plus size={10} />
+                      Add
+                    </button>
+                  </div>
+                  {/* Day events */}
+                  {eventsLoading ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <Loader2 size={16} className="animate-spin text-[var(--accent)]" />
+                    </div>
+                  ) : dayEvs.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center px-4">
+                      <p className="text-[12px] text-white/28">No events scheduled</p>
+                      <p className="text-[10px] text-white/18 mt-1">Tap Add to create one</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-white/[0.04] flex-1">
                       {dayEvs.map((ev) => {
-                        const c         = eventColors(ev.source);
+                        const c = eventColors(ev.source);
+                        const badge = getEventMetaBadge(ev);
+                        const timeLabel = new Date(ev.start_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+                        const endLabel = ev.end_time ? new Date(ev.end_time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
                         const sourceLabel = eventSourceLabel(ev.source);
-                        const badge     = getEventMetaBadge(ev);
-                        const evStart   = new Date(ev.start_time);
-                        const evEnd     = ev.end_time ? new Date(ev.end_time) : null;
-                        const timeLabel = evStart.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-                        const endLabel  = evEnd?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
                         return (
-                          <button key={ev.id} onClick={() => openEventDetail(ev)}
-                            className={`w-full overflow-hidden rounded-xl border border-white/[0.07] text-left transition-colors hover:border-white/[0.14] ${isPast ? "opacity-55 hover:opacity-80" : ""}`}>
-                            {/* Relationship color bar */}
-                            <div className={`h-[3px] w-full ${c.rule} sm:h-auto sm:w-[3px] sm:shrink-0`} />
-                            <div className="flex flex-col sm:flex-row sm:items-stretch">
-                              {/* Time column */}
-                              <div className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-3 py-2 sm:w-[70px] sm:shrink-0 sm:flex-col sm:justify-center sm:border-b-0 sm:border-r sm:px-2.5">
-                                <div className="flex items-center gap-2 sm:block">
-                                  <span className="text-[10px] font-semibold leading-none text-white/50">{timeLabel}</span>
-                                  {endLabel && <span className="text-[9px] leading-none text-white/28 sm:mt-0.5 sm:block">{endLabel}</span>}
-                                </div>
-                                <div className={`h-2 w-2 rounded-full ${c.dot} opacity-40 sm:hidden`} />
+                          <button key={ev.id}
+                            onClick={() => openEventDetail(ev)}
+                            className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.03]"
+                          >
+                            <div className={`h-11 w-1 shrink-0 rounded-full ${c.rule}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <p className={`text-[13px] font-medium leading-snug truncate ${c.text}`}>{ev.title}</p>
+                                {badge && (
+                                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none ${badge.className}`}>
+                                    {badge.label}
+                                  </span>
+                                )}
                               </div>
-                              {/* Content */}
-                              <div className="flex min-w-0 flex-1 items-start justify-between gap-2.5 px-3 py-2.5 sm:px-3.5">
-                                <div className="min-w-0">
-                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                    <div className={`truncate text-[13px] font-semibold leading-snug ${c.text}`}>{ev.title}</div>
-                                    {badge && (
-                                      <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-semibold leading-none ${badge.className}`}>
-                                        {badge.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="mt-0.5 flex items-center gap-1.5">
-                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.dot} opacity-85`} />
-                                    <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-white/24">{sourceLabel}</span>
-                                  </div>
-                                  {ev.location && (
-                                    <div className="mt-0.5 flex items-center gap-1">
-                                      <MapPin size={9} className="shrink-0 text-white/25" />
-                                      <span className="truncate text-[10px] text-white/30">{ev.location}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                {/* Source dot */}
-                                <div className={`hidden h-2 w-2 rounded-full shrink-0 ${c.dot} opacity-40 sm:block`} />
+                              <p className="mt-0.5 text-[10px] text-white/35">
+                                {timeLabel}{endLabel ? ` – ${endLabel}` : ""}{ev.location ? ` · ${ev.location}` : ""}
+                              </p>
+                              <div className="mt-0.5 flex items-center gap-1.5">
+                                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${c.dot} opacity-85`} />
+                                <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-white/22">{sourceLabel}</span>
                               </div>
                             </div>
                           </button>
                         );
                       })}
                     </div>
-
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Sidebar — desktop only; mobile uses toolbar + button for actions */}
@@ -2996,140 +3179,190 @@ function CalendarModeView() {
           </div>
         )}
 
-        {/* Source legend */}
+        {/* ── Source Manager ── */}
         <div className="wac-card p-4">
+          {/* Header */}
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Sources</div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-3">
               <button
                 onClick={showAllSources}
                 disabled={allSourcesActive}
-                className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/24 transition-colors hover:text-white/48 disabled:cursor-default disabled:opacity-30"
+                className="text-[9.5px] text-white/30 transition-colors hover:text-white/55 disabled:cursor-default disabled:opacity-30"
               >
-                All
+                Select all
               </button>
               <button
                 onClick={hideAllSources}
                 disabled={!anySourcesActive}
-                className="text-[9px] font-semibold uppercase tracking-[0.08em] text-white/24 transition-colors hover:text-white/48 disabled:cursor-default disabled:opacity-30"
+                className="text-[9.5px] text-white/30 transition-colors hover:text-white/55 disabled:cursor-default disabled:opacity-30"
               >
-                None
+                Clear all
               </button>
             </div>
           </div>
-          <div className="mb-3 text-[10px] text-white/22">
-            {activeSourceCount} of {availableSourceIds.length} shown
-          </div>
-          <div className="space-y-2.5">
-            {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {
-              const active = !disabled && activeSources.has(id);
-              return (
-                <button key={id} onClick={() => !disabled && toggleSource(id)}
-                  disabled={disabled}
-                  className={`w-full flex items-center gap-2.5 text-left ${disabled ? "cursor-default" : "group"}`}>
-                  <span className={`w-2 h-2 rounded-full shrink-0 transition-opacity ${dot} ${active ? "opacity-75" : "opacity-18"}`} />
-                  <span className={`text-[11px] transition-colors ${active ? "text-white/55" : "text-white/22"}`}>{label}</span>
-                </button>
-              );
-            })}
 
-            {/* Imported calendars section */}
-            {importedCals.length > 0 && (
-              <>
-                <div className="border-t border-white/[0.06] pt-2.5 mt-1">
-                  <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20 mb-2">Imported</div>
-                  {importedCals.map((cal) => {
-                    const active = activeSources.has(cal.id);
-                    return (
-                      <div key={cal.id} className="flex items-center gap-2.5 group mb-2">
-                        <button onClick={() => toggleSource(cal.id)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
-                          <span className={`w-2 h-2 rounded-full shrink-0 transition-opacity ${cal.colorDot} ${active ? "opacity-75" : "opacity-18"}`} />
-                          <span className={`text-[11px] truncate transition-colors ${active ? "text-white/55" : "text-white/22"}`}>{cal.name}</span>
+          {/* ── WAC Master ── */}
+          {(() => {
+            const wacBucket = sourceBuckets.wac;
+            const wacActive = wacBucket.mode !== "off";
+            return (
+              <div className="py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full shrink-0 bg-white/55 ${wacActive ? "opacity-75" : "opacity-18"} transition-opacity`} />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-[11px] font-medium transition-colors ${wacActive ? "text-white/65" : "text-white/25"}`}>WAC Master</div>
+                    <div className={`text-[9.5px] mt-0.5 transition-colors ${wacActive ? "text-white/28" : "text-white/14"}`}>Official WAC events and platform-wide dates</div>
+                  </div>
+                  <button onClick={() => toggleSource("wac")} className="shrink-0">
+                    <div className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-200 ${wacActive ? "bg-teal-500/90" : "bg-white/[0.08]"}`}>
+                      <span className={`absolute top-[3px] w-[14px] h-[14px] rounded-full shadow-sm transition-all duration-200 ${wacActive ? "left-[19px] bg-white" : "left-[3px] bg-white/40"}`} />
+                    </div>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="border-t border-white/[0.05]" />
+
+          {/* ── Source buckets ── */}
+          {(["group", "org", "business"] as CalSource[]).map((key) => {
+            const source = CAL_SOURCES.find((s) => s.id === key)!;
+            const bucket = sourceBuckets[key];
+            const isActive = bucket.mode !== "off";
+            const entities = getEntitiesForBucket(key);
+            const statusText = bucket.mode === "off" ? "" : bucket.mode === "all" ? (entities.length > 0 ? `All · ${entities.length}` : "") : `Custom · ${bucket.selected.size}`;
+            const sourceDesc = key === "group" ? "Calendars from groups you follow" : key === "org" ? "Calendars from organizations you follow" : "Calendars from businesses you follow";
+            const emptyLabel = key === "group" ? "No group calendars yet" : key === "org" ? "No organization calendars yet" : "No business calendars yet";
+            const ctaLabel = key === "group" ? "Find groups" : key === "org" ? "Find organizations" : "Find businesses";
+            const ctaHref = key === "group" ? "/groups" : key === "org" ? "/organizations" : "/businesses";
+
+            return (
+              <div key={key} className="py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${source.dot} ${isActive ? "opacity-75" : "opacity-18"} transition-opacity`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[11px] font-medium transition-colors ${isActive ? "text-white/65" : "text-white/25"}`}>{source.label}</span>
+                      {statusText && (
+                        <span className={`text-[9px] font-medium ${bucket.mode === "custom" ? "text-teal-400/50" : "text-white/20"}`}>{statusText}</span>
+                      )}
+                    </div>
+                    <div className={`text-[9.5px] mt-0.5 transition-colors ${isActive ? "text-white/28" : "text-white/14"}`}>{sourceDesc}</div>
+                  </div>
+                  <button onClick={() => toggleSource(key)} className="shrink-0">
+                    <div className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-200 ${isActive ? "bg-teal-500/90" : "bg-white/[0.08]"}`}>
+                      <span className={`absolute top-[3px] w-[14px] h-[14px] rounded-full shadow-sm transition-all duration-200 ${isActive ? "left-[19px] bg-white" : "left-[3px] bg-white/40"}`} />
+                    </div>
+                  </button>
+                </div>
+
+                {/* Inline entity list when bucket is active */}
+                {isActive && entities.length > 0 && (
+                  <div className="mt-2 ml-[18px] space-y-0.5">
+                    {entities.map((entity) => {
+                      const isSelected = bucket.mode === "all" || bucket.selected.has(entity.id);
+                      return (
+                        <button
+                          key={entity.id}
+                          onClick={() => {
+                            if (bucket.mode === "all") {
+                              const selected = new Set(entities.map((e) => e.id));
+                              selected.delete(entity.id);
+                              setBucketCustomSelection(key, selected);
+                            } else {
+                              const next = new Set(bucket.selected);
+                              if (isSelected) next.delete(entity.id); else next.add(entity.id);
+                              setBucketCustomSelection(key, next);
+                            }
+                          }}
+                          className="w-full flex items-center gap-2 py-1 text-left group"
+                        >
+                          <div className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition-colors ${
+                            isSelected ? "bg-teal-500/80" : "border border-white/[0.12] bg-white/[0.03]"
+                          }`}>
+                            {isSelected && <Check size={9} className="text-white" />}
+                          </div>
+                          <span className={`text-[10px] truncate flex-1 transition-colors ${isSelected ? "text-white/50" : "text-white/22"}`}>
+                            {entity.name}
+                          </span>
                         </button>
-                        <button onClick={() => removeImportedCal(cal.id)} className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400/70 transition-all shrink-0">
-                          <Trash2 size={10} />
+                      );
+                    })}
+                    {bucket.mode === "custom" && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => setBucketMode(key, "all")}
+                          className="text-[9px] font-medium text-white/22 hover:text-white/45 transition-colors"
+                        >
+                          Select all
+                        </button>
+                        <button
+                          onClick={() => setBucketCustomSelection(key, new Set())}
+                          className="text-[9px] font-medium text-white/22 hover:text-white/45 transition-colors"
+                        >
+                          Clear
                         </button>
                       </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Add Calendar */}
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="mt-4 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.07] text-[10px] font-semibold text-white/28 hover:text-white/55 hover:border-white/14 transition-colors">
-            <Plus size={10} />Add Calendar
-          </button>
-        </div>
-
-        {calendarPrefsUserId && (
-          <div className="wac-card p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25">Saved Calendars</div>
-              {hasSavedCalendars && (
-                <div className="text-[9px] text-white/20">
-                  {savedCalendarEntities.organizations.length + savedCalendarEntities.businesses.length}
-                </div>
-              )}
-            </div>
-            {!hasSavedCalendars ? (
-              <p className="text-[11px] text-white/22 leading-relaxed">
-                Follow an organization or business and add its calendar to see it here.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {savedCalendarEntities.organizations.length > 0 && (
-                  <div>
-                    <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Organizations</div>
-                    <div className="space-y-2">
-                      {savedCalendarEntities.organizations.map((entity) => (
-                        <div key={entity.id} className="flex items-center gap-2">
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 opacity-70" />
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-white/52">{entity.name}</span>
-                          <button
-                            onClick={() => void removeSavedCalendar(entity)}
-                            className="shrink-0 text-white/20 transition-colors hover:text-red-400/70"
-                            title="Remove saved calendar"
-                          >
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                    )}
                   </div>
                 )}
-                {savedCalendarEntities.businesses.length > 0 && (
-                  <div className={savedCalendarEntities.organizations.length > 0 ? "border-t border-white/[0.06] pt-3" : ""}>
-                    <div className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Businesses</div>
-                    <div className="space-y-2">
-                      {savedCalendarEntities.businesses.map((entity) => (
-                        <div key={entity.id} className="flex items-center gap-2">
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-400 opacity-70" />
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-white/52">{entity.name}</span>
-                          <button
-                            onClick={() => void removeSavedCalendar(entity)}
-                            className="shrink-0 text-white/20 transition-colors hover:text-red-400/70"
-                            title="Remove saved calendar"
-                          >
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+
+                {/* Empty state */}
+                {isActive && entities.length === 0 && (
+                  <div className="mt-2 ml-[18px]">
+                    <p className="text-[10px] text-white/20">{emptyLabel}</p>
+                    <Link
+                      href={ctaHref}
+                      className="inline-block mt-1 text-[9.5px] font-medium text-teal-400/50 hover:text-teal-400/75 transition-colors"
+                    >
+                      {ctaLabel} →
+                    </Link>
                   </div>
                 )}
+
+                {key !== "business" && <div className="border-t border-white/[0.05] mt-2.5" />}
               </div>
+            );
+          })}
+
+          {/* ── External Calendars ── */}
+          <div className="border-t border-white/[0.05] mt-1 pt-3">
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className="w-2 h-2 rounded-full shrink-0 bg-purple-400/60" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-white/50">External Calendars</div>
+                <div className="text-[9.5px] mt-0.5 text-white/22">Connected personal or imported calendars</div>
+              </div>
+            </div>
+            {importedCals.length > 0 ? (
+              <div className="space-y-1.5 ml-[18px] mb-3">
+                {importedCals.map((cal) => (
+                  <div key={cal.id} className="flex items-center gap-2 group">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${cal.colorDot} opacity-75`} />
+                    <span className="text-[10px] truncate text-white/50 flex-1">{cal.name}</span>
+                    <button onClick={() => removeImportedCal(cal.id)} className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400/70 transition-all shrink-0">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-white/18 ml-[18px] mb-2.5">No external calendars connected</p>
             )}
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-white/[0.07] text-[10px] font-medium text-white/30 hover:text-white/55 hover:border-white/14 transition-colors">
+              <Plus size={10} />Connect Calendar
+            </button>
           </div>
-        )}
+        </div>
 
         {/* This period's events — real data from calendar fetch */}
         <div className="wac-card p-4">
           <div className="text-[10px] font-semibold tracking-[0.14em] uppercase text-white/25 mb-3">
-            {calView === "week" ? "This Week" : `${MONTH_NAMES[navDate.getMonth()]}`}
+            {calView === "agenda" ? "This Week" : `${MONTH_NAMES[navDate.getMonth()]}`}
           </div>
           {calEvents.length === 0 ? (
             <p className="text-[11px] text-white/22 leading-relaxed">
@@ -3171,169 +3404,361 @@ function CalendarModeView() {
 
       </div>
 
-      {/* Mobile: Sources filter bottom sheet */}
-      {showSourceSheet && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setShowSourceSheet(false)} />
-          <div className="relative z-10 w-full bg-[#0e0e0e] border-t border-white/[0.09] rounded-t-2xl shadow-2xl pb-[max(env(safe-area-inset-bottom,0px),20px)]">
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-9 h-[3px] rounded-full bg-white/[0.12]" />
-            </div>
-            <div className="px-5 pt-3 pb-5">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/30">Calendar Sources</span>
-                <button onClick={() => setShowSourceSheet(false)} className="text-white/25 hover:text-white/55 transition-colors">
-                  <X size={14} />
-                </button>
-              </div>
-              <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                <span className="text-[11px] text-white/42">
-                  {activeSourceCount} of {availableSourceIds.length} sources active
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={showAllSources}
-                    disabled={allSourcesActive}
-                    className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/38 transition-colors hover:text-white/62 disabled:cursor-default disabled:opacity-30"
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={hideAllSources}
-                    disabled={!anySourcesActive}
-                    className="text-[10px] font-semibold uppercase tracking-[0.08em] text-white/38 transition-colors hover:text-white/62 disabled:cursor-default disabled:opacity-30"
-                  >
-                    None
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-4">
-                {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot, disabled }) => {
-                  const active = !disabled && activeSources.has(id);
-                  return (
-                    <button key={id} onClick={() => !disabled && toggleSource(id)}
-                      disabled={disabled}
-                      className={`w-full flex items-center gap-3 text-left ${disabled ? "opacity-40 cursor-default" : ""}`}>
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-opacity ${dot} ${active ? "opacity-75" : "opacity-18"}`} />
-                      <span className={`text-[13px] flex-1 transition-colors ${active ? "text-white/65" : "text-white/28"}`}>{label}</span>
-                      <div className={`relative w-9 h-[18px] rounded-full transition-colors shrink-0 ${active ? "bg-teal-500/40" : "bg-white/[0.10]"}`}>
-                        <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white/75 shadow-sm transition-transform ${active ? "translate-x-[21px]" : "translate-x-[3px]"}`} />
-                      </div>
+      {/* Mobile: Calendar Sources full-screen control panel — portalled above Navbar */}
+      {showSourceSheet && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] lg:hidden bg-[#0c0c0e] flex flex-col" style={{ height: "100dvh" }}>
+
+          {/* ── Drill-down sub-screen ── */}
+          {drillDownSource !== null ? (() => {
+            const ddKey = drillDownSource;
+            const ddBucket = sourceBuckets[ddKey];
+            const ddEntities = getEntitiesForBucket(ddKey);
+            const ddSource = CAL_SOURCES.find((s) => s.id === ddKey);
+            const ddLabel = ddSource?.label ?? ddKey;
+            const ddDot = ddSource?.dot ?? "bg-white/55";
+            // Local draft selection for this drill-down (initialized from bucket state)
+            // We use the bucket state directly since changes apply immediately
+            const ddIsAllMode = ddBucket.mode === "all";
+            const ddSelected = ddBucket.selected;
+            const ddAllSelected = ddIsAllMode || (ddEntities.length > 0 && ddEntities.every((e) => ddSelected.has(e.id)));
+            const ddNoneSelected = !ddIsAllMode && ddEntities.every((e) => !ddSelected.has(e.id));
+
+            return (
+              <>
+                {/* Header */}
+                <div className="shrink-0 bg-[#0c0c0e]">
+                  <div className="flex items-center gap-3 px-4 h-[56px]">
+                    <button onClick={() => setDrillDownSource(null)}
+                      className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-white/50 hover:text-white/80 transition-all">
+                      <ChevronLeft size={18} />
                     </button>
-                  );
-                })}
-
-                {/* Imported calendars */}
-                {importedCals.length > 0 && (
-                  <div className="border-t border-white/[0.07] pt-4 space-y-4">
-                    <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/25">Imported Calendars</div>
-                    {importedCals.map((cal) => {
-                      const active = activeSources.has(cal.id);
-                      return (
-                        <div key={cal.id} className="flex items-center gap-3">
-                          <button onClick={() => toggleSource(cal.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-opacity ${cal.colorDot} ${active ? "opacity-75" : "opacity-20"}`} />
-                            <span className={`text-[13px] flex-1 truncate transition-colors ${active ? "text-white/65" : "text-white/28"}`}>{cal.name}</span>
-                          </button>
-                          <button onClick={() => removeImportedCal(cal.id)} className="text-white/18 hover:text-red-400/65 transition-colors shrink-0 mr-2">
-                            <Trash2 size={13} />
-                          </button>
-                          <div onClick={() => toggleSource(cal.id)} className={`relative w-9 h-[18px] rounded-full transition-colors shrink-0 cursor-pointer ${active ? "bg-teal-500/40" : "bg-white/[0.10]"}`}>
-                            <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white/75 shadow-sm transition-transform ${active ? "translate-x-[21px]" : "translate-x-[3px]"}`} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${ddDot} opacity-80`} />
+                    <h2 className="text-[16px] font-semibold text-white/95 tracking-tight">{ddLabel}</h2>
                   </div>
-                )}
-
-                {calendarPrefsUserId && (
-                  <div className="border-t border-white/[0.07] pt-4 space-y-3">
-                    <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/25">Saved Calendars</div>
-                    {!hasSavedCalendars ? (
-                      <p className="text-[11px] text-white/30 leading-relaxed">
-                        Follow an organization or business and add its calendar to manage it here.
-                      </p>
-                    ) : (
-                      <>
-                        {savedCalendarEntities.organizations.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Organizations</div>
-                            {savedCalendarEntities.organizations.map((entity) => (
-                              <div key={entity.id} className="flex items-center gap-3">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-emerald-400 opacity-75" />
-                                <span className="text-[13px] flex-1 truncate text-white/60">{entity.name}</span>
-                                <button
-                                  onClick={() => void removeSavedCalendar(entity)}
-                                  className="text-white/18 hover:text-red-400/65 transition-colors shrink-0"
-                                  title="Remove saved calendar"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {savedCalendarEntities.businesses.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-white/20">Businesses</div>
-                            {savedCalendarEntities.businesses.map((entity) => (
-                              <div key={entity.id} className="flex items-center gap-3">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-blue-400 opacity-75" />
-                                <span className="text-[13px] flex-1 truncate text-white/60">{entity.name}</span>
-                                <button
-                                  onClick={() => void removeSavedCalendar(entity)}
-                                  className="text-white/18 hover:text-red-400/65 transition-colors shrink-0"
-                                  title="Remove saved calendar"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
+                  <div className="h-px bg-white/[0.07]" />
+                  {/* Mode selector + utility */}
+                  <div className="px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {(["all", "custom", "off"] as SourceBucketMode[]).map((m) => {
+                        const isActive = ddBucket.mode === m;
+                        const modeLabel = m === "all" ? "All" : m === "custom" ? "Custom" : "Off";
+                        return (
+                          <button key={m}
+                            onClick={() => setBucketMode(ddKey, m)}
+                            className={`px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-colors ${
+                              isActive
+                                ? "bg-white/[0.12] text-white/85 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]"
+                                : "text-white/35 hover:text-white/55 hover:bg-white/[0.04]"
+                            }`}
+                          >
+                            {modeLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {ddBucket.mode === "custom" && (
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setBucketCustomSelection(ddKey, new Set(ddEntities.map((e) => e.id)))}
+                          disabled={ddAllSelected}
+                          className="text-[11px] font-medium text-white/35 hover:text-white/60 transition-colors disabled:opacity-25"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={() => setBucketCustomSelection(ddKey, new Set())}
+                          disabled={ddNoneSelected}
+                          className="text-[11px] font-medium text-white/35 hover:text-white/60 transition-colors disabled:opacity-25"
+                        >
+                          Clear All
+                        </button>
+                      </div>
                     )}
                   </div>
-                )}
+                  <div className="h-px bg-white/[0.05]" />
+                </div>
 
-                {/* Add Calendar CTA */}
-                <div className="border-t border-white/[0.07] pt-4">
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.06)_transparent]">
+                  {ddBucket.mode === "off" ? (
+                    <div className="flex flex-col items-center justify-center h-full px-8">
+                      <div className={`w-10 h-10 rounded-full ${ddDot} opacity-15 mb-4`} />
+                      <p className="text-[14px] font-medium text-white/30 text-center mb-1">Source disabled</p>
+                      <p className="text-[12px] text-white/20 text-center leading-relaxed">
+                        Set to All or Custom to see events from this source.
+                      </p>
+                    </div>
+                  ) : ddBucket.mode === "all" ? (
+                    <div className="flex flex-col items-center justify-center h-full px-8">
+                      <div className={`w-10 h-10 rounded-full ${ddDot} opacity-30 mb-4`} />
+                      <p className="text-[14px] font-medium text-white/45 text-center mb-1">Showing all {ddLabel.toLowerCase()}</p>
+                      <p className="text-[12px] text-white/20 text-center leading-relaxed">
+                        {ddEntities.length > 0
+                          ? `All ${ddEntities.length} calendar${ddEntities.length !== 1 ? "s" : ""} in this source are visible.`
+                          : "All events from this source will appear on your calendar."}
+                      </p>
+                      {ddEntities.length > 0 && (
+                        <button
+                          onClick={() => {
+                            // Switch to custom with all selected
+                            setBucketCustomSelection(ddKey, new Set(ddEntities.map((e) => e.id)));
+                          }}
+                          className="mt-4 px-4 py-2 rounded-full border border-white/[0.08] text-[12px] font-medium text-white/40 hover:text-white/65 hover:border-white/[0.14] transition-colors"
+                        >
+                          Customize selection
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    /* Custom mode: entity list with checkboxes */
+                    <div className="pb-[max(env(safe-area-inset-bottom,0px),20px)]">
+                      {ddEntities.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 px-8">
+                          <p className="text-[13px] text-white/25 text-center leading-relaxed">
+                            {ddKey === "group" ? "Join groups to see them here." :
+                             ddKey === "org" ? "Follow organizations to see them here." :
+                             ddKey === "business" ? "Follow businesses to see them here." :
+                             "No calendars available."}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="pt-2">
+                          {ddEntities.map((entity) => {
+                            const isChecked = ddSelected.has(entity.id);
+                            return (
+                              <button
+                                key={entity.id}
+                                onClick={() => {
+                                  const next = new Set(ddSelected);
+                                  if (isChecked) next.delete(entity.id); else next.add(entity.id);
+                                  setBucketCustomSelection(ddKey, next);
+                                }}
+                                className="w-full flex items-center px-5 py-3.5 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors"
+                              >
+                                {/* Checkbox */}
+                                <div className={`w-5 h-5 rounded-md border shrink-0 flex items-center justify-center transition-colors ${
+                                  isChecked
+                                    ? "bg-teal-500 border-teal-500"
+                                    : "border-white/[0.18] bg-white/[0.04]"
+                                }`}>
+                                  {isChecked && <Check size={13} className="text-white" />}
+                                </div>
+                                <span className={`text-[14px] font-medium ml-4 flex-1 truncate text-left transition-colors ${
+                                  isChecked ? "text-white/80" : "text-white/35"
+                                }`}>{entity.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="shrink-0 border-t border-white/[0.07] bg-[#0c0c0e] px-5 py-3 pb-[max(env(safe-area-inset-bottom,0px),12px)]">
+                  <button onClick={() => setDrillDownSource(null)}
+                    className="w-full h-[46px] rounded-xl bg-white/[0.08] hover:bg-white/[0.12] active:bg-white/[0.15] text-[14px] font-semibold text-white/80 transition-colors">
+                    Done
+                  </button>
+                </div>
+              </>
+            );
+          })() : (
+          /* ── Main source list screen ── */
+          <>
+          {/* ── Header ── */}
+          <div className="shrink-0 bg-[#0c0c0e]">
+            <div className="flex items-center justify-between px-4 h-[56px]">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowSourceSheet(false)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-white/50 hover:text-white/80 transition-all">
+                  <X size={18} />
+                </button>
+                <h2 className="text-[16px] font-semibold text-white/95 tracking-tight">Calendar Sources</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={showAllSources}
+                  disabled={allSourcesActive}
+                  className="text-[12px] font-medium text-white/40 hover:text-white/65 transition-colors disabled:opacity-25 disabled:cursor-default"
+                >
+                  All On
+                </button>
+                <span className="text-white/15 text-[10px]">|</span>
+                <button
+                  onClick={hideAllSources}
+                  disabled={!anySourcesActive}
+                  className="text-[12px] font-medium text-white/40 hover:text-white/65 transition-colors disabled:opacity-25 disabled:cursor-default"
+                >
+                  All Off
+                </button>
+              </div>
+            </div>
+            <div className="h-px bg-white/[0.07]" />
+            <div className="px-5 py-2.5">
+              <span className="text-[11px] font-medium text-white/35 tracking-wide">
+                {activeSourceCount} of {CORE_CALENDAR_SOURCE_IDS.length} source{CORE_CALENDAR_SOURCE_IDS.length !== 1 ? "s" : ""} active
+              </span>
+            </div>
+            <div className="h-px bg-white/[0.05]" />
+          </div>
+
+          {/* ── Scrollable content ── */}
+          <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.06)_transparent]">
+            <div className="pb-[max(env(safe-area-inset-bottom,0px),40px)]">
+
+              {/* ── Source Buckets ── */}
+              <div className="px-4 pt-5 pb-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/25 mb-1 px-1">Sources</p>
+              </div>
+              <div>
+                {CAL_SOURCES.filter((s) => s.id !== "imported").map(({ id, label, dot }) => {
+                  const key = id as CalendarSourceFilter;
+                  const bucket = sourceBuckets[key];
+                  const isActive = bucket.mode !== "off";
+                  const entities = getEntitiesForBucket(key);
+                  const hasEntities = entities.length > 0;
+                  const summary = bucketSummaryLabel(key);
+                  const descriptions: Record<string, string> = {
+                    wac: "Official WAC events",
+                    group: "Events from your groups",
+                    org: "Organization events",
+                    business: "Business events",
+                  };
+
+                  return (
+                    <div key={id} className="flex items-center px-5 py-3.5 hover:bg-white/[0.03] transition-colors">
+                      {/* Left: color dot + labels → tap to drill down (if has entities) */}
+                      <button
+                        onClick={() => {
+                          if (key === "wac") {
+                            // WAC has no sub-entities, just toggle
+                            toggleSource(id);
+                          } else {
+                            setDrillDownSource(key);
+                          }
+                        }}
+                        className="flex items-center flex-1 min-w-0 text-left"
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot} ${isActive ? "opacity-90" : "opacity-20"} transition-opacity`} />
+                        <div className="flex-1 min-w-0 ml-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[14px] font-medium transition-colors ${isActive ? "text-white/80" : "text-white/30"}`}>{label}</span>
+                            {bucket.mode === "custom" && (
+                              <span className="text-[10px] font-semibold text-teal-400/60 bg-teal-400/[0.08] px-1.5 py-0.5 rounded-full">
+                                {summary}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-white/25 block mt-0.5 leading-tight">{descriptions[id] || ""}</span>
+                        </div>
+                        {/* Chevron for drill-down (not for WAC) */}
+                        {key !== "wac" && hasEntities && (
+                          <ChevronRight size={14} className="text-white/20 shrink-0 ml-2" />
+                        )}
+                      </button>
+                      {/* Right: toggle switch */}
+                      <button
+                        onClick={() => toggleSource(id)}
+                        className="shrink-0 ml-3"
+                      >
+                        <div className={`relative w-[44px] h-[26px] rounded-full transition-colors duration-200 ${isActive ? "bg-teal-500" : "bg-white/[0.12]"}`}>
+                          <span className={`absolute top-1/2 left-[3px] w-5 h-5 rounded-full shadow-sm transition-transform duration-200 ${isActive ? "-translate-y-1/2 translate-x-[18px] bg-white" : "-translate-y-1/2 translate-x-0 bg-white/50"}`} />
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ── Connected Calendars ── */}
+              <div className="mt-2">
+                <div className="h-px bg-white/[0.06] mx-4" />
+                <div className="px-4 pt-5 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/25 mb-1 px-1">Connected Calendars</p>
+                </div>
+                {importedCals.length > 0 ? (
+                  <div>
+                    {importedCals.map((cal) => (
+                      <div key={cal.id} className="flex items-center px-5 py-3.5 hover:bg-white/[0.03] active:bg-white/[0.05] transition-colors">
+                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${cal.colorDot} opacity-90 transition-opacity`} />
+                        <span className="text-[14px] font-medium ml-4 flex-1 truncate text-left text-white/75">{cal.name}</span>
+                        <button onClick={() => removeImportedCal(cal.id)} className="text-white/15 hover:text-red-400/60 transition-colors shrink-0 p-1.5">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-5 py-4">
+                    <div className="flex items-center gap-3 px-4 py-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                      <Link2 size={16} className="text-white/15 shrink-0" />
+                      <p className="text-[12px] text-white/25 leading-relaxed">
+                        No external calendars connected yet.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── External Calendars ── */}
+              <div className="mt-2">
+                <div className="h-px bg-white/[0.06] mx-4" />
+                <div className="px-4 pt-5 pb-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/25 mb-1 px-1">External Calendars</p>
+                </div>
+                <div className="px-5">
+                  <p className="text-[12px] text-white/30 leading-relaxed mb-4">
+                    Connect Google Calendar, Outlook, Apple Calendar, or an ICS feed. External events sync one-way into WAC — they are read-only and managed in the source app.
+                  </p>
                   <button
                     onClick={() => { setShowSourceSheet(false); setShowImportModal(true); }}
-                    className="w-full flex items-center gap-3 py-2.5 px-4 rounded-xl border border-teal-400/15 bg-teal-500/[0.05] text-teal-400/70 hover:bg-teal-500/[0.10] hover:text-teal-400/90 transition-colors">
-                    <Plus size={14} />
-                    <span className="text-[13px] font-medium">Add Calendar</span>
+                    className="w-full flex items-center justify-center gap-2.5 h-[48px] rounded-xl border border-teal-400/25 bg-teal-500/[0.07] text-teal-400/80 hover:bg-teal-500/[0.14] hover:text-teal-400 active:bg-teal-500/[0.18] transition-colors">
+                    <Link2 size={15} />
+                    <span className="text-[14px] font-semibold">Connect Calendar</span>
                   </button>
                 </div>
               </div>
+
             </div>
           </div>
+
+          {/* ── Sticky footer: Done ── */}
+          <div className="shrink-0 border-t border-white/[0.07] bg-[#0c0c0e] px-5 py-3 pb-[max(env(safe-area-inset-bottom,0px),12px)]">
+            <button onClick={() => setShowSourceSheet(false)}
+              className="w-full h-[46px] rounded-xl bg-white/[0.08] hover:bg-white/[0.12] active:bg-white/[0.15] text-[14px] font-semibold text-white/80 transition-colors">
+              Done
+            </button>
+          </div>
+          </>
+          )}
         </div>
-      )}
+      , document.body)}
 
-      {/* Import Calendar modal */}
-      {showImportModal && (
-        <ImportCalendarModal onClose={() => setShowImportModal(false)} onSave={addImportedCal} />
-      )}
-
-      {/* Modals */}
-      {modalDraft && !showFullEditor && (
-        <CreateEventModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} onMoreOptions={handleMoreOptions} />
-      )}
-      {modalDraft && showFullEditor && (
-        <FullEventEditorModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} />
-      )}
-      {selectedCalEvent && (
-        <CalEventDetailModal
-          event={selectedCalEvent}
-          onClose={() => setSelectedCalEvent(null)}
-          onEdit={() => openEventEdit(selectedCalEvent)}
-          onDelete={() => handleEventDelete(selectedCalEvent.id)}
-        />
-      )}
     </div>
+
+    {/* Import Calendar modal */}
+    {showImportModal && (
+      <ImportCalendarModal onClose={() => setShowImportModal(false)} onSave={addImportedCal} />
+    )}
+
+    {/* Modals */}
+    {modalDraft && !showFullEditor && (
+      <CreateEventModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} onMoreOptions={handleMoreOptions} />
+    )}
+    {modalDraft && showFullEditor && (
+      <FullEventEditorModal draft={modalDraft} onClose={closeModal} onSave={handleEventSave} />
+    )}
+    {selectedCalEvent && (
+      <CalEventDetailModal
+        event={selectedCalEvent}
+        onClose={() => setSelectedCalEvent(null)}
+        onEdit={() => openEventEdit(selectedCalEvent)}
+        onDelete={() => handleEventDelete(selectedCalEvent.id)}
+      />
+    )}
+    </>
   );
 }
 
@@ -3341,15 +3766,184 @@ function CalendarModeView() {
 
 export default function EventsPage() {
   const router = useRouter();
-  const [activeLens, setActiveLens] = useState<Lens>("my-network");
-  const [activeType, setActiveType] = useState("All");
+  const [activeLens, setActiveLens] = useState<Lens>("discover");
+  const [appliedFilters, setAppliedFilters] = useState<EventFilters>(DEFAULT_FILTERS);
+  const [draftFilters,   setDraftFilters]   = useState<EventFilters>(DEFAULT_FILTERS);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const calendarFilterTrigger = useRef<(() => void) | null>(null);
+  const [calActiveSourceCount, setCalActiveSourceCount] = useState(CORE_CALENDAR_SOURCE_IDS.length);
+  const [filterDrillDown, setFilterDrillDown] = useState<HierarchicalSourceId | null>(null);
+  const [drillDraftSelected, setDrillDraftSelected] = useState<string[]>([]);
+  const [drillSearch, setDrillSearch] = useState("");
   const [calendarHeaderSignedIn, setCalendarHeaderSignedIn] = useState(false);
 
-  const showFeatured   = activeLens === "my-network";
-  const showBrowse     = activeLens !== "calendar";
-  const showCategories = activeLens !== "calendar";
-  const browseLabel    = activeLens === "browse" ? "Explore Events" : "Network Events";
+  function openFilterSheet() {
+    setDraftFilters(appliedFilters);
+    setFilterDrillDown(null);
+    setDrillSearch("");
+    setShowFilterSheet(true);
+  }
+  function applyFilters() {
+    setAppliedFilters(draftFilters);
+    setShowFilterSheet(false);
+    setFilterDrillDown(null);
+    setDrillSearch("");
+  }
+  function resetDraftFilters() {
+    setDraftFilters(DEFAULT_FILTERS);
+  }
+  function toggleArr<T>(arr: T[], item: T): T[] {
+    return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
+  }
 
+  function openDrillDown(id: HierarchicalSourceId) {
+    setDrillDraftSelected(draftFilters[id].selected);
+    setDrillSearch("");
+    setFilterDrillDown(id);
+  }
+  function applyDrillDown() {
+    if (!filterDrillDown) return;
+    setDraftFilters((f) => ({
+      ...f,
+      [filterDrillDown]: {
+        mode: drillDraftSelected.length === 0 ? "all" : "custom",
+        selected: drillDraftSelected,
+      },
+    }));
+    setFilterDrillDown(null);
+    setDrillSearch("");
+  }
+  function toggleHierarchicalSource(id: HierarchicalSourceId) {
+    setDraftFilters((f) => ({
+      ...f,
+      [id]: { ...f[id], mode: f[id].mode !== "off" ? "off" : "all" },
+    }));
+  }
+  function hierSourceStateLabel(state: HierarchicalSourceState, id: HierarchicalSourceId): string | null {
+    if (state.mode === "off") return null;
+    if (state.mode === "all") return "All";
+    const total = MOCK_FOLLOWED[id].length;
+    return `${state.selected.length} of ${total}`;
+  }
+
+  // Quick filter ↔ structured filter synchronization
+  function toggleQuickFilter(qf: string) {
+    setDraftFilters((f) => {
+      const isActive = f.quick.includes(qf);
+      const nextQuick = isActive ? f.quick.filter((q) => q !== qf) : [...f.quick, qf];
+      const next = { ...f, quick: nextQuick };
+
+      if (qf === "This Week") {
+        next.date = isActive ? null : "This Week";
+      } else if (qf === "Online") {
+        next.formats = isActive
+          ? f.formats.filter((fmt) => fmt !== "Online")
+          : f.formats.includes("Online") ? f.formats : [...f.formats, "Online"];
+      } else if (qf === "Popular") {
+        next.sort = isActive ? "Relevant" : "Popular";
+      } else if (qf === "Near Me") {
+        next.sort = isActive ? "Relevant" : "Closest";
+      }
+
+      return next;
+    });
+  }
+
+  const activeFilterCount = useMemo(() => (
+    appliedFilters.categories.length +
+    appliedFilters.formats.length +
+    (appliedFilters.date ? 1 : 0) +
+    appliedFilters.sources.length +
+    (appliedFilters.groups.mode !== "off" ? 1 : 0) +
+    (appliedFilters.organizations.mode !== "off" ? 1 : 0) +
+    (appliedFilters.businesses.mode !== "off" ? 1 : 0) +
+    appliedFilters.paths.length +
+    (appliedFilters.sort && appliedFilters.sort !== "Relevant" ? 1 : 0) +
+    appliedFilters.quick.length
+  ), [appliedFilters]);
+
+  // Build active filter summary tokens for display
+  const activeFilterSummary = useMemo(() => {
+    const tokens: string[] = [];
+    tokens.push(...appliedFilters.quick);
+    tokens.push(...appliedFilters.categories);
+    if (appliedFilters.date) tokens.push(appliedFilters.date);
+    tokens.push(...appliedFilters.formats);
+    tokens.push(...appliedFilters.sources);
+    if (appliedFilters.groups.mode !== "off") tokens.push("Groups");
+    if (appliedFilters.organizations.mode !== "off") tokens.push("Organizations");
+    if (appliedFilters.businesses.mode !== "off") tokens.push("Businesses");
+    tokens.push(...appliedFilters.lifeStages);
+    if (appliedFilters.sort && appliedFilters.sort !== "Relevant") tokens.push(appliedFilters.sort);
+    return tokens;
+  }, [appliedFilters]);
+
+  // Draft filter summary for live preview
+  const draftFilterSummary = useMemo(() => {
+    const tokens: string[] = [];
+    tokens.push(...draftFilters.quick);
+    tokens.push(...draftFilters.categories);
+    if (draftFilters.date) tokens.push(draftFilters.date);
+    tokens.push(...draftFilters.formats);
+    tokens.push(...draftFilters.sources);
+    if (draftFilters.groups.mode !== "off") tokens.push("Groups");
+    if (draftFilters.organizations.mode !== "off") tokens.push("Organizations");
+    if (draftFilters.businesses.mode !== "off") tokens.push("Businesses");
+    tokens.push(...draftFilters.lifeStages);
+    if (draftFilters.sort && draftFilters.sort !== "Relevant") tokens.push(draftFilters.sort);
+    return tokens;
+  }, [draftFilters]);
+
+  const draftFilterCount = useMemo(() => (
+    draftFilters.categories.length +
+    draftFilters.formats.length +
+    (draftFilters.date ? 1 : 0) +
+    draftFilters.sources.length +
+    (draftFilters.groups.mode !== "off" ? 1 : 0) +
+    (draftFilters.organizations.mode !== "off" ? 1 : 0) +
+    (draftFilters.businesses.mode !== "off" ? 1 : 0) +
+    draftFilters.lifeStages.length +
+    (draftFilters.sort && draftFilters.sort !== "Relevant" ? 1 : 0) +
+    draftFilters.quick.length
+  ), [draftFilters]);
+
+  type LocationState = "idle" | "requesting" | "granted" | "denied";
+  const [locationState, setLocationState] = useState<LocationState>("idle");
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+
+  function requestLocation() {
+    if (!("geolocation" in navigator)) {
+      setLocationState("denied");
+      return;
+    }
+    setLocationState("requesting");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setLocationState("granted");
+        // Reverse-geocode to a city/region label using a free API
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const json = await res.json();
+          const city   = json?.address?.city || json?.address?.town || json?.address?.village || json?.address?.county || null;
+          const state  = json?.address?.state || null;
+          const country = json?.address?.country_code?.toUpperCase() || null;
+          const parts = [city, state ?? country].filter(Boolean);
+          setLocationLabel(parts.length > 0 ? parts.join(", ") : "Your area");
+        } catch {
+          setLocationLabel("Your area");
+        }
+      },
+      () => {
+        setLocationState("denied");
+      },
+      { timeout: 10000 }
+    );
+  }
+
+  const isDiscover = activeLens === "discover";
   const isCalendar = activeLens === "calendar";
   const calendarLensHelperText = calendarHeaderSignedIn
     ? "WAC follows its source toggle. Groups stay category-based for now. Organization and business events are refined by the calendars you've added."
@@ -3384,101 +3978,876 @@ export default function EventsPage() {
     return () => window.removeEventListener("events-compose", handler);
   }, [router]);
 
+  // Body scroll lock when filter sheet is open
+  useEffect(() => {
+    document.body.style.overflow = showFilterSheet ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [showFilterSheet]);
+
+  // Escape key to close filter panel
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && showFilterSheet) setShowFilterSheet(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [showFilterSheet]);
+
   return (
     <div className="w-full min-h-screen bg-[var(--background)]">
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pb-24 pt-20 md:pt-24">
 
         {/* Page header */}
-        {isCalendar ? (
-          <>
-            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
-              <span className="italic font-light opacity-90 text-teal-400">Calendar</span>
-            </h1>
-            <p className="mt-2 text-sm text-white/45">
-              {calendarLensHelperText}
-            </p>
-          </>
-        ) : (
-          <>
-            <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
-              <span className="italic font-light opacity-90 text-teal-400">Events</span>
-            </h1>
-            <p className="mt-2 text-sm text-white/45 max-w-lg">
-              Community gatherings, network calendars, and shared moments across the diaspora.
-            </p>
-          </>
-        )}
+        <h1 className="font-serif text-3xl md:text-4xl tracking-tight text-white leading-tight">
+          <span className="italic font-light opacity-90 text-teal-400">Events</span>
+        </h1>
+        <p className="mt-2 text-sm text-white/45 max-w-lg hidden sm:block">
+          {isCalendar ? calendarLensHelperText : "Community gatherings, network calendars, and shared moments across the diaspora."}
+        </p>
 
-        {/* Mode selector + optional calendar workspace label */}
-        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${isCalendar ? "mt-5" : "mt-5"}`}>
-          <div className="flex items-center gap-3">
-            {/* Lens tabs */}
-            <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-full sm:w-fit">
-              {LENSES.map(({ id, label, icon: Icon }) => {
-                const active = activeLens === id;
-                return (
-                  <button key={id} onClick={() => setActiveLens(id)}
-                    className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
-                      active ? "bg-white/[0.08] text-white/80" : "text-white/40 hover:text-white/65"
-                    }`}>
-                    <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
-                    <span className="sm:hidden">{label}</span>
-                    <span className="hidden sm:inline">{label}</span>
-                  </button>
-                );
-              })}
-            </div>
+        {/* Mode selector + filter icon — unified capsule */}
+        <div className="mt-3 sm:mt-5">
+          <div className="flex items-center gap-0.5 p-0.5 bg-white/[0.05] border border-white/[0.09] rounded-full w-fit">
+            {LENSES.map(({ id, label, icon: Icon }) => {
+              const active = activeLens === id;
+              return (
+                <button key={id} onClick={() => setActiveLens(id)}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium tracking-[0.02em] transition-all whitespace-nowrap ${
+                    active ? "bg-white/[0.08] text-white/80" : "text-white/40 hover:text-white/65"
+                  }`}>
+                  <Icon size={12} strokeWidth={active ? 2.2 : 1.8} className="shrink-0" />
+                  {label}
+                </button>
+              );
+            })}
+            {/* Divider */}
+            <span className="w-px h-4 bg-white/[0.10] mx-0.5 shrink-0" />
+            {/* Context-sensitive filter button */}
+            {(() => {
+              const isCalFilter = activeLens === "calendar";
+              const hasFilter = isCalFilter
+                ? calActiveSourceCount < CORE_CALENDAR_SOURCE_IDS.length
+                : activeFilterCount > 0;
+              const badgeCount = isCalFilter ? calActiveSourceCount : activeFilterCount;
+              return (
+                <button
+                  onClick={() => isCalFilter ? calendarFilterTrigger.current?.() : openFilterSheet()}
+                  className={`relative flex items-center justify-center w-9 h-9 rounded-full transition-all ${
+                    hasFilter
+                      ? "bg-white/[0.08] text-white/80"
+                      : "text-white/40 hover:text-white/65 hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <SlidersHorizontal size={12} strokeWidth={hasFilter ? 2.2 : 1.8} className="shrink-0" />
+                  {hasFilter && (
+                    <span className="absolute -right-0.5 -top-0.5 min-w-[14px] h-[14px] rounded-full bg-teal-500/80 flex items-center justify-center px-[3px] text-[8px] font-bold text-white leading-none">
+                      {badgeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
           </div>
         </div>
 
-        {showCategories && (
-          <div className="relative mt-4">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1"
-              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-              {EVENT_TYPES.map((type) => (
-                <button key={type} onClick={() => setActiveType(type)}
-                  className={`shrink-0 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors whitespace-nowrap ${
-                    activeType === type
+        {/* Calendar workspace */}
+        {isCalendar && (
+          <CalendarModeView
+            registerFilterTrigger={(fn) => { calendarFilterTrigger.current = fn; }}
+            onActiveSourceCountChange={setCalActiveSourceCount}
+          />
+        )}
+
+        {/* Discover workspace */}
+        {isDiscover && (
+          <>
+            {/* ── Main content ── */}
+            <div className="mt-4">
+
+              {/* ── Quick shortcut chips ── */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+                {/* Near Me — special: triggers geolocation */}
+                <button
+                  onClick={() => {
+                    if (locationState === "idle" || locationState === "denied") {
+                      requestLocation();
+                      setAppliedFilters((f) => ({ ...f, quick: f.quick.includes("Near Me") ? f.quick : [...f.quick, "Near Me"], sort: "Closest" }));
+                    } else {
+                      setLocationState("idle"); setLocationLabel(null);
+                      setAppliedFilters((f) => ({ ...f, quick: f.quick.filter((q) => q !== "Near Me"), sort: f.sort === "Closest" ? "Relevant" : f.sort }));
+                    }
+                  }}
+                  className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
+                    locationState === "granted"
                       ? "border-teal-400/30 bg-teal-500/[0.08] text-teal-400/80"
-                      : "border-white/[0.12] bg-transparent text-white/55 hover:text-white/80 hover:border-white/18"
-                  }`}>
-                  {type}
+                      : locationState === "requesting"
+                      ? "border-white/[0.15] bg-white/[0.04] text-white/45"
+                      : "border-white/[0.12] bg-transparent text-white/50 hover:text-white/75 hover:border-white/[0.18]"
+                  }`}
+                >
+                  <MapPin size={11} className="shrink-0" />
+                  {locationState === "granted" && locationLabel
+                    ? locationLabel
+                    : locationState === "requesting"
+                    ? "Locating…"
+                    : "Near Me"}
                 </button>
-              ))}
-            </div>
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--background)] to-transparent" />
-          </div>
-        )}
 
-        {isCalendar && <CalendarModeView />}
+                {/* This Week */}
+                {(() => {
+                  const active = appliedFilters.quick.includes("This Week");
+                  return (
+                    <button
+                      onClick={() => setAppliedFilters((f) => ({ ...f, quick: toggleArr(f.quick, "This Week"), date: active ? f.date : "This Week" }))}
+                      className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
+                        active ? "border-teal-400/30 bg-teal-500/[0.08] text-teal-400/80" : "border-white/[0.12] bg-transparent text-white/50 hover:text-white/75 hover:border-white/[0.18]"
+                      }`}
+                    >
+                      <Clock size={11} className="shrink-0" />
+                      This Week
+                    </button>
+                  );
+                })()}
 
-        {showFeatured && (
-          <section className="mt-8">
-            <SectionLabel label="From Your Network" variant="featured" className="mb-4" />
-            <div className="md:hidden flex gap-3 overflow-x-auto pb-1"
-              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-              {FEATURED.map((ev) => <div key={ev.id} className="shrink-0 w-[272px]"><FeaturedCard event={ev} /></div>)}
-            </div>
-            <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURED.map((ev) => <FeaturedCard key={ev.id} event={ev} />)}
-            </div>
-          </section>
-        )}
+                {/* My Network */}
+                {(() => {
+                  const active = appliedFilters.quick.includes("My Network");
+                  return (
+                    <button
+                      onClick={() => setAppliedFilters((f) => ({
+                        ...f,
+                        quick: toggleArr(f.quick, "My Network"),
+                        sources: active ? f.sources.filter((s) => s !== "My Network") : (f.sources.includes("My Network") ? f.sources : [...f.sources, "My Network"]),
+                      }))}
+                      className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
+                        active ? "border-teal-400/30 bg-teal-500/[0.08] text-teal-400/80" : "border-white/[0.12] bg-transparent text-white/50 hover:text-white/75 hover:border-white/[0.18]"
+                      }`}
+                    >
+                      <Users size={11} className="shrink-0" />
+                      My Network
+                    </button>
+                  );
+                })()}
 
-        {showBrowse && (
-          <section className="mt-8">
-            <SectionLabel label={browseLabel} variant="standard" className="mb-4" />
-            <Suspense fallback={
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[1,2,3,4,5,6].map((i) => <div key={i} className="wac-card h-28 animate-pulse" />)}
+                {/* Active filter count badge — shows extra filters beyond quick shortcuts */}
+                {activeFilterSummary.filter((t) => !["Near Me", "This Week", "My Network"].includes(t)).length > 0 && (
+                  <span className="shrink-0 text-[10px] text-white/25 font-medium">
+                    +{activeFilterSummary.filter((t) => !["Near Me", "This Week", "My Network"].includes(t)).length}
+                  </span>
+                )}
               </div>
-            }>
-              <EventsResults eventType={activeType !== "All" ? activeType : undefined} />
-            </Suspense>
-          </section>
+
+              {/* Filter overlay is rendered at root level to avoid stacking context issues */}
+
+              {/* ── Section 1: From Your Network ── */}
+              <section className="mt-8">
+                <SectionLabel label="From Your Network" variant="featured" className="mb-4" />
+                <div className="flex gap-3 overflow-x-auto pb-1 md:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {FEATURED.map((ev) => (
+                    <div key={ev.id} className="shrink-0 w-[272px]">
+                      <FeaturedCard event={ev} />
+                    </div>
+                  ))}
+                </div>
+                <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {FEATURED.map((ev) => <FeaturedCard key={ev.id} event={ev} />)}
+                </div>
+              </section>
+
+              {/* ── Section 2: Near You ── */}
+              <section className="mt-10">
+                <SectionLabel label="Near You" variant="standard" className="mb-4" />
+                {locationState === "granted" ? (
+                  <div className="wac-card flex items-center gap-3 px-4 py-3">
+                    <div className="w-8 h-8 flex items-center justify-center rounded-xl bg-teal-500/[0.10] border border-teal-400/15 shrink-0">
+                      <MapPin size={14} className="text-teal-400/80" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-medium text-white/65 truncate">
+                        Showing events near{locationLabel ? ` ${locationLabel}` : " you"}
+                      </p>
+                      <p className="text-[10px] text-white/30 mt-0.5">Location access granted</p>
+                    </div>
+                    <button
+                      onClick={() => { setLocationState("idle"); setLocationLabel(null); }}
+                      className="shrink-0 text-white/22 hover:text-white/50 transition-colors"
+                      title="Reset location"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ) : locationState === "denied" ? (
+                  <div className="wac-card flex items-start gap-4 p-5">
+                    <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500/[0.08] border border-red-400/15 shrink-0">
+                      <MapPin size={16} className="text-red-400/55" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium text-white/55">Location access denied</p>
+                      <p className="text-[11px] text-white/32 mt-1 leading-relaxed max-w-sm">
+                        To enable location, allow access in your browser settings and reload the page.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="wac-card flex items-start gap-4 p-5">
+                    <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-teal-500/[0.10] border border-teal-400/15 shrink-0">
+                      {locationState === "requesting" ? (
+                        <Loader2 size={16} className="text-teal-400/65 animate-spin" />
+                      ) : (
+                        <MapPin size={16} className="text-teal-400/65" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium text-white/65">Find events near you</p>
+                      <p className="text-[11px] text-white/35 mt-1 leading-relaxed max-w-sm">
+                        Share your location or select a region to discover events happening around you.
+                      </p>
+                      <button
+                        onClick={requestLocation}
+                        disabled={locationState === "requesting"}
+                        className="mt-3 text-[11px] font-medium text-teal-400/70 hover:text-teal-400 transition-colors disabled:opacity-50 disabled:cursor-default"
+                      >
+                        {locationState === "requesting" ? "Requesting access…" : "Enable location →"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* ── Section 3: Coming Up Soon ── */}
+              <section className="mt-10">
+                <SectionLabel label="Coming Up Soon" variant="standard" className="mb-4" />
+                <Suspense fallback={
+                  <div className={"grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
+                    {[1,2,3].map((i) => <div key={i} className="wac-card h-28 animate-pulse" />)}
+                  </div>
+                }>
+                  <EventsResults
+                    upcoming={true}
+                    limit={6}
+                    categories={appliedFilters.categories}
+                    formats={appliedFilters.formats}
+                    datePreset={appliedFilters.date}
+                    sources={appliedFilters.sources}
+                    audiences={appliedFilters.lifeStages}
+                    sortBy={appliedFilters.sort}
+                  />
+                </Suspense>
+              </section>
+
+              {/* ── Section 4: Beyond Your Network ── */}
+              <section className="mt-10">
+                <SectionLabel label="Beyond Your Network" variant="standard" className="mb-4" />
+                <Suspense fallback={
+                  <div className={"grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>
+                    {[1,2,3,4,5,6].map((i) => <div key={i} className="wac-card h-28 animate-pulse" />)}
+                  </div>
+                }>
+                  <EventsResults
+                    upcoming={!!appliedFilters.date}
+                    categories={appliedFilters.categories}
+                    formats={appliedFilters.formats}
+                    datePreset={appliedFilters.date}
+                    sources={appliedFilters.sources}
+                    audiences={appliedFilters.lifeStages}
+                    sortBy={appliedFilters.sort}
+                  />
+                </Suspense>
+              </section>
+
+            </div>
+
+          </>
         )}
 
       </div>
+
+      {/* ── Filter overlay — premium discovery control panel (portalled to escape navbar stacking context) ── */}
+      {showFilterSheet && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-[#09090b] flex flex-col" style={{ height: "100dvh" }}>
+
+          {/* ── Header bar ── */}
+          <div className="shrink-0 border-b border-white/[0.06] bg-[#09090b]">
+            <div className="max-w-6xl mx-auto px-5 lg:px-8 flex items-center justify-between h-13">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowFilterSheet(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/[0.06] text-white/45 hover:text-white/75 transition-all -ml-1"
+                >
+                  <X size={17} />
+                </button>
+                <h2 className="text-[14px] font-semibold text-white/90 tracking-tight">Filters</h2>
+              </div>
+              {/* Active filter summary — inline on desktop */}
+              <div className="hidden lg:flex items-center gap-1.5 flex-1 mx-6 min-w-0">
+                {draftFilterSummary.length > 0 ? (
+                  <div className="flex items-center gap-1 flex-wrap min-w-0">
+                    {draftFilterSummary.slice(0, 6).map((token, i) => (
+                      <span key={`${token}-${i}`}>
+                        <span className="text-[11px] font-medium text-white/40">{token}</span>
+                        {i < Math.min(draftFilterSummary.length, 6) - 1 && <span className="text-white/12 mx-0.5">·</span>}
+                      </span>
+                    ))}
+                    {draftFilterSummary.length > 6 && <span className="text-[10px] text-white/25">+{draftFilterSummary.length - 6}</span>}
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-white/18">No filters applied</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowFilterSheet(false)}
+                  className="hidden lg:flex px-4 py-1.5 rounded-full border border-white/[0.10] text-[11px] font-medium text-white/40 hover:text-white/60 hover:border-white/[0.16] transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={applyFilters}
+                  className="hidden lg:flex px-5 py-1.5 rounded-full bg-teal-500/[0.14] border border-teal-400/25 text-[11px] font-semibold text-teal-300/90 hover:bg-teal-500/[0.24] hover:border-teal-400/35 transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+            {/* Mobile summary */}
+            <div className="lg:hidden px-5 pb-2.5">
+              {draftFilterSummary.length > 0 ? (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {draftFilterSummary.slice(0, 5).map((token, i) => (
+                    <span key={`${token}-${i}`}>
+                      <span className="text-[11px] font-medium text-white/40">{token}</span>
+                      {i < Math.min(draftFilterSummary.length, 5) - 1 && <span className="text-white/12 mx-0.5">·</span>}
+                    </span>
+                  ))}
+                  {draftFilterSummary.length > 5 && <span className="text-[10px] text-white/25">+{draftFilterSummary.length - 5}</span>}
+                </div>
+              ) : (
+                <span className="text-[11px] text-white/18">No filters applied</span>
+              )}
+            </div>
+          </div>
+
+          {/* ── Scrollable filter content ── */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.06)_transparent]">
+            <div className="max-w-6xl mx-auto px-5 lg:px-8 pb-28 lg:pb-8">
+
+              {/* ── Desktop: 3-column layout ── */}
+              <div className="hidden lg:grid grid-cols-3 gap-x-10 pt-4">
+
+                {/* ── Column 1: Quick Filters + Categories ── */}
+                <div>
+                  {/* Quick Filters */}
+                  <div className="pb-4 border-b border-white/[0.05]">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25 mb-2.5">Quick Filters</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {QUICK_FILTERS.map((qf) => {
+                        const active = draftFilters.quick.includes(qf);
+                        return (
+                          <button key={qf} onClick={() => toggleQuickFilter(qf)}
+                            className={`px-3 py-[5px] rounded-full border text-[11px] font-medium transition-all ${
+                              active ? "border-teal-400/30 bg-teal-500/[0.10] text-teal-300/85" : "border-white/[0.10] text-white/40 hover:text-white/65 hover:border-white/[0.16]"
+                            }`}>{qf}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Categories */}
+                  <div className="py-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">Categories</p>
+                      {draftFilters.categories.length > 0 && (
+                        <span className="text-[9px] text-teal-400/55 font-medium">{draftFilters.categories.length}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FILTER_CATEGORIES.map((cat) => {
+                        const active = draftFilters.categories.includes(cat);
+                        return (
+                          <button key={cat} onClick={() => setDraftFilters((f) => ({ ...f, categories: toggleArr(f.categories, cat) }))}
+                            className={`px-3 py-[5px] rounded-full border text-[11px] font-medium transition-all ${
+                              active ? "border-teal-400/30 bg-teal-500/[0.10] text-teal-300/85" : "border-white/[0.10] text-white/40 hover:text-white/65 hover:border-white/[0.16]"
+                            }`}>{cat}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Column 2: Date + Format + Life Stage ── */}
+                <div>
+                  {/* Date */}
+                  <div className="pb-4 border-b border-white/[0.05]">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">Date</p>
+                      {draftFilters.date && (
+                        <span className="text-[9px] text-teal-400/55 font-medium">{draftFilters.date}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FILTER_DATES.map((d) => {
+                        const active = draftFilters.date === d;
+                        return (
+                          <button key={d} onClick={() => setDraftFilters((f) => ({ ...f, date: f.date === d ? null : d }))}
+                            className={`px-3 py-[5px] rounded-full border text-[11px] font-medium transition-all ${
+                              active ? "border-teal-400/30 bg-teal-500/[0.10] text-teal-300/85" : "border-white/[0.10] text-white/40 hover:text-white/65 hover:border-white/[0.16]"
+                            }`}>{d}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Format */}
+                  <div className="py-4 border-b border-white/[0.05]">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">Format</p>
+                      {draftFilters.formats.length > 0 && (
+                        <span className="text-[9px] text-teal-400/55 font-medium">{draftFilters.formats.join(", ")}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FILTER_FORMATS.map((fmt) => {
+                        const active = draftFilters.formats.includes(fmt);
+                        return (
+                          <button key={fmt} onClick={() => setDraftFilters((f) => ({ ...f, formats: toggleArr(f.formats, fmt) }))}
+                            className={`px-3 py-[5px] rounded-full border text-[11px] font-medium transition-all ${
+                              active ? "border-teal-400/30 bg-teal-500/[0.10] text-teal-300/85" : "border-white/[0.10] text-white/40 hover:text-white/65 hover:border-white/[0.16]"
+                            }`}>{fmt}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Browse by Path */}
+                  <div className="py-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">Browse by Path</p>
+                      {draftFilters.paths.length > 0 && (
+                        <span className="text-[9px] text-teal-400/55 font-medium">{draftFilters.paths.join(", ")}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {FILTER_PATHS.map((pathItem) => {
+                        const active = draftFilters.paths.includes(pathItem.id);
+                        return (
+                          <button key={pathItem.id} onClick={() => setDraftFilters((f) => ({ ...f, paths: toggleArr(f.paths, pathItem.id) }))}
+                            className={`flex items-center gap-1.5 px-3 py-[5px] rounded-full border text-[11px] font-medium transition-all ${
+                              active ? "border-teal-400/30 bg-teal-500/[0.10] text-teal-300/85" : "border-white/[0.10] text-white/40 hover:text-white/65 hover:border-white/[0.16]"
+                            }`}>
+                              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${pathItem.dot} ${active ? "" : "opacity-80"}`} />
+                              {pathItem.id}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Column 3: Source + Sort ── */}
+                <div>
+                  {/* Source */}
+                  <div className="pb-4 border-b border-white/[0.05]">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/25 mb-3">Sources</p>
+                    <div className="space-y-0.5">
+                      {EVENT_SOURCES.map(({ id, label, description, dot, hierarchical }) => {
+                        const isActive = draftFilters.sources.includes(id);
+                        return (
+                          <div key={id} className="flex items-center gap-2 px-1.5 py-2 rounded-lg hover:bg-white/[0.025] transition-colors">
+                            <button
+                              onClick={() => setDraftFilters((f) => ({ ...f, sources: toggleArr(f.sources, id) }))}
+                              className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                            >
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${dot} transition-opacity ${isActive ? "opacity-90" : "opacity-20"}`} />
+                              <div className="flex-1 min-w-0">
+                                <span className={`text-[11px] font-medium block transition-colors ${isActive ? "text-white/75" : "text-white/30"}`}>{label}</span>
+                                <span className="text-[9px] text-white/20 leading-tight block mt-0.5 truncate">{description}</span>
+                              </div>
+                              {hierarchical && <ChevronRight size={10} className="text-white/15 shrink-0" />}
+                            </button>
+                            <button onClick={() => setDraftFilters((f) => ({ ...f, sources: toggleArr(f.sources, id) }))}>
+                              <div className={`relative w-[38px] h-[22px] rounded-full transition-colors duration-200 ${isActive ? "bg-teal-500" : "bg-white/[0.10]"}`}>
+                                <span className={`absolute top-1/2 left-[3px] w-4 h-4 rounded-full shadow-sm transition-transform duration-200 ${isActive ? "-translate-y-1/2 translate-x-[16px] bg-white" : "-translate-y-1/2 translate-x-0 bg-white/50"}`} />
+                              </div>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sort */}
+                  <div className="py-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/25">Sort</p>
+                      <span className="text-[9px] text-white/20 font-medium">{draftFilters.sort}</span>
+                    </div>
+                    <div className="space-y-px">
+                      {FILTER_SORTS.map((s) => {
+                        const active = draftFilters.sort === s;
+                        return (
+                          <button key={s} onClick={() => setDraftFilters((f) => ({ ...f, sort: s }))}
+                            className={`flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-left transition-all ${
+                              active ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
+                            }`}>
+                            <span className={`w-[15px] h-[15px] rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                              active ? "border-[#b08d57]/50 bg-[#b08d57]/15" : "border-white/[0.12] bg-white/[0.03]"
+                            }`}>{active && <span className="w-1.5 h-1.5 rounded-full bg-[#b08d57]" />}</span>
+                            <span className={`text-[11px] font-medium transition-colors ${active ? "text-white/65" : "text-white/35"}`}>{s}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ── Mobile: single-column layout ── */}
+              {/* Typography system:
+                  T2 header  = text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48  (section labels — understated)
+                  T3 label   = text-[13px] font-medium text-white/65  (interactive choices — chips, row titles, sort options)
+                  T4 support = text-[11px] text-white/28  (descriptions, helper copy — clearly secondary)        */}
+              <div className="lg:hidden">
+
+                {/* ① Quick Filters */}
+                <div className="py-4 border-b border-white/[0.06]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48 mb-3">Quick Filters</p>
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_FILTERS.map((qf) => {
+                      const active = draftFilters.quick.includes(qf);
+                      return (
+                        <button key={qf} onClick={() => toggleQuickFilter(qf)}
+                          className={`px-4 py-[7px] rounded-full border text-[13px] font-medium transition-all ${
+                            active
+                              ? "border-teal-400/40 bg-teal-500/[0.13] text-teal-300/90"
+                              : "border-white/[0.16] text-white/65 hover:text-white/82 hover:border-white/[0.26]"
+                          }`}>{qf}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ② Categories */}
+                <div className="py-4 border-b border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Categories</p>
+                    {draftFilters.categories.length > 0 && (
+                      <span className="text-[10px] text-teal-400/60 font-semibold">{draftFilters.categories.length} selected</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {FILTER_CATEGORIES.map((cat) => {
+                      const active = draftFilters.categories.includes(cat);
+                      return (
+                        <button key={cat} onClick={() => setDraftFilters((f) => ({ ...f, categories: toggleArr(f.categories, cat) }))}
+                          className={`px-4 py-[7px] rounded-full border text-[13px] font-medium transition-all ${
+                            active
+                              ? "border-teal-400/40 bg-teal-500/[0.13] text-teal-300/90"
+                              : "border-white/[0.16] text-white/65 hover:text-white/82 hover:border-white/[0.26]"
+                          }`}>{cat}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ③ Date */}
+                <div className="py-4 border-b border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Date</p>
+                    {draftFilters.date && (
+                      <span className="text-[10px] text-teal-400/60 font-medium">{draftFilters.date}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {FILTER_DATES.map((d) => {
+                      const active = draftFilters.date === d;
+                      return (
+                        <button key={d} onClick={() => setDraftFilters((f) => ({ ...f, date: f.date === d ? null : d }))}
+                          className={`px-4 py-[7px] rounded-full border text-[13px] font-medium transition-all ${
+                            active
+                              ? "border-teal-400/40 bg-teal-500/[0.13] text-teal-300/90"
+                              : "border-white/[0.16] text-white/65 hover:text-white/82 hover:border-white/[0.26]"
+                          }`}>{d}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ④ Format */}
+                <div className="py-4 border-b border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Format</p>
+                    {draftFilters.formats.length > 0 && (
+                      <span className="text-[10px] text-teal-400/60 font-medium">{draftFilters.formats.join(", ")}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {FILTER_FORMATS.map((fmt) => {
+                      const active = draftFilters.formats.includes(fmt);
+                      return (
+                        <button key={fmt} onClick={() => setDraftFilters((f) => ({ ...f, formats: toggleArr(f.formats, fmt) }))}
+                          className={`px-4 py-[7px] rounded-full border text-[13px] font-medium transition-all ${
+                            active
+                              ? "border-teal-400/40 bg-teal-500/[0.13] text-teal-300/90"
+                              : "border-white/[0.16] text-white/65 hover:text-white/82 hover:border-white/[0.26]"
+                          }`}>{fmt}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ⑤ Sources */}
+                <div className="border-b border-white/[0.06]">
+                  <div className="pt-4 pb-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Sources</p>
+                    <p className="text-[11px] text-white/28 mt-1">Where the event is coming from.</p>
+                  </div>
+                  <div className="pb-2">
+                    {EVENT_SOURCES.map(({ id, label, description, dot, hierarchical }) => {
+                      const isHier = hierarchical;
+                      const hierKey = id as HierarchicalSourceId;
+                      const isActive = isHier
+                        ? draftFilters[hierKey].mode !== "off"
+                        : draftFilters.sources.includes(id);
+                      const stateLabel = isHier
+                        ? hierSourceStateLabel(draftFilters[hierKey], hierKey)
+                        : null;
+                      return (
+                        <div key={id} className="flex items-center py-3 hover:bg-white/[0.02] rounded-xl transition-colors -mx-1 px-1">
+                          <button
+                            onClick={() => isHier
+                              ? openDrillDown(hierKey)
+                              : setDraftFilters((f) => ({ ...f, sources: toggleArr(f.sources, id) }))}
+                            className="flex items-center flex-1 min-w-0 text-left gap-4"
+                          >
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot} transition-opacity ${isActive ? "opacity-90" : "opacity-25"}`} />
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-[13px] font-medium block transition-colors ${isActive ? "text-white/80" : "text-white/65"}`}>
+                                {label}
+                                {stateLabel && (
+                                  <span className="text-[11px] text-teal-400/70 font-medium ml-2">{stateLabel}</span>
+                                )}
+                              </span>
+                              <span className="text-[11px] text-white/28 leading-tight block mt-0.5">{description}</span>
+                            </div>
+                            {isHier && <ChevronRight size={13} className="text-white/22 shrink-0" />}
+                          </button>
+                          <button
+                            onClick={() => isHier
+                              ? toggleHierarchicalSource(hierKey)
+                              : setDraftFilters((f) => ({ ...f, sources: toggleArr(f.sources, id) }))}
+                            className="shrink-0 ml-3"
+                          >
+                            <div className={`relative w-[44px] h-[26px] rounded-full transition-colors duration-200 ${isActive ? "bg-teal-500" : "bg-white/[0.10]"}`}>
+                              <span className={`absolute top-1/2 left-[3px] w-5 h-5 rounded-full shadow-sm transition-transform duration-200 ${isActive ? "-translate-y-1/2 translate-x-[18px] bg-white" : "-translate-y-1/2 translate-x-0 bg-white/45"}`} />
+                            </div>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ⑥ Browse by Path */}
+                <div className="py-4 border-b border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Browse by Path</p>
+                    {draftFilters.paths.length > 0 && (
+                      <span className="text-[10px] text-teal-400/60 font-medium">{draftFilters.paths.length} selected</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {FILTER_PATHS.map((pathItem) => {
+                      const active = draftFilters.paths.includes(pathItem.id);
+                      return (
+                        <button key={pathItem.id} onClick={() => setDraftFilters((f) => ({ ...f, paths: toggleArr(f.paths, pathItem.id) }))}
+                          className={`flex items-center gap-2 px-4 py-[7px] rounded-full border text-[13px] font-medium transition-all ${
+                            active
+                              ? "border-teal-400/40 bg-teal-500/[0.13] text-teal-300/90"
+                              : "border-white/[0.16] text-white/65 hover:text-white/82 hover:border-white/[0.26]"
+                          }`}>
+                            <div className={`w-[6px] h-[6px] rounded-full shrink-0 ${pathItem.dot} ${active ? "" : "opacity-80"}`} />
+                            {pathItem.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ⑦ Sort */}
+                <div className="py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.09em] text-white/48">Sort</p>
+                    <span className="text-[10px] text-white/30 font-medium">{draftFilters.sort}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {FILTER_SORTS.map((s) => {
+                      const active = draftFilters.sort === s;
+                      return (
+                        <button key={s} onClick={() => setDraftFilters((f) => ({ ...f, sort: s }))}
+                          className={`flex items-center gap-3.5 w-full px-3 py-2.5 rounded-xl text-left transition-all ${
+                            active ? "bg-white/[0.04]" : "hover:bg-white/[0.02]"
+                          }`}>
+                          <span className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                            active ? "border-[#b08d57]/50 bg-[#b08d57]/15" : "border-white/[0.14] bg-transparent"
+                          }`}>{active && <span className="w-1.5 h-1.5 rounded-full bg-[#b08d57]" />}</span>
+                          <span className={`text-[13px] font-medium transition-colors ${active ? "text-white/80" : "text-white/65"}`}>{s}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+          {/* ── Mobile sticky bottom action bar ── */}
+          <div className="lg:hidden shrink-0 border-t border-white/[0.06] bg-[#09090b]/95 backdrop-blur-md px-5 pt-3 pb-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={resetDraftFilters}
+                className="flex-1 px-4 py-2.5 rounded-full border border-white/[0.10] text-[12px] font-medium text-white/40 hover:text-white/60 transition-all text-center"
+              >
+                Clear
+              </button>
+              <button
+                onClick={applyFilters}
+                className="flex-[2] px-4 py-2.5 rounded-full bg-teal-500/[0.14] border border-teal-400/25 text-[12px] font-semibold text-teal-300/90 hover:bg-teal-500/[0.24] transition-all text-center"
+              >
+                {draftFilterCount > 0 ? `Apply · ${draftFilterCount}` : "Apply"}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Source drill-down sub-screen ── */}
+          {filterDrillDown && (() => {
+            const entities = MOCK_FOLLOWED[filterDrillDown];
+            const filtered = drillSearch.trim()
+              ? entities.filter((e) => e.name.toLowerCase().includes(drillSearch.toLowerCase()))
+              : entities;
+            const allSelected = entities.length > 0 && entities.every((e) => drillDraftSelected.includes(e.id));
+            return (
+              <div className="absolute inset-0 bg-[#09090b] flex flex-col z-10">
+                {/* Header — back + title only, no action in top-right */}
+                <div className="shrink-0 flex items-center gap-3 px-4 h-[56px] border-b border-white/[0.06]">
+                  <button
+                    onClick={() => { setFilterDrillDown(null); setDrillSearch(""); }}
+                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] text-white/50 hover:text-white/80 transition-all"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <h3 className="text-[15px] font-semibold text-white/90 tracking-tight capitalize flex-1">{filterDrillDown}</h3>
+                </div>
+
+                {entities.length === 0 ? (
+                  /* Empty state */
+                  <div className="flex-1 flex items-center justify-center p-8">
+                    <div className="text-center max-w-xs">
+                      <div className="w-12 h-12 rounded-full bg-white/[0.04] border border-white/[0.07] flex items-center justify-center mx-auto mb-4">
+                        <Users size={20} className="text-white/20" />
+                      </div>
+                      <p className="text-[13px] font-medium text-white/45">No {filterDrillDown} followed yet.</p>
+                      <p className="text-[11px] text-white/25 mt-2 leading-relaxed">
+                        Follow {filterDrillDown} across WAC to select specific ones here.
+                      </p>
+                      <button className="mt-5 px-4 py-2 rounded-full border border-white/[0.12] text-[12px] font-medium text-white/55 hover:text-white/75 hover:border-white/[0.20] transition-all">
+                        Find {filterDrillDown}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Search */}
+                    <div className="shrink-0 px-4 pt-3 pb-2">
+                      <div className="flex items-center gap-2.5 bg-white/[0.05] rounded-xl px-3 py-2.5">
+                        <Search size={14} className="text-white/30 shrink-0" />
+                        <input
+                          value={drillSearch}
+                          onChange={(e) => setDrillSearch(e.target.value)}
+                          placeholder={`Search ${filterDrillDown}…`}
+                          className="flex-1 bg-transparent text-[13px] text-white/75 placeholder:text-white/25 outline-none"
+                        />
+                        {drillSearch && (
+                          <button onClick={() => setDrillSearch("")} className="text-white/30 hover:text-white/60 transition-colors">
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Helper row — selection status + Select all */}
+                    <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-white/[0.05]">
+                      <span className="text-[11px] text-white/30 font-medium">
+                        {drillDraftSelected.length === 0 ? "None selected" : `${drillDraftSelected.length} of ${entities.length} selected`}
+                      </span>
+                      <button
+                        onClick={() => setDrillDraftSelected(entities.map((e) => e.id))}
+                        className={`text-[11px] font-semibold transition-colors ${allSelected ? "text-teal-400/40" : "text-teal-400/75 hover:text-teal-400"}`}
+                        disabled={allSelected}
+                      >
+                        Select all
+                      </button>
+                    </div>
+
+                    {/* Scrollable entity list */}
+                    <div className="flex-1 overflow-y-auto">
+                      {filtered.length === 0 ? (
+                        <div className="flex items-center justify-center py-12">
+                          <p className="text-[12px] text-white/25">No results for &ldquo;{drillSearch}&rdquo;</p>
+                        </div>
+                      ) : (
+                        filtered.map((entity) => {
+                          const isChecked = drillDraftSelected.includes(entity.id);
+                          return (
+                            <button
+                              key={entity.id}
+                              onClick={() => setDrillDraftSelected((sel) =>
+                                isChecked ? sel.filter((id) => id !== entity.id) : [...sel, entity.id]
+                              )}
+                              className="flex items-center gap-4 w-full px-4 py-3.5 hover:bg-white/[0.03] transition-colors"
+                            >
+                              <span className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                                isChecked ? "bg-teal-500 border-teal-400" : "border-white/[0.18] bg-transparent"
+                              }`}>
+                                {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                              </span>
+                              <span className={`text-[13px] font-medium flex-1 text-left transition-colors ${isChecked ? "text-white/85" : "text-white/65"}`}>
+                                {entity.name}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Sticky bottom action bar — same pattern as filter sheet */}
+                    <div className="shrink-0 border-t border-white/[0.06] bg-[#09090b]/95 backdrop-blur-md px-5 pt-3 pb-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setDrillDraftSelected([])}
+                          className="flex-1 px-4 py-2.5 rounded-full border border-white/[0.10] text-[12px] font-medium text-white/40 hover:text-white/60 transition-all text-center"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={applyDrillDown}
+                          className="flex-[2] px-4 py-2.5 rounded-full bg-teal-500/[0.14] border border-teal-400/25 text-[12px] font-semibold text-teal-300/90 hover:bg-teal-500/[0.24] transition-all text-center"
+                        >
+                          {drillDraftSelected.length > 0 ? `Apply · ${drillDraftSelected.length}` : "Apply"}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 }

@@ -7,6 +7,14 @@ import EventCard, { EventDisplayMode, EventEntry, EventSourceType, EventStatus, 
 
 interface EventsResultsProps {
   eventType?: string;
+  upcoming?:  boolean;
+  limit?:     number;
+  categories?: string[];
+  formats?: string[];
+  datePreset?: string | null;
+  sources?: string[];
+  audiences?: string[];
+  sortBy?: string;
 }
 
 const NORMALIZED_EVENT_TYPES: EventType[] = ["event", "announcement", "feature_drop", "alert"];
@@ -28,7 +36,7 @@ type EventRsvpRow = {
   user_id: string;
 };
 
-function EventsResultsInner({ eventType }: EventsResultsProps) {
+function EventsResultsInner({ eventType, upcoming, limit, categories, formats, datePreset, sources, audiences, sortBy }: EventsResultsProps) {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
 
@@ -48,12 +56,16 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
           data: { user },
         } = await supabase.auth.getUser();
 
+        // Determine sort column and direction
+        const sortCol = sortBy === "Popular" ? "attending_count" : "start_time";
+        const sortAsc = sortBy === "Soonest" || sortBy === "Relevant" || !sortBy;
+
         let query = supabase
           .from("events")
-          .select("id, title, description, source_type, source_id, display_mode, status, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, location_name, city, state, country, start_time, end_time, event_type, visibility, access_mode, capacity")
+          .select("id, title, description, source_type, source_id, display_mode, status, organization_id, host_entity_type, host_entity_id, linked_entity_type, linked_entity_id, hosting_metadata, location_name, city, state, country, start_time, end_time, event_type, visibility, access_mode, capacity, category, format, audience")
           .eq("status", "published")
           .in("display_mode", ["calendar", "both"])
-          .order("start_time", { ascending: true });
+          .order(sortCol, { ascending: sortAsc });
 
         if (searchQuery.trim()) {
           query = query.or(
@@ -61,11 +73,82 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
           );
         }
 
+        if (upcoming) {
+          query = query.gte("start_time", new Date().toISOString());
+        }
+
         if (eventType && NORMALIZED_EVENT_TYPES.includes(eventType as EventType)) {
           query = query.ilike("event_type", eventType);
         }
 
-        const { data: eventRows, error: eventsError } = await query.limit(60);
+        // Category filter
+        if (categories && categories.length > 0) {
+          query = query.in("category", categories.map((c) => c.toLowerCase()));
+        }
+
+        // Format filter — map UI labels to DB values
+        if (formats && formats.length > 0) {
+          const dbFormats = formats.map((f) =>
+            f === "In Person" ? "in_person" : f.toLowerCase()
+          );
+          query = query.in("format", dbFormats);
+        }
+
+        // Date preset filter
+        if (datePreset) {
+          const now = new Date();
+          let start: Date | null = null;
+          let end: Date | null = null;
+
+          if (datePreset === "Today") {
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            end = new Date(start);
+            end.setDate(end.getDate() + 1);
+          } else if (datePreset === "This Week") {
+            const day = now.getDay();
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+            end = new Date(start);
+            end.setDate(end.getDate() + 7);
+          } else if (datePreset === "This Weekend") {
+            const day = now.getDay();
+            const satOffset = day <= 6 ? 6 - day : 0;
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + satOffset);
+            end = new Date(start);
+            end.setDate(end.getDate() + 2);
+          } else if (datePreset === "This Month") {
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          }
+
+          if (start) query = query.gte("start_time", start.toISOString());
+          if (end) query = query.lt("start_time", end.toISOString());
+        }
+
+        // Source filter — map UI labels to DB source_type values
+        if (sources && sources.length > 0) {
+          const sourceMap: Record<string, string> = {
+            "WAC": "wac",
+            "My Network": "wac",
+            "Groups": "group",
+            "Organizations": "organization",
+            "Businesses": "business",
+          };
+          const dbSources = [...new Set(sources.map((s) => sourceMap[s]).filter(Boolean))];
+          if (dbSources.length > 0) {
+            query = query.in("source_type", dbSources);
+          }
+          // "Public" source means visibility = public
+          if (sources.includes("Public")) {
+            query = query.eq("visibility", "public");
+          }
+        }
+
+        // Audience filter
+        if (audiences && audiences.length > 0) {
+          query = query.in("audience", audiences.map((a) => a.toLowerCase()));
+        }
+
+        const { data: eventRows, error: eventsError } = await query.limit(limit ?? 60);
         if (eventsError) throw eventsError;
 
         const rows = (eventRows ?? []) as EventRow[];
@@ -129,7 +212,8 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, eventType]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, eventType, upcoming, limit, JSON.stringify(categories), JSON.stringify(formats), datePreset, JSON.stringify(sources), JSON.stringify(audiences), sortBy]);
 
   if (loading) {
     return (
@@ -167,6 +251,6 @@ function EventsResultsInner({ eventType }: EventsResultsProps) {
   );
 }
 
-export default function EventsResults({ eventType }: EventsResultsProps) {
-  return <EventsResultsInner eventType={eventType} />;
+export default function EventsResults(props: EventsResultsProps) {
+  return <EventsResultsInner {...props} />;
 }

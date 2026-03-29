@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 const NAV_ITEMS = [
   { name: "Directory", href: "/directory", icon: Compass,      isPulse: false, isAlerts: false },
   { name: "Events",    href: "/events",    icon: CalendarDays, isPulse: false, isAlerts: false },
-  { name: "Pulse",     href: "/community", icon: Activity,     isPulse: true,  isAlerts: false },
+  { name: "Pulse",     href: "/pulse",     icon: Activity,     isPulse: true,  isAlerts: false },
   { name: "Groups",    href: "/groups",    icon: Network,      isPulse: false, isAlerts: false },
   { name: "Alerts",    href: "/notifications", icon: Bell,     isPulse: false, isAlerts: true },
 ];
@@ -96,11 +96,6 @@ export default function MobileBottomNav() {
                     : "group-hover:drop-shadow-[0_0_10px_rgba(176,141,87,0.5)]"
                 }`}>
                   <Icon size={24} strokeWidth={isActive ? 2.2 : 1.6} />
-
-                  {/* Active dot */}
-                  {isActive && (
-                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[var(--accent)] shadow-[0_0_6px_rgba(176,141,87,1)]" />
-                  )}
 
                   {/* Notification badge */}
                   {isAlerts && notifCount > 0 && (

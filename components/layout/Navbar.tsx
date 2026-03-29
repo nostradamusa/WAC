@@ -3,16 +3,19 @@
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Search, Plus, MessageCircle, Compass, CalendarDays, Activity, Network, Telescope,
   ChevronDown, ChevronRight, User, Settings, Building2, LogOut, Briefcase, Landmark, Globe, Check, MessageSquarePlus,
+  Home,
 } from "lucide-react";
 import LanguageToggle from "./LanguageToggle";
 import { useActor } from "@/components/providers/ActorProvider";
 import type { ActorIdentity } from "@/components/providers/ActorProvider";
 import GlobalSearchOverlay from "./GlobalSearchOverlay";
 import { useUnreadMessageCount } from "@/lib/hooks/useUnreadCounts";
+import { PROPERTIES_ENABLED } from "@/lib/constants/featureFlags";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +62,7 @@ function Avatar({ actor, size }: { actor: ActorIdentity | null; size: number }) 
 export default function Navbar() {
   const [userEmail, setUserEmail]       = useState<string | null>(null);
   const [userId, setUserId]             = useState<string | null>(null);
+  const [authLoaded, setAuthLoaded]     = useState(false);
   const [isMenuOpen, setIsMenuOpen]     = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showCreateTip,  setShowCreateTip]  = useState(false);
@@ -114,11 +118,11 @@ export default function Navbar() {
       router.push("/groups/new");
       return;
     }
-    if (pathname === "/community" || pathname.startsWith("/community/")) {
+    if (pathname === "/pulse" || pathname.startsWith("/pulse/")) {
       window.dispatchEvent(new CustomEvent("open-compose-sheet"));
       return;
     }
-    router.push("/community");
+    router.push("/pulse");
   }
   const { currentActor, setCurrentActor, ownedEntities } = useActor();
   const unreadMessages = useUnreadMessageCount(currentActor?.id, userId);
@@ -144,6 +148,7 @@ export default function Navbar() {
         setUserEmail(data.user.email ?? null);
         setUserId(data.user.id);
       }
+      setAuthLoaded(true);
     }
     loadUser();
 
@@ -203,10 +208,11 @@ export default function Navbar() {
 
   // ── Add to Network menu items ─────────────────────────────────────────────
   const NETWORK_ITEMS = [
-    { label: "Add Business",     sub: "Register your business",          href: "/profile/entities/new?type=business",     Icon: Briefcase,    accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50" },
-    { label: "Add Organization", sub: "Create an org or association",    href: "/profile/entities/new?type=organization", Icon: Landmark,     accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50" },
-    { label: "Create Event",     sub: "Host an event for your network",  href: "/events/new",                             Icon: CalendarDays, accent: "text-teal-400",   ring: "border-teal-400/20  group-hover:border-teal-400/40"  },
-  ] as const;
+    { label: "Add Business",     sub: "Register your business",          href: "/profile/entities/new?type=business",     Icon: Briefcase,    accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50", isSoon: false },
+    { label: "Add Organization", sub: "Create an org or association",    href: "/profile/entities/new?type=organization", Icon: Landmark,     accent: "text-[#b08d57]",  ring: "border-[#b08d57]/25 group-hover:border-[#b08d57]/50", isSoon: false },
+    { label: "Create Event",     sub: "Host an event for your network",  href: "/events/new",                             Icon: CalendarDays, accent: "text-teal-400",   ring: "border-teal-400/20  group-hover:border-teal-400/40",  isSoon: false },
+    { label: "List a Property",  sub: "Real estate on the network",      href: "/properties/new",                         Icon: Home,         accent: "text-emerald-400", ring: "border-emerald-400/20 group-hover:border-emerald-400/40", isSoon: !PROPERTIES_ENABLED },
+  ];
 
   // ── Inner components (close over state) ───────────────────────────────────
 
@@ -225,10 +231,13 @@ export default function Navbar() {
             : "shadow-[0_0_10px_rgba(176,141,87,0.25)] hover:shadow-[0_0_16px_rgba(176,141,87,0.4)]"
         }`}
       >
-        <img
+        <Image
           src="/images/wac-logo.jpg"
-          alt="WAC"
+          alt=""
           aria-hidden="true"
+          width={40}
+          height={40}
+          priority
           className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
         />
       </button>
@@ -268,9 +277,11 @@ export default function Navbar() {
         className="px-4 py-3 border-b border-white/[0.07] flex items-center gap-3 transition-colors hover:bg-white/[0.03] group"
       >
         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] shadow-[0_0_10px_rgba(176,141,87,0.15)] group-hover:shadow-[0_0_16px_rgba(176,141,87,0.3)] border-2 border-[#b08d57]/60 shrink-0 transition-shadow">
-          <img
+          <Image
             src="/images/wac-logo.jpg"
-            alt="WAC"
+            alt=""
+            width={32}
+            height={32}
             className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
           />
         </div>
@@ -403,9 +414,11 @@ export default function Navbar() {
         className="px-5 py-4 border-b border-white/[0.07] flex items-center gap-3.5 transition-colors active:bg-white/[0.04] group"
       >
         <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-[var(--accent)] shadow-[0_0_14px_rgba(176,141,87,0.2)] border-2 border-[#b08d57]/60 shrink-0 transition-shadow">
-          <img
+          <Image
             src="/images/wac-logo.jpg"
-            alt="WAC"
+            alt=""
+            width={40}
+            height={40}
             className="w-full h-full object-cover scale-[1.4] mix-blend-multiply opacity-95"
           />
         </div>
@@ -593,7 +606,7 @@ export default function Navbar() {
               className="flex items-center gap-3 transition-opacity hover:opacity-90"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#b08d57]/60 shadow-[0_0_15px_rgba(176,141,87,0.4)] bg-[var(--accent)]">
-                <img src="/images/wac-logo.jpg" alt="World Albanian Congress Logo" className="h-full w-full object-cover scale-[1.4] mix-blend-multiply opacity-95" />
+                <Image src="/images/wac-logo.jpg" alt="World Albanian Congress Logo" width={40} height={40} priority className="h-full w-full object-cover scale-[1.4] mix-blend-multiply opacity-95" />
               </div>
               <div className="hidden sm:flex items-center">
                 <span className="text-lg font-serif tracking-tight text-white whitespace-nowrap">
@@ -608,7 +621,7 @@ export default function Navbar() {
               {([
                 { href: "/directory", label: "Directory", icon: Compass },
                 { href: "/events",    label: "Events",    icon: CalendarDays },
-                { href: "/community", label: "Pulse", icon: Activity },
+                { href: "/pulse", label: "Pulse", icon: Activity },
                 { href: "/groups",    label: "Groups",    icon: Network },
                 { href: "/vision",    label: "Vision",    icon: Telescope },
               ] as const).map(({ href, label, icon: Icon }) => {
@@ -618,7 +631,7 @@ export default function Navbar() {
                     key={href}
                     href={href}
                     onClick={(e) => {
-                      if (isActive && href === "/community") {
+                      if (isActive && href === "/pulse") {
                         e.preventDefault();
                         window.dispatchEvent(new CustomEvent("wac-refresh-feed"));
                       }
@@ -672,21 +685,39 @@ export default function Navbar() {
                     <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">Add to Network</p>
                   </div>
                   <div className="pb-2">
-                    {NETWORK_ITEMS.map(({ label, sub, href, Icon, accent, ring }) => (
-                      <Link
-                        key={href}
-                        href={href}
-                        onClick={() => setShowNetworkMenu(false)}
-                        className={`group flex items-center gap-3 px-4 py-2.5 transition hover:bg-white/[0.04]`}
-                      >
-                        <div className={`w-8 h-8 rounded-xl border ${ring} bg-white/[0.03] flex items-center justify-center shrink-0 transition-colors`}>
-                          <Icon size={14} strokeWidth={1.8} className={`${accent} opacity-70 group-hover:opacity-100 transition-opacity`} />
+                    {NETWORK_ITEMS.map(({ label, sub, href, Icon, accent, ring, isSoon }) => (
+                      isSoon ? (
+                        <div
+                          key={href}
+                          className="group flex items-center gap-3 px-4 py-2.5 opacity-40 cursor-default"
+                        >
+                          <div className={`w-8 h-8 rounded-xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-center shrink-0`}>
+                            <Icon size={14} strokeWidth={1.8} className="text-white/25" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-white/50 flex items-center gap-2">
+                              {label}
+                              <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-white/30 bg-white/[0.06] px-1.5 py-0.5 rounded-full border border-white/[0.06] leading-none">Soon</span>
+                            </div>
+                            <div className="text-[10px] text-white/20 mt-0.5 leading-none">{sub}</div>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">{label}</div>
-                          <div className="text-[10px] text-white/28 mt-0.5 leading-none">{sub}</div>
-                        </div>
-                      </Link>
+                      ) : (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setShowNetworkMenu(false)}
+                          className={`group flex items-center gap-3 px-4 py-2.5 transition hover:bg-white/[0.04]`}
+                        >
+                          <div className={`w-8 h-8 rounded-xl border ${ring} bg-white/[0.03] flex items-center justify-center shrink-0 transition-colors`}>
+                            <Icon size={14} strokeWidth={1.8} className={`${accent} opacity-70 group-hover:opacity-100 transition-opacity`} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-white/80 group-hover:text-white transition-colors">{label}</div>
+                            <div className="text-[10px] text-white/28 mt-0.5 leading-none">{sub}</div>
+                          </div>
+                        </Link>
+                      )
                     ))}
                   </div>
                 </div>
@@ -715,7 +746,10 @@ export default function Navbar() {
 
             <LanguageToggle />
 
-            {userEmail ? (
+            {!authLoaded ? (
+              /* Neutral placeholder — prevents flash of "Log In" → avatar during auth resolution */
+              <div aria-hidden="true" className="w-8 h-8 rounded-full border-2 border-[#b08d57]/30 bg-[var(--accent)]/10" />
+            ) : userEmail ? (
               <div className="relative" ref={desktopMenuRef}>
                 <AvatarButton className="w-8 h-8" />
                 {isMenuOpen && (
@@ -739,7 +773,13 @@ export default function Navbar() {
         <div className="flex md:hidden items-center justify-between p-3 gap-3">
 
           {/* Left: branded identity control */}
-          {userEmail ? (
+          {!authLoaded ? (
+            /* Neutral placeholder — exact same size as BrandedIdentityTrigger, prevents auth-resolution flash */
+            <div
+              aria-hidden="true"
+              className="shrink-0 w-10 h-10 rounded-full border-2 border-[#b08d57]/30 bg-[var(--accent)]/10"
+            />
+          ) : userEmail ? (
             <BrandedIdentityTrigger />
           ) : (
             <Link
@@ -871,21 +911,39 @@ export default function Navbar() {
               <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/25">Add to Network</p>
             </div>
             <div className="pb-4">
-              {NETWORK_ITEMS.map(({ label, sub, href, Icon, accent, ring }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setShowNetworkMenu(false)}
-                  className="group flex items-center gap-4 px-5 py-3.5 transition active:bg-white/[0.05]"
-                >
-                  <div className={`w-10 h-10 rounded-2xl border ${ring} bg-white/[0.03] flex items-center justify-center shrink-0 transition-colors`}>
-                    <Icon size={16} strokeWidth={1.8} className={`${accent} opacity-70`} />
+              {NETWORK_ITEMS.map(({ label, sub, href, Icon, accent, ring, isSoon }) => (
+                isSoon ? (
+                  <div
+                    key={href}
+                    className="group flex items-center gap-4 px-5 py-3.5 opacity-40 cursor-default"
+                  >
+                    <div className={`w-10 h-10 rounded-2xl border border-white/[0.08] bg-white/[0.02] flex items-center justify-center shrink-0`}>
+                      <Icon size={16} strokeWidth={1.8} className="text-white/25" />
+                    </div>
+                    <div>
+                      <div className="text-[15px] font-medium text-white/50 flex items-center gap-2">
+                        {label}
+                        <span className="text-[8px] font-bold uppercase tracking-[0.12em] text-white/30 bg-white/[0.06] px-1.5 py-0.5 rounded-full border border-white/[0.06] leading-none">Soon</span>
+                      </div>
+                      <div className="text-[11px] text-white/20 mt-0.5">{sub}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[15px] font-medium text-white/85">{label}</div>
-                    <div className="text-[11px] text-white/30 mt-0.5">{sub}</div>
-                  </div>
-                </Link>
+                ) : (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={() => setShowNetworkMenu(false)}
+                    className="group flex items-center gap-4 px-5 py-3.5 transition active:bg-white/[0.05]"
+                  >
+                    <div className={`w-10 h-10 rounded-2xl border ${ring} bg-white/[0.03] flex items-center justify-center shrink-0 transition-colors`}>
+                      <Icon size={16} strokeWidth={1.8} className={`${accent} opacity-70`} />
+                    </div>
+                    <div>
+                      <div className="text-[15px] font-medium text-white/85">{label}</div>
+                      <div className="text-[11px] text-white/30 mt-0.5">{sub}</div>
+                    </div>
+                  </Link>
+                )
               ))}
             </div>
             <div className="h-6" />

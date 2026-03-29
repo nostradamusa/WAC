@@ -2,29 +2,28 @@ import SectionLabel from "@/components/ui/SectionLabel";
 
 export default function WhyItExists() {
   return (
-    <section className="py-16 px-4 bg-[rgba(255,255,255,0.01)] border-y border-[var(--border)]">
-      <div className="mx-auto max-w-screen-xl grid md:grid-cols-[1fr_1.3fr] gap-10 md:gap-16 items-center">
+    <section className="py-16 md:py-20 px-4 sm:px-6 bg-[rgba(255,255,255,0.01)] border-y border-[var(--border)]">
+      <div className="mx-auto max-w-screen-xl grid md:grid-cols-[1fr_1.3fr] gap-10 md:gap-16 items-start">
 
         {/* Left: label + heading */}
         <div>
           <SectionLabel label="Our Purpose" variant="standard" className="mb-5" />
-          <h2 className="font-serif text-3xl md:text-4xl font-normal text-white leading-[1.2]">
-            The network the{" "}
-            <span className="italic text-[#b08d57]">Albanian diaspora</span>{" "}
-            has been missing.
+          <h2 className="font-serif text-[28px] md:text-[38px] font-normal text-white leading-[1.2] tracking-tight">
+            <span className="italic text-[#b08d57]">Albanians</span> are everywhere.
+            <br />
+            <span className="text-white/55">Their network should be too.</span>
           </h2>
         </div>
 
         {/* Right: copy */}
-        <div className="space-y-4 text-[15px] text-white/60 leading-[1.75]">
+        <div className="space-y-5 text-[15px] text-white/50 leading-[1.8]">
           <p>
-            Albanians live across the world, thriving in every major industry, city, and
-            profession. Yet for decades our communities have lacked a shared digital
-            infrastructure — finding Albanian professionals, businesses, and organizations
-            has relied entirely on fragmented social media and word of mouth.
+            Professionals, businesses, organizations, and builders are spread across the world,
+            but discovery still depends too much on word of mouth, scattered social platforms,
+            and accidental introductions.
           </p>
-          <p className="text-white/80 font-medium">
-            World Albanian Congress was built to change that.
+          <p className="text-white/65 font-medium">
+            World Albanian Congress brings identity, signal, geography, and opportunity into one system.
           </p>
         </div>
 

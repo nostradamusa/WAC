@@ -9,7 +9,7 @@ import {
   X, Plus, Loader2, Image as ImageIcon, FileText, CalendarDays,
   HelpCircle, MapPin, ChevronDown, Tag,
 } from "lucide-react";
-import { ASK_CATEGORIES, ASK_URGENCY_OPTIONS } from "@/lib/constants/askConstants";
+import { ASK_CATEGORIES, ASK_URGENCY_OPTIONS, getCategoryLabel } from "@/lib/constants/askConstants";
 import { COMPOSER_INTENTS } from "@/lib/constants/intentConstants";
 import MyStoryViewer, { MyStory } from "./MyStoryViewer";
 
@@ -24,7 +24,7 @@ export interface ComposeOverridePayload {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PostType    = "update" | "event" | "ask";
+type PostType    = "update" | "ask";
 type MediaMode   = "idle" | "photo" | "video";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -219,7 +219,9 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
   const [askUrgency,  setAskUrgency]  = useState("normal");
 
   // ── Intent tag (for non-ask posts: announcement, hiring, etc.)
-  const [intentTag, setIntentTag] = useState<string | null>(null);
+  const [intentTag,            setIntentTag]            = useState<string | null>(null);
+  const [showIntentTags,       setShowIntentTags]       = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   // ── Group context (when posting into a group)
   const [linkedGroupId, setLinkedGroupId]     = useState<string | null>(null);
@@ -323,20 +325,11 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
     setIsSheetOpen(false);
     setContent(""); clearAllMedia(); setPostType("update"); setError("");
     setAskTitle(""); setAskCategory(""); setAskLocation(""); setAskUrgency("normal");
-    setIntentTag(null); setOverrideActor(null);
+    setIntentTag(null); setShowIntentTags(false); setShowCategoryDropdown(false); setOverrideActor(null);
     setLinkedGroupId(null); setLinkedGroupName(null);
   }, [clearAllMedia]);
 
   const handlePostType = (type: PostType) => {
-    if (type === "event") {
-      // Navigate immediately — do NOT closeSheet() first.
-      // Calling closeSheet() removes the overlay before Next.js finishes loading
-      // the new route, causing the feed to flash visible for hundreds of ms.
-      // Leaving the sheet open means the overlay covers the transition cleanly;
-      // CreatePostBox is unmounted by the route change, which discards state naturally.
-      router.push("/events/create");
-      return;
-    }
     setPostType(type);
   };
 
@@ -471,9 +464,8 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
   ];
 
   const POST_TYPES: { type: PostType; label: string; icon: React.ReactNode }[] = [
-    { type: "update", label: "Update", icon: <FileText     size={18} strokeWidth={1.6} /> },
-    { type: "event",  label: "Event",  icon: <CalendarDays size={18} strokeWidth={1.6} /> },
-    { type: "ask",    label: "Ask",    icon: <HelpCircle   size={18} strokeWidth={1.6} /> },
+    { type: "update", label: "Update", icon: <FileText   size={18} strokeWidth={1.6} /> },
+    { type: "ask",    label: "Ask",    icon: <HelpCircle size={18} strokeWidth={1.6} /> },
   ];
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -558,19 +550,14 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
           <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={closeSheet} />
 
           <div
-            className="absolute left-0 right-0 bottom-0 md:inset-0 md:flex md:items-center md:justify-center md:pointer-events-none"
+            className="absolute inset-0 md:flex md:items-center md:justify-center md:pointer-events-none"
           >
             <div
-              className="w-full md:max-w-lg md:pointer-events-auto bg-[#0f0f0f] rounded-t-2xl md:rounded-2xl border-t md:border border-white/[0.09] shadow-2xl overflow-hidden flex flex-col"
-              style={{ minHeight: "72dvh", maxHeight: "93dvh" }}
+              className="w-full h-full md:h-auto md:max-h-[93dvh] md:max-w-lg md:pointer-events-auto bg-[#0f0f0f] md:rounded-2xl md:border border-white/[0.09] shadow-2xl overflow-hidden flex flex-col"
             >
-              {/* Drag handle */}
-              <div className="md:hidden flex justify-center pt-3 pb-0 shrink-0">
-                <div className="w-9 h-1 rounded-full bg-white/15" />
-              </div>
 
               {/* ── Header ────────────────────────────────────────────────── */}
-              <div className="px-5 pt-4 shrink-0">
+              <div className="px-5 pt-20 md:pt-4 shrink-0">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full shrink-0 overflow-hidden bg-[#b08d57]/[0.08] border border-[#b08d57]/20 flex items-center justify-center font-bold text-[#b08d57] text-sm">
@@ -607,20 +594,33 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
               </div>
 
               {/* ── Post type picker ──────────────────────────────────────── */}
-              <div className="grid grid-cols-3 gap-0 border-y border-white/[0.07] shrink-0">
-                  {POST_TYPES.map(({ type, label, icon }) => (
-                    <button key={type} onClick={() => handlePostType(type)}
-                      className={`flex flex-col items-center gap-1.5 py-3.5 transition-all ${
-                        postType === type
-                          ? "text-[#b08d57] bg-[#b08d57]/[0.07] border-b-2 border-[#b08d57]/60"
-                          : "text-white/38 hover:text-white/65 hover:bg-white/[0.03] border-b-2 border-transparent"
-                      }`}
-                    >
-                      {icon}
-                      <span className="text-[10px] font-semibold tracking-wide">{label}</span>
-                    </button>
-                  ))}
+              <div className="grid grid-cols-2 gap-0 border-t border-white/[0.07] shrink-0">
+                {POST_TYPES.map(({ type, label, icon }) => (
+                  <button key={type} onClick={() => handlePostType(type)}
+                    className={`flex flex-col items-center gap-1.5 py-3.5 transition-all ${
+                      postType === type
+                        ? "text-[#b08d57] bg-[#b08d57]/[0.07] border-b-2 border-[#b08d57]/60"
+                        : "text-white/38 hover:text-white/65 hover:bg-white/[0.03] border-b-2 border-transparent"
+                    }`}
+                  >
+                    {icon}
+                    <span className="text-[10px] font-semibold tracking-wide">{label}</span>
+                  </button>
+                ))}
               </div>
+
+              {/* ── Create Event — separate action, not an inline compose mode ── */}
+              <button
+                type="button"
+                onClick={() => router.push("/events/create")}
+                className="flex items-center justify-between w-full px-5 py-2.5 border-y border-white/[0.06] text-white/38 hover:text-white/60 hover:bg-white/[0.025] transition-all group shrink-0"
+              >
+                <div className="flex items-center gap-2.5">
+                  <CalendarDays size={14} strokeWidth={1.8} />
+                  <span className="text-[11px] font-medium">Create an event</span>
+                </div>
+                <span className="text-[10px] text-white/20 group-hover:text-white/38 transition-colors">Opens event builder →</span>
+              </button>
 
               {/* ── Scrollable body ───────────────────────────────────────── */}
               <div className="overflow-y-auto flex-1">
@@ -635,26 +635,50 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                       style={{ minHeight: 110 }}
                     />
 
-                    {/* Intent tag selector */}
-                    <div className="flex items-center gap-1.5 mt-3 mb-1 flex-wrap">
-                      <span className="text-[10px] text-white/30 font-medium mr-1 shrink-0">
-                        <Tag size={10} strokeWidth={2} className="inline -mt-0.5 mr-0.5" />Tag:
-                      </span>
-                      {COMPOSER_INTENTS.filter(i => i.slug !== "update" && i.slug !== "ask").map((intent) => (
-                        <button
-                          key={intent.slug}
-                          type="button"
-                          onClick={() => setIntentTag(intentTag === intent.slug ? null : intent.slug)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all ${
-                            intentTag === intent.slug
-                              ? `${intent.badgeCls} ring-1 ring-white/10`
-                              : "text-white/30 bg-white/[0.03] border-white/[0.08] hover:text-white/50 hover:bg-white/[0.05]"
-                          }`}
+                    {/* Intent tag selector — collapsed by default */}
+                    <div className="mt-3 mb-1">
+                      {intentTag ? (
+                        // Selected tag — show as compact removable chip
+                        (() => {
+                          const def = COMPOSER_INTENTS.find(i => i.slug === intentTag);
+                          if (!def) return null;
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border ${def.badgeCls}`}>
+                              <def.icon size={9} strokeWidth={2} />
+                              {def.label}
+                              <button type="button" onClick={() => setIntentTag(null)}
+                                className="ml-0.5 opacity-55 hover:opacity-100 transition-opacity">
+                                <X size={9} strokeWidth={2.5} />
+                              </button>
+                            </span>
+                          );
+                        })()
+                      ) : showIntentTags ? (
+                        // Expanded chip wall
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {COMPOSER_INTENTS.filter(i => i.slug !== "update" && i.slug !== "ask").map((intent) => (
+                            <button key={intent.slug} type="button"
+                              onClick={() => { setIntentTag(intent.slug); setShowIntentTags(false); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border text-white/35 bg-white/[0.03] border-white/[0.08] hover:text-white/55 hover:bg-white/[0.05] transition-all"
+                            >
+                              <intent.icon size={9} strokeWidth={2} />
+                              {intent.label}
+                            </button>
+                          ))}
+                          <button type="button" onClick={() => setShowIntentTags(false)}
+                            className="text-[10px] text-white/22 hover:text-white/45 transition-colors ml-1">
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        // Ghost "Add a tag" trigger
+                        <button type="button" onClick={() => setShowIntentTags(true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium border border-white/[0.08] text-white/28 hover:text-white/50 hover:border-white/[0.15] transition-all"
                         >
-                          <intent.icon size={9} strokeWidth={2} />
-                          {intent.label}
+                          <Tag size={10} strokeWidth={2} />
+                          Add a tag
                         </button>
-                      ))}
+                      )}
                     </div>
 
                     {mediaMode === "photo" && photoPreviews.length > 0 && (
@@ -752,67 +776,87 @@ export default function CreatePostBox({ onPostCreated }: { onPostCreated?: () =>
                       />
                     </div>
 
-                    {/* Category */}
+                    {/* Category — custom dropdown (no native select) */}
                     <div>
                       <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">
                         Category <span className="text-rose-400/70">*</span>
                       </label>
-                      <div className="relative">
-                        <select
-                          value={askCategory}
-                          onChange={(e) => setAskCategory(e.target.value)}
-                          disabled={isSubmitting}
-                          className="w-full appearance-none bg-white/[0.04] border border-white/[0.10] rounded-xl px-3 pr-8 py-2.5 text-sm text-white focus:outline-none focus:border-[#b08d57]/50 transition-colors disabled:opacity-50 cursor-pointer"
-                        >
-                          <option value="" disabled className="bg-[#111] text-white/50">Select a category…</option>
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => setShowCategoryDropdown(v => !v)}
+                        className="w-full flex items-center justify-between bg-white/[0.04] border border-white/[0.10] rounded-xl px-3 py-2.5 text-sm focus:outline-none transition-colors disabled:opacity-50"
+                      >
+                        <span className={askCategory ? "text-white" : "text-white/30"}>
+                          {askCategory ? getCategoryLabel(askCategory) : "Select a category…"}
+                        </span>
+                        <ChevronDown size={13} strokeWidth={2} className={`text-white/30 transition-transform duration-150 ${showCategoryDropdown ? "rotate-180" : ""}`} />
+                      </button>
+                      {showCategoryDropdown && (
+                        <div className="mt-1 bg-[#1c1c1c] border border-white/[0.10] rounded-xl overflow-hidden" style={{ maxHeight: 220, overflowY: "auto" }}>
                           {ASK_CATEGORIES.map((c) => (
-                            <option key={c.slug} value={c.slug} className="bg-[#111] text-white">
+                            <button
+                              key={c.slug}
+                              type="button"
+                              onClick={() => { setAskCategory(c.slug); setShowCategoryDropdown(false); }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-b border-white/[0.05] last:border-b-0 ${
+                                askCategory === c.slug
+                                  ? "text-[#b08d57] bg-[#b08d57]/[0.07]"
+                                  : "text-white/65 hover:bg-white/[0.04] hover:text-white"
+                              }`}
+                            >
                               {c.label}
-                            </option>
+                            </button>
                           ))}
-                        </select>
-                        <ChevronDown size={13} strokeWidth={2} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Location */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">
+                        Location <span className="text-white/20 normal-case font-normal">(optional)</span>
+                      </label>
+                      <div className="relative">
+                        <MapPin size={12} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={askLocation}
+                          onChange={(e) => setAskLocation(e.target.value)}
+                          placeholder="e.g. Newark, NJ"
+                          maxLength={80}
+                          disabled={isSubmitting}
+                          className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl pl-7 pr-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#b08d57]/50 transition-colors"
+                        />
                       </div>
                     </div>
 
-                    {/* Location + Urgency row */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">
-                          Location <span className="text-white/20 normal-case font-normal">(optional)</span>
-                        </label>
-                        <div className="relative">
-                          <MapPin size={12} strokeWidth={1.8} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-                          <input
-                            type="text"
-                            value={askLocation}
-                            onChange={(e) => setAskLocation(e.target.value)}
-                            placeholder="e.g. Newark, NJ"
-                            maxLength={80}
-                            disabled={isSubmitting}
-                            className="w-full bg-white/[0.04] border border-white/[0.10] rounded-xl pl-7 pr-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#b08d57]/50 transition-colors"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">
-                          Urgency <span className="text-white/20 normal-case font-normal">(optional)</span>
-                        </label>
-                        <div className="relative">
-                          <select
-                            value={askUrgency}
-                            onChange={(e) => setAskUrgency(e.target.value)}
-                            disabled={isSubmitting}
-                            className="w-full appearance-none bg-white/[0.04] border border-white/[0.10] rounded-xl px-3 pr-7 py-2.5 text-sm text-white focus:outline-none focus:border-[#b08d57]/50 transition-colors disabled:opacity-50 cursor-pointer"
-                          >
-                            {ASK_URGENCY_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value} className="bg-[#111] text-white">
-                                {o.label}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={13} strokeWidth={2} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                        </div>
+                    {/* Urgency — pill buttons (no native select) */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">
+                        Urgency <span className="text-white/20 normal-case font-normal">(optional)</span>
+                      </label>
+                      <div className="flex gap-2">
+                        {ASK_URGENCY_OPTIONS.map((o) => {
+                          const active = askUrgency === o.value;
+                          const activeCls =
+                            o.value === "urgent" ? "text-rose-400 bg-rose-400/[0.08] border-rose-400/40" :
+                            o.value === "soon"   ? "text-amber-400 bg-amber-400/[0.08] border-amber-400/40" :
+                                                   "text-[#b08d57] bg-[#b08d57]/[0.08] border-[#b08d57]/40";
+                          return (
+                            <button
+                              key={o.value}
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => setAskUrgency(o.value)}
+                              className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                                active ? activeCls : "text-white/35 bg-white/[0.03] border-white/[0.08] hover:text-white/55 hover:bg-white/[0.05]"
+                              }`}
+                            >
+                              {o.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 

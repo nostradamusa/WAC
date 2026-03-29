@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import type { PersonDirectoryRow } from "@/lib/types/person-directory";
 import type { BusinessProfile } from "@/lib/types/business-directory";
 import type { OrganizationDirectoryEntry } from "@/lib/types/organization-directory";
+import type { EnrichedProperty } from "@/lib/types/property-directory";
 
 type EntityCountRow = {
   name: string | null;
@@ -41,12 +42,16 @@ export type SearchFilters = {
   country?: string;
   industry?: string;
   specialty?: string;
+  profession?: string;
   skills?: string[];
   mentorOnly?: boolean;
   openToWork?: boolean;
   openToHire?: boolean;
   openToInvest?: boolean;
   openToCollaborate?: boolean;
+  listing_type?: string;
+  property_type?: string;
+  bedrooms?: string;
 };
 
 const STATE_MAP: Record<string, string[]> = {
@@ -123,6 +128,7 @@ export async function getPeopleDirectory(
       p_country: filters.country || null,
       p_industry: filters.industry || null,
       p_specialty: filters.specialty || null,
+      p_profession: filters.profession || null,
       p_mentor_only: filters.mentorOnly || false,
       p_open_to_work: filters.openToWork || false,
       p_open_to_hire: filters.openToHire || false,
@@ -419,5 +425,71 @@ export async function getEntitiesCount(q: string): Promise<number> {
   } catch (err) {
     console.error("Error getting entities count:", err);
     return 0;
+  }
+}
+
+/**
+ * Fetch active, approved properties with relations.
+ */
+export async function getPropertiesDirectory(filters: SearchFilters): Promise<{
+  properties: EnrichedProperty[];
+  error: Error | null;
+}> {
+  try {
+    let query = supabase
+      .from("properties")
+      .select(`
+        *,
+        media:property_media(*),
+        features:property_features(feature_tag),
+        owner:profiles!properties_owner_user_id_fkey(id, full_name, avatar_url, username, is_verified, headline, city, country),
+        business:businesses!properties_representing_business_id_fkey(id, name, logo_url, slug, is_verified, industry:industries(name))
+      `)
+      .eq("status", "active")
+      .eq("moderation_status", "approved")
+      .order("created_at", { ascending: false });
+
+    // Apply exact map filters
+    if (filters.country) {
+      query = query.ilike("country", filters.country);
+    }
+    if (filters.listing_type) {
+      query = query.eq("listing_type", filters.listing_type);
+    }
+    if (filters.property_type) {
+      query = query.eq("property_type", filters.property_type);
+    }
+    if (filters.bedrooms) {
+      const beds = parseInt(filters.bedrooms, 10);
+      if (!isNaN(beds)) {
+        query = query.gte("bedrooms", beds);
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    let rawProps = (data as any[]) || [];
+    let properties = rawProps.map(p => {
+      if (p.business && p.business.industry) {
+        p.business.industry_name = p.business.industry.name || p.business.industry[0]?.name;
+        delete p.business.industry;
+      }
+      return p as EnrichedProperty;
+    });
+
+    // Local Text Search
+    if (filters.q) {
+      const qLower = filters.q.toLowerCase();
+      properties = properties.filter((p) => {
+        const h = `${p.title} ${p.description || ""} ${p.city} ${p.country}`.toLowerCase();
+        return h.includes(qLower);
+      });
+    }
+
+    return { properties, error: null };
+  } catch (err) {
+    console.error("Error fetching properties directory:", err);
+    return { properties: [], error: toError(err, "Failed to fetch properties directory") };
   }
 }

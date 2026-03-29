@@ -506,8 +506,40 @@ function ViewerInner({ post, onClose }: Props) {
               </div>
             )}
 
-            {/* CTA */}
-            {hasCTA && (
+            {/* CTA — property listings get a rich embed card */}
+            {hasCTA && post.post_intent === "property_listing" ? (
+              <div className="px-5 py-4 border-b border-white/[0.05]">
+                <a
+                  href={post.cta_url!}
+                  className="block rounded-xl overflow-hidden border border-[#10b981]/15 bg-[#10b981]/[0.03] hover:bg-[#10b981]/[0.06] transition-all group"
+                >
+                  {displayItems.length > 0 && (
+                    <div className="relative w-full h-[160px] overflow-hidden">
+                      <img
+                        src={displayItems[0].url}
+                        alt=""
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        loading="lazy"
+                      />
+                      <span className="absolute top-2 left-2 px-2 py-[3px] rounded-md bg-black/60 backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-[#10b981]">
+                        Property
+                      </span>
+                    </div>
+                  )}
+                  <div className="px-3.5 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-white/85 truncate leading-tight">
+                        {post.cta_label}
+                      </p>
+                    </div>
+                    <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-[#10b981]/70 group-hover:text-[#10b981] transition-colors">
+                      View
+                      <ArrowUpRight size={12} strokeWidth={2.5} />
+                    </span>
+                  </div>
+                </a>
+              </div>
+            ) : hasCTA ? (
               <div className="px-5 py-4 border-b border-white/[0.05]">
                 <a
                   href={post.cta_url!}
@@ -523,7 +555,7 @@ function ViewerInner({ post, onClose }: Props) {
                   <ArrowUpRight size={14} strokeWidth={2.5} />
                 </a>
               </div>
-            )}
+            ) : null}
 
             {/* Comments thread */}
             <div className="px-5 pt-3 pb-4">

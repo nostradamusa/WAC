@@ -20,8 +20,21 @@ import {
 import { supabase } from "@/lib/supabase";
 import { getGroupBySlug, updateGroup } from "@/lib/services/groupService";
 import OrgSearchCombobox, { type OrgResult } from "@/components/ui/OrgSearchCombobox";
-import PremiumSelect from "@/components/ui/PremiumSelect";
+import TaxonomySheet from "@/components/ui/TaxonomySheet";
 import type { GroupData } from "@/lib/types/group";
+import {
+  PATHS,
+  FOCUS_AREAS_BY_PATH,
+  GROUP_TYPES,
+  PLACE_SCOPES,
+  parseTaxonomyCategory,
+  buildTaxonomyCategory,
+  encodePlaceLocation,
+  decodePlaceLocation,
+  getGroupTypesForFocusArea,
+  type PathId,
+  type GroupTypeId,
+} from "@/lib/constants/taxonomy";
 
 const MAX_FILE_MB = 5;
 
@@ -38,18 +51,6 @@ async function uploadGroupImage(
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const CATEGORIES = [
-  "Parenting & Family",
-  "Career & Professional",
-  "Business & Founder",
-  "Industry Circles",
-  "Education & Mentorship",
-  "Travel & Lifestyle",
-  "Culture & Identity",
-  "City / Region",
-  "Special Interest",
-];
 
 type Privacy    = "public" | "private" | "secret";
 type JoinPolicy = "open"   | "request" | "invite_only";
@@ -83,9 +84,29 @@ export default function GroupSettingsPage() {
   const [name,        setName]        = useState("");
   const [tagline,     setTagline]     = useState("");
   const [description, setDescription] = useState("");
-  const [category,    setCategory]    = useState("");
-  const [tags,        setTags]        = useState("");
-  const [location,    setLocation]    = useState("");
+  const [selectedPath,      setSelectedPath]      = useState<PathId | "">("");
+  const [selectedFocusArea, setSelectedFocusArea] = useState<string>("");
+  const [selectedGroupType, setSelectedGroupType] = useState<GroupTypeId | "">("");
+  const [tags,              setTags]              = useState("");
+  // Place fields (Living / Places)
+  const [placeScope,        setPlaceScope]        = useState("");
+  const [placeLabel,        setPlaceLabel]        = useState("");
+  // General location relevance
+  const [location,          setLocation]          = useState("");
+
+  const isPlacesGroup = selectedPath === "living" && selectedFocusArea === "places";
+
+  function handleFocusAreaChange(focusAreaId: string) {
+    setSelectedFocusArea(focusAreaId);
+    if (selectedGroupType && focusAreaId) {
+      const valid = getGroupTypesForFocusArea(focusAreaId);
+      if (!valid.includes(selectedGroupType as GroupTypeId)) {
+        setSelectedGroupType("");
+      }
+    } else {
+      setSelectedGroupType("");
+    }
+  }
   const [privacy,     setPrivacy]     = useState<Privacy>("private");
   const [joinPolicy,  setJoinPolicy]  = useState<JoinPolicy>("request");
   const [linkedOrg,   setLinkedOrg]   = useState<OrgResult | null>(null);
@@ -130,9 +151,42 @@ export default function GroupSettingsPage() {
       setName(groupData.name);
       setTagline(groupData.tagline ?? "");
       setDescription(groupData.description ?? "");
-      setCategory(groupData.category);
+
+      // Parse compound or legacy category string + validate against live taxonomy.
+      // Wrapped in try-catch: a corrupt or unexpected DB value must never crash init().
+      let resolvedPath: PathId   = "living";
+      let resolvedFocusArea      = "";
+      let resolvedGroupType: GroupTypeId | "" = "";
+      try {
+        const parsed         = parseTaxonomyCategory(groupData.category);
+        const pathFocusAreas = FOCUS_AREAS_BY_PATH[parsed.path] ?? [];
+        const focusAreaValid = pathFocusAreas.some((fa) => fa.id === parsed.focusArea);
+
+        resolvedPath      = parsed.path;
+        resolvedFocusArea = focusAreaValid ? parsed.focusArea : "";
+
+        if (resolvedFocusArea && parsed.groupType) {
+          const validTypes = getGroupTypesForFocusArea(resolvedFocusArea);
+          resolvedGroupType = validTypes.includes(parsed.groupType) ? parsed.groupType : "";
+        }
+      } catch {
+        // Fallback: path defaults to "living", focus area + group type left empty —
+        // user can re-classify the group from scratch.
+      }
+
+      setSelectedPath(resolvedPath);
+      setSelectedFocusArea(resolvedFocusArea);
+      setSelectedGroupType(resolvedGroupType);
       setTags((groupData.tags ?? []).join(", "));
-      setLocation(groupData.location_relevance ?? "");
+      // Parse location_relevance — may be encoded as "Scope: Label" for Living/Places groups
+      const rawLocation = groupData.location_relevance ?? "";
+      const { scope, label: locLabel } = decodePlaceLocation(rawLocation);
+      if (scope) {
+        setPlaceScope(scope);
+        setPlaceLabel(locLabel);
+      } else {
+        setLocation(rawLocation);
+      }
       setPrivacy(groupData.privacy as Privacy);
       setJoinPolicy(groupData.join_policy as JoinPolicy);
       setAvatarUrl(groupData.avatar_url ?? null);
@@ -176,13 +230,25 @@ export default function GroupSettingsPage() {
     setSaveError("");
     setSaved(false);
 
+    if (!selectedPath || !selectedFocusArea || !selectedGroupType) {
+      setSaveError("Please complete all classification fields: Path, Focus Area, and Group Type.");
+      setSaving(false);
+      return;
+    }
+
+    const category = buildTaxonomyCategory(selectedPath, selectedFocusArea, selectedGroupType);
+
+    const locationValue = isPlacesGroup
+      ? encodePlaceLocation(placeScope, placeLabel)
+      : location;
+
     const { error } = await updateGroup(group.id, {
       name,
       tagline,
       description,
       category,
       tags,
-      location_relevance: location,
+      location_relevance: locationValue,
       privacy,
       join_policy: joinPolicy,
       linked_org_id: linkedOrg?.id ?? null,
@@ -377,24 +443,102 @@ export default function GroupSettingsPage() {
               <h2 className="text-sm font-bold tracking-widest uppercase text-white/70">Community Type</h2>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-6">
+
+              {/* Path tile picker */}
               <div>
-                <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
-                  Category <span className="text-[#b08d57]/60">*</span>
+                <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-2">
+                  Path <span className="text-[#b08d57]/60">*</span>
                 </label>
-                <PremiumSelect
-                  id="group-category"
-                  name="group-category"
-                  value={category}
-                  onChange={setCategory}
-                  options={[
-                    { value: "", label: "Select a category", disabled: true },
-                    ...CATEGORIES.map((cat) => ({ value: cat, label: cat })),
-                  ]}
-                  triggerClassName="w-full border-[var(--border)] bg-[#111] px-5 py-3 text-sm text-white"
+                <p className="text-[11px] text-white/30 mb-3 leading-relaxed">
+                  Choose the primary area of life this group belongs to.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {PATHS.map((path) => {
+                    const isActive = selectedPath === path.id;
+                    return (
+                      <button
+                        key={path.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedPath(path.id);
+                          setSelectedFocusArea("");
+                          setSelectedGroupType("");
+                          setPlaceScope("");
+                          setPlaceLabel("");
+                        }}
+                        className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${
+                          isActive
+                            ? `${path.border} ${path.bg}`
+                            : "border-white/[0.08] bg-white/[0.01] hover:border-white/15"
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${path.dot}`} />
+                        <span className={`text-xs font-semibold leading-tight ${isActive ? path.color : "text-white/65"}`}>
+                          {path.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Focus Area — dependent on path */}
+              <div>
+                <label htmlFor="settings-focus-area" className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
+                  Focus Area <span className="text-[#b08d57]/60">*</span>
+                </label>
+                <TaxonomySheet
+                  id="settings-focus-area"
+                  value={selectedFocusArea}
+                  onChange={handleFocusAreaChange}
+                  disabled={!selectedPath}
+                  placeholder={selectedPath ? "Select a focus area" : "Select a Path first"}
+                  options={(selectedPath ? FOCUS_AREAS_BY_PATH[selectedPath] : []).map((fa) => ({
+                    value: fa.id,
+                    label: fa.label,
+                  }))}
+                  triggerClassName="border-[var(--border)] bg-[#111] px-5 text-white"
                 />
               </div>
 
+              {/* Group Type — dependent on Focus Area */}
+              <div>
+                <label htmlFor="settings-group-type" className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
+                  Group Type <span className="text-[#b08d57]/60">*</span>
+                </label>
+                {!selectedFocusArea ? (
+                  <p className="text-[11px] text-white/28 py-2.5">
+                    Select a Focus Area first.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-white/30 mb-2">
+                      How this group functions. Not sure? Start with{" "}
+                      <span className="text-white/50 font-medium">Network</span>.
+                    </p>
+                    <TaxonomySheet
+                      id="settings-group-type"
+                      value={selectedGroupType}
+                      onChange={(v) => setSelectedGroupType(v as GroupTypeId)}
+                      placeholder="Select a group type"
+                      options={getGroupTypesForFocusArea(selectedFocusArea)
+                        .map((typeId) => GROUP_TYPES.find((g) => g.id === typeId))
+                        .filter((gt): gt is (typeof GROUP_TYPES)[number] => gt !== undefined)
+                        .map((gt) => ({ value: gt.id as string, label: gt.label }))}
+                      triggerClassName="border-[var(--border)] bg-[#111] px-5 text-white"
+                    />
+                    {selectedGroupType && (() => {
+                      const gt = GROUP_TYPES.find((g) => g.id === selectedGroupType);
+                      return gt ? (
+                        <p className="mt-1.5 text-[11px] text-white/30 leading-relaxed">{gt.description}</p>
+                      ) : null;
+                    })()}
+                  </>
+                )}
+              </div>
+
+              {/* Tags */}
               <div>
                 <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">Tags</label>
                 <input
@@ -408,19 +552,63 @@ export default function GroupSettingsPage() {
                 <p className="mt-1.5 text-[10px] text-white/30">Comma-separated.</p>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
-                  Location Relevance
-                </label>
-                <input
-                  id="group-location"
-                  name="group-location"
-                  value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  placeholder="e.g. New York City, USA — or leave blank for global"
-                  className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white placeholder:text-white/20"
-                />
-              </div>
+              {/* Place Scope + Location Label (Living / Places) or general Location Relevance */}
+              {isPlacesGroup ? (
+                <div className="space-y-4 p-4 rounded-xl border border-violet-400/20 bg-violet-500/[0.05]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400 shrink-0" />
+                    <p className="text-[11px] font-semibold text-violet-400/80 uppercase tracking-[0.1em]">Place Details</p>
+                  </div>
+                  <div>
+                    <label htmlFor="settings-place-scope" className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
+                      Place Scope
+                    </label>
+                    <TaxonomySheet
+                      id="settings-place-scope"
+                      value={placeScope}
+                      onChange={setPlaceScope}
+                      placeholder="Select a scope"
+                      options={PLACE_SCOPES.map((s) => ({ value: s.value, label: s.label }))}
+                      triggerClassName="border-[var(--border)] bg-[#111] px-5 text-white"
+                    />
+                    <p className="mt-1.5 text-[10px] text-white/30">
+                      How large is the geographic area this group serves?
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="group-place-label" className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
+                      Location Label
+                    </label>
+                    <input
+                      id="group-place-label"
+                      name="group-place-label"
+                      type="text"
+                      value={placeLabel}
+                      onChange={(e) => setPlaceLabel(e.target.value)}
+                      placeholder="e.g. NYC, South Florida, Australia, Germany"
+                      className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white placeholder:text-white/20"
+                    />
+                    <p className="mt-1.5 text-[10px] text-white/30">
+                      The specific place name shown on the group profile.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-white/50 uppercase tracking-widest mb-1.5">
+                    Location Relevance
+                  </label>
+                  <input
+                    id="group-location"
+                    name="group-location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. New York City, USA — or leave blank for global"
+                    className="w-full rounded-xl border border-[var(--border)] bg-[#111] px-5 py-3 text-sm outline-none transition focus:border-[var(--accent)] text-white placeholder:text-white/20"
+                  />
+                </div>
+              )}
+
             </div>
           </div>
 

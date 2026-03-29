@@ -31,7 +31,7 @@ export default function WelcomePage() {
 
   const handleEnter = () => {
     markSeen();
-    router.push(isLoggedIn ? "/community" : "/vision");
+    router.push(isLoggedIn ? "/pulse" : "/vision");
   };
 
   if (!mounted) return null;

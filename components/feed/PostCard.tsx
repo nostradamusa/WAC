@@ -900,8 +900,43 @@ export default function PostCard({
           </div>
         )}
 
-          {/* CTA */}
-          {hasCTA && !isEditing && (
+          {/* CTA — property listings get a rich card; others get a plain button */}
+          {hasCTA && !isEditing && postIntent === "property_listing" ? (() => {
+            const coverItems = getDisplayMediaItems(post.media_items, post.image_url);
+            return (
+            <a
+              href={post.cta_url!}
+              className="block mt-3 mb-1 rounded-xl overflow-hidden border border-[#10b981]/15 bg-[#10b981]/[0.03] hover:bg-[#10b981]/[0.06] transition-all group"
+            >
+              {/* Cover image from the post's media */}
+              {coverItems.length > 0 && (
+                <div className="relative w-full h-[140px] overflow-hidden">
+                  <img
+                    src={coverItems[0].url}
+                    alt=""
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                  <span className="absolute top-2 left-2 px-2 py-[3px] rounded-md bg-black/60 backdrop-blur-sm text-[9px] font-bold uppercase tracking-wide text-[#10b981]">
+                    Property
+                  </span>
+                </div>
+              )}
+              <div className="px-3.5 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold text-white/85 truncate leading-tight">
+                    {post.cta_label}
+                  </p>
+                  <p className="text-[10px] text-white/35 mt-0.5 truncate">{post.cta_url?.replace(/^\/properties\//, "")}</p>
+                </div>
+                <span className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-[#10b981]/70 group-hover:text-[#10b981] transition-colors">
+                  View
+                  <ArrowUpRight size={12} strokeWidth={2.5} />
+                </span>
+              </div>
+            </a>
+            );
+          })() : hasCTA && !isEditing ? (
             <a
               href={post.cta_url!}
               target="_blank"
@@ -914,7 +949,7 @@ export default function PostCard({
               <span>{post.cta_label}</span>
               <ArrowUpRight size={14} strokeWidth={2.5} />
             </a>
-          )}
+          ) : null}
 
           {/* Compact action row */}
           <div className="flex items-center gap-0.5 mt-1.5 -ml-1.5 pb-2">

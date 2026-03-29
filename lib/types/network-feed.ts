@@ -21,6 +21,7 @@ export type PostIntent =
   | "mentorship"
   | "referral"
   | "discussion"
+  | "property_listing"
   | null;
 
 /** Who is publishing */

@@ -389,7 +389,7 @@ export default function StoriesNewPage() {
         media_items: [storyMeta], ...authorFields(),
       });
       if (dbErr) throw dbErr;
-      router.push("/community");
+      router.push("/pulse");
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to post story.");
       setIsPosting(false);
@@ -420,7 +420,7 @@ export default function StoriesNewPage() {
         media_items: mediaItems, ...authorFields(),
       });
       if (dbErr) throw dbErr;
-      router.push("/community");
+      router.push("/pulse");
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to post story.");
       setIsPosting(false);
