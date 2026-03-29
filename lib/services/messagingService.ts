@@ -238,10 +238,10 @@ export async function getUserConversations(
 
     if (allPartError) throw allPartError;
 
-    // 3. Fetch the last message for each conversation
+    // 3. Fetch the last message for each conversation + all messages for unread counting
     const { data: lastMessages, error: msgError } = await supabase
       .from("messages")
-      .select("id, conversation_id, content, created_at, sender_id, is_read")
+      .select("id, conversation_id, content, created_at, sender_id, sender_type, is_read, status")
       .in("conversation_id", conversationIds)
       .order("created_at", { ascending: false });
 
@@ -249,11 +249,17 @@ export async function getUserConversations(
 
     // Filter to just the most recent message per conversation
     const latestMsgsMap = new Map();
+    // Build a per-conversation message list for real unread counts
+    const allMsgsMap = new Map<string, typeof lastMessages>();
     if (lastMessages) {
       for (const msg of lastMessages) {
         if (!latestMsgsMap.has(msg.conversation_id)) {
           latestMsgsMap.set(msg.conversation_id, msg);
         }
+        if (!allMsgsMap.has(msg.conversation_id)) {
+          allMsgsMap.set(msg.conversation_id, []);
+        }
+        allMsgsMap.get(msg.conversation_id)!.push(msg);
       }
     }
 
@@ -293,15 +299,13 @@ export async function getUserConversations(
       const otherPartProfile = otherPart ? profilesMap.get(otherPart.actor_id) : null;
       const lastMsg = latestMsgsMap.get(p.conversation_id);
 
-      // Simple unread calculation (if the last message was after our last_read_at, it's unread)
-      let unread_count = 0;
-      if (lastMsg && !(lastMsg.sender_id === actorId && lastMsg.sender_type === actorType)) {
-        const msgDate = new Date(lastMsg.created_at);
-        const readDate = new Date(p.last_read_at);
-        if (msgDate > readDate) {
-          unread_count = 1; // Real counting would require querying all unread msgs, this is a proxy
-        }
-      }
+      // Real unread count: count messages from others that arrived after our last_read_at
+      const readDate = new Date(p.last_read_at);
+      const convMsgs = allMsgsMap.get(p.conversation_id) ?? [];
+      const unread_count = convMsgs.filter((m) =>
+        !(m.sender_id === actorId && m.sender_type === actorType) &&
+        new Date(m.created_at) > readDate
+      ).length;
 
       const groupParts = allParticipants?.filter(op => op.conversation_id === p.conversation_id && conv?.type === 'group');
       const groupProfiles = groupParts ? groupParts.map(gp => {
@@ -366,6 +370,7 @@ export interface MessageInterface {
   reactions: string[];
   reply_to_id: string | null;
   metadata: MessageMetadata;
+  status: "sending" | "sent" | "delivered" | "seen";
   created_at: string;
 }
 
@@ -398,6 +403,14 @@ export async function markConversationRead(
   if (error) {
     console.error("Error marking conversation read:", error);
   }
+
+  // Mark unread messages from OTHER senders as "seen"
+  await supabase
+    .from("messages")
+    .update({ status: "seen" })
+    .eq("conversation_id", conversationId)
+    .neq("sender_id", actorId)
+    .in("status", ["sent", "delivered"]);
 }
 
 export async function sendMessage(
@@ -437,6 +450,70 @@ export async function sendMessage(
   }
 
   return data as MessageInterface;
+}
+
+// ── Inbox search: search across message content in user's conversations ──────
+
+export interface MessageSearchResult {
+  message_id: string;
+  conversation_id: string;
+  content: string;
+  sender_name: string;
+  conversation_title: string;
+  created_at: string;
+}
+
+export async function searchConversationMessages(
+  actorId: string,
+  actorType: MessagingActorType,
+  query: string,
+): Promise<MessageSearchResult[]> {
+  if (!query || query.length < 2) return [];
+
+  try {
+    // Get user's conversation IDs
+    const { data: parts } = await supabase
+      .from("conversation_participants")
+      .select("conversation_id")
+      .eq("actor_id", actorId)
+      .eq("actor_type", actorType);
+
+    if (!parts || parts.length === 0) return [];
+    const convIds = parts.map((p) => p.conversation_id);
+
+    // Search messages across those conversations
+    const { data: msgs, error } = await supabase
+      .from("messages")
+      .select("id, conversation_id, content, sender_id, sender_type, created_at")
+      .in("conversation_id", convIds)
+      .ilike("content", `%${query}%`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error || !msgs) return [];
+
+    // Collect sender IDs for name lookup
+    const senderIds = [...new Set(msgs.map((m) => m.sender_id))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", senderIds);
+
+    const nameMap = new Map<string, string>();
+    profiles?.forEach((p) => nameMap.set(p.id, p.full_name));
+
+    return msgs.map((m) => ({
+      message_id: m.id,
+      conversation_id: m.conversation_id,
+      content: m.content,
+      sender_name: nameMap.get(m.sender_id) ?? "Member",
+      conversation_title: "", // Filled client-side from existing data
+      created_at: m.created_at,
+    }));
+  } catch (err) {
+    console.error("Error searching messages:", err);
+    return [];
+  }
 }
 
 export async function toggleMessageReactionDB(msgId: string, reactionType: string, currentReactions: string[]): Promise<void> {

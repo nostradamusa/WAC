@@ -13,6 +13,8 @@ import {
   MessagingContact,
   searchMessagingContacts,
   getOrCreateConversation,
+  searchConversationMessages,
+  MessageSearchResult,
 } from "@/lib/services/messagingService";
 
 function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
@@ -54,6 +56,30 @@ export default function MessagesInboxPage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [conversations, setConversations] = useState<ConversationOverview[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Message search state ──
+  const [messageResults, setMessageResults] = useState<MessageSearchResult[]>([]);
+  const [messageSearching, setMessageSearching] = useState(false);
+  const debouncedSearchQuery = useDebounce(searchQuery, 400);
+
+  useEffect(() => {
+    if (!debouncedSearchQuery || debouncedSearchQuery.length < 2 || !currentActor) {
+      setMessageResults([]);
+      return;
+    }
+    async function search() {
+      if (!currentActor) return;
+      setMessageSearching(true);
+      const results = await searchConversationMessages(
+        currentActor.id,
+        toMessagingActorType(currentActor.type),
+        debouncedSearchQuery,
+      );
+      setMessageResults(results);
+      setMessageSearching(false);
+    }
+    search();
+  }, [debouncedSearchQuery, currentActor]);
 
   // ── Compose modal state ──
   const [composeOpen, setComposeOpen] = useState(false);
@@ -297,6 +323,39 @@ export default function MessagesInboxPage() {
                   ? "Requests are not wired yet for this account."
                   : "Start a conversation from the compose button."}
               </p>
+            </div>
+          )}
+
+          {/* ── Message search results ──────────────────────────── */}
+          {searchQuery.trim().length >= 2 && (
+            <div className="mt-2 px-1">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/25">Messages</span>
+                {messageSearching && (
+                  <Loader2 size={12} className="animate-spin text-white/20" />
+                )}
+              </div>
+              {!messageSearching && messageResults.length === 0 && (
+                <p className="px-3 py-2 text-[12px] text-white/30">No messages matching &quot;{searchQuery}&quot;</p>
+              )}
+              {messageResults.map((result) => {
+                const conv = conversations.find((c) => c.id === result.conversation_id);
+                const convTitle = conv ? formatConversationTitle(conv) : "Conversation";
+                return (
+                  <Link
+                    key={result.message_id}
+                    href={`/messages/${result.conversation_id}`}
+                    className="flex flex-col gap-0.5 p-3 mx-1 mb-0.5 rounded-xl hover:bg-white/[0.04] transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[12px] font-semibold text-white/60 truncate">{convTitle}</span>
+                      <span className="text-[10px] text-white/25">&middot;</span>
+                      <span className="text-[10px] text-white/25">{result.sender_name}</span>
+                    </div>
+                    <p className="text-[13px] text-white/40 truncate">{result.content}</p>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>

@@ -2,18 +2,17 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
-import type { ActorIdentity } from "@/components/providers/ActorProvider";
 import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
+import { usePresence, formatPresence } from "@/lib/hooks/usePresence";
 import {
   ConversationOverview,
   getMessages,
   getUserConversations,
   markConversationRead,
   MessageInterface,
-  MessageMetadata,
   MessagingActorType,
   sendMessage,
   toggleMessageReactionDB,
@@ -60,6 +59,31 @@ export default function ActiveChatPage({
   const [identitySwitcherOpen, setIdentitySwitcherOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Presence + typing ──
+  const otherParticipantId = conversation?.type === "direct" ? conversation.other_participant?.id ?? null : null;
+  const { presence, sendTyping, touchLastActive } = usePresence(
+    conversationId,
+    currentActor?.id ?? null,
+    otherParticipantId,
+  );
+  const presenceLabel = conversation?.type === "direct" ? formatPresence(presence) : null;
+
+  // Touch last_active_at on mount and message send
+  useEffect(() => { touchLastActive(); }, [touchLastActive]);
+
+  // Emit typing events on input change
+  function handleInputChange(value: string) {
+    setInputText(value);
+    if (value.trim()) {
+      sendTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => sendTyping(false), 2500);
+    } else {
+      sendTyping(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +181,8 @@ export default function ActiveChatPage({
     if (!currentActor || !conversation || !inputText.trim() || sending) return;
 
     setSending(true);
+    sendTyping(false);
+    touchLastActive();
     const content = inputText.trim();
     const replyId = replyTo?.id;
     setInputText("");
@@ -225,29 +251,42 @@ export default function ActiveChatPage({
           <ArrowLeft size={20} />
         </Link>
 
-        {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-[#1A1A1A] border border-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center">
-          {conversation.type === "direct" && conversation.other_participant?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={conversation.other_participant.avatar_url}
-              alt={formatConversationTitle(conversation)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-sm font-serif font-bold text-white/40">
-              {formatConversationTitle(conversation).charAt(0)}
-            </span>
+        {/* Avatar with presence indicator */}
+        <div className="relative shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#1A1A1A] border border-white/[0.08] overflow-hidden flex items-center justify-center">
+            {conversation.type === "direct" && conversation.other_participant?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={conversation.other_participant.avatar_url}
+                alt={formatConversationTitle(conversation)}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-serif font-bold text-white/40">
+                {formatConversationTitle(conversation).charAt(0)}
+              </span>
+            )}
+          </div>
+          {presence.isOnline && conversation.type === "direct" && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500/90 border-2 border-[#0A0A0A]" />
           )}
         </div>
 
-        {/* Name + status */}
+        {/* Name + presence */}
         {conversation.type === "direct" && conversation.other_participant?.profile_url ? (
           <Link href={conversation.other_participant.profile_url} className="min-w-0 group">
             <h1 className="text-[16px] font-serif font-bold truncate group-hover:text-[#b08d57] transition-colors">
               {formatConversationTitle(conversation)}
             </h1>
-            <p className="text-[11px] text-white/35 capitalize">{conversation.other_participant?.type ?? "direct"}</p>
+            <p className="text-[11px] text-white/35">
+              {presenceLabel ? (
+                <span className={presence.isTyping ? "text-[#b08d57]/70" : presence.isOnline ? "text-emerald-400/70" : "text-white/35"}>
+                  {presenceLabel}
+                </span>
+              ) : (
+                <span className="capitalize">{conversation.other_participant?.type ?? "direct"}</span>
+              )}
+            </p>
           </Link>
         ) : (
           <div className="min-w-0">
@@ -255,7 +294,7 @@ export default function ActiveChatPage({
             <p className="text-[11px] text-white/35">
               {conversation.type === "group"
                 ? `${conversation.participants?.length ?? 0} participant${(conversation.participants?.length ?? 0) === 1 ? "" : "s"}`
-                : conversation.other_participant?.type ?? "direct"}
+                : presenceLabel || (conversation.other_participant?.type ?? "direct")}
             </p>
           </div>
         )}
@@ -365,8 +404,19 @@ export default function ActiveChatPage({
                           <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
                         )}
                         <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
-                        <div className={`mt-1.5 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
+                        <div className={`mt-1.5 flex items-center gap-1 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
                           {formatTimestamp(message.created_at)}
+                          {isMine && (
+                            <span className="inline-flex ml-0.5">
+                              {message.status === "seen" ? (
+                                <CheckCheck size={13} className="text-[#b08d57]/80" />
+                              ) : message.status === "delivered" ? (
+                                <CheckCheck size={13} />
+                              ) : (
+                                <Check size={13} />
+                              )}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -432,6 +482,19 @@ export default function ActiveChatPage({
                 </div>
               );
             })
+          )}
+
+          {/* Typing indicator */}
+          {presence.isTyping && (
+            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="bg-[#1b1b1b] border border-white/[0.06] rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce [animation-delay:300ms]" />
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -528,7 +591,7 @@ export default function ActiveChatPage({
               ref={inputRef}
               rows={1}
               value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
+              onChange={(event) => handleInputChange(event.target.value)}
               placeholder="Write a message..."
               className="w-full resize-none rounded-2xl bg-[#1A1A1A] border border-white/[0.06] pl-4 pr-10 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32 transition-colors"
               style={{ fieldSizing: "content" } as React.CSSProperties}
