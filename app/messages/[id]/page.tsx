@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users, Mic, Loader2, FileText } from "lucide-react";
 import ThreadDetailPanel from "@/components/messages/ThreadDetailPanel";
+import VoiceNoteRecorder from "@/components/messages/VoiceNoteRecorder";
+import VoiceNotePlayer from "@/components/messages/VoiceNotePlayer";
+import AttachmentBubble from "@/components/messages/AttachmentBubble";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
 import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import { usePresence, formatPresence } from "@/lib/hooks/usePresence";
+import { isVoiceNote, isAttachment, buildVoiceNotePayload, buildAttachmentPayload } from "@/lib/messaging/metadata";
+import type { AttachmentMetadata } from "@/lib/messaging/metadata";
 import {
   ConversationOverview,
   getMessages,
@@ -49,6 +55,8 @@ export default function ActiveChatPage({
 }) {
   const resolvedParams = use(params);
   const conversationId = resolvedParams.id;
+  const searchParams = useSearchParams();
+  const jumpToMessageId = searchParams.get("jump");
   const { currentActor, ownedEntities, setCurrentActor, isLoading } = useActor();
   const [conversation, setConversation] = useState<ConversationOverview | null>(null);
   const [messages, setMessages] = useState<MessageInterface[]>([]);
@@ -59,8 +67,12 @@ export default function ActiveChatPage({
   const [activeReactionMsgId, setActiveReactionMsgId] = useState<string | null>(null);
   const [identitySwitcherOpen, setIdentitySwitcherOpen] = useState(false);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);
+  const [voiceRecording, setVoiceRecording] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl?: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Presence + typing ──
@@ -153,10 +165,24 @@ export default function ActiveChatPage({
     };
   }, [conversationId]);
 
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!scrollRef.current) return;
+    // If jumping to a specific message, scroll to it instead of bottom
+    if (jumpToMessageId && messages.some((m) => m.id === jumpToMessageId)) {
+      const el = document.getElementById(`msg-${jumpToMessageId}`);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          setHighlightedMsgId(jumpToMessageId);
+          setTimeout(() => setHighlightedMsgId(null), 2500);
+        }, 100);
+        return;
+      }
+    }
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  }, [messages, jumpToMessageId]);
 
   const senderNameMap = useMemo(() => {
     const entries = new Map<string, string>();
@@ -225,6 +251,74 @@ export default function ActiveChatPage({
   function handleReply(message: MessageInterface) {
     setReplyTo(message);
     inputRef.current?.focus();
+  }
+
+  async function uploadToStorage(file: File | Blob, fileName: string): Promise<string | null> {
+    const ext = fileName.split(".").pop() || "bin";
+    const path = `messages/${conversationId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from("feed_media").upload(path, file, { contentType: file instanceof File ? file.type : (file as Blob).type });
+    if (error) { console.error("Upload error:", error); return null; }
+    const { data: urlData } = supabase.storage.from("feed_media").getPublicUrl(path);
+    return urlData.publicUrl;
+  }
+
+  async function handleVoiceNoteSend(blob: Blob, durationSeconds: number, mimeType: string) {
+    if (!currentActor || !conversation) return;
+    setVoiceRecording(false);
+    setUploading(true);
+
+    const ext = mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm";
+    const url = await uploadToStorage(blob, `voice_note.${ext}`);
+    if (!url) { setUploading(false); return; }
+
+    const metadata = buildVoiceNotePayload(url, durationSeconds, mimeType);
+    await sendMessage(conversation.id, currentActor.id, toMessagingActorType(currentActor.type), "🎙️ Voice note", undefined, metadata);
+    await markConversationRead(conversation.id, currentActor.id, toMessagingActorType(currentActor.type));
+    setUploading(false);
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+    setPendingAttachment({ file, previewUrl });
+    // Reset input so same file can be re-selected
+    e.target.value = "";
+  }
+
+  async function handleAttachmentSend() {
+    if (!currentActor || !conversation || !pendingAttachment) return;
+    setUploading(true);
+
+    const { file, previewUrl } = pendingAttachment;
+    const url = await uploadToStorage(file, file.name);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (!url) { setUploading(false); setPendingAttachment(null); return; }
+
+    // Get image dimensions if applicable
+    let width: number | undefined;
+    let height: number | undefined;
+    if (file.type.startsWith("image/")) {
+      try {
+        const img = new Image();
+        img.src = url;
+        await new Promise<void>((resolve) => { img.onload = () => { width = img.naturalWidth; height = img.naturalHeight; resolve(); }; img.onerror = () => resolve(); });
+      } catch { /* ignore */ }
+    }
+
+    const metadata = buildAttachmentPayload(file.name, file.name, file.size, file.type, { width, height });
+    // Fix: first arg should be file_url
+    metadata.file_url = url;
+
+    const content = inputText.trim() || (file.type.startsWith("image/") ? "📷 Image" : `📎 ${file.name}`);
+    const replyId = replyTo?.id;
+    setInputText("");
+    setReplyTo(null);
+    setPendingAttachment(null);
+
+    await sendMessage(conversation.id, currentActor.id, toMessagingActorType(currentActor.type), content, replyId, metadata);
+    await markConversationRead(conversation.id, currentActor.id, toMessagingActorType(currentActor.type));
+    setUploading(false);
   }
 
   if (loading || isLoading) {
@@ -338,7 +432,7 @@ export default function ActiveChatPage({
               const hasReactions = message.reactions && message.reactions.length > 0;
 
               return (
-                <div key={message.id} className={`flex ${isMine ? "justify-end" : "justify-start"} group/msg relative`}>
+                <div key={message.id} id={`msg-${message.id}`} className={`flex ${isMine ? "justify-end" : "justify-start"} group/msg relative transition-colors duration-700 ${highlightedMsgId === message.id ? "bg-[#b08d57]/[0.08] rounded-xl" : ""}`}>
                   <div className={`max-w-[80%] relative ${hasReactions ? "mb-3" : ""}`}>
                     {/* Quoted reply preview */}
                     {quotedMsg && (
@@ -355,7 +449,74 @@ export default function ActiveChatPage({
                     )}
 
                     {/* Message bubble */}
-                    {message.metadata?.type === "entity_card" ? (
+                    {isVoiceNote(message.metadata) ? (
+                      /* ── Voice note message ─────────────────────── */
+                      <div
+                        className={`rounded-2xl px-4 py-3 ${
+                          isMine
+                            ? "bg-[#b08d57] text-black rounded-br-md"
+                            : "bg-[#1b1b1b] border border-white/[0.06] text-white rounded-bl-md"
+                        }`}
+                      >
+                        {!isMine && conversation.type === "group" && (
+                          <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
+                        )}
+                        <VoiceNotePlayer
+                          audioUrl={message.metadata.audio_url}
+                          durationSeconds={message.metadata.duration_seconds}
+                          isMine={isMine}
+                        />
+                        <div className={`mt-1.5 flex items-center gap-1 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
+                          {formatTimestamp(message.created_at)}
+                          {isMine && (
+                            <span className="inline-flex ml-0.5">
+                              {message.status === "seen" ? (
+                                <CheckCheck size={13} className="text-[#b08d57]/80" />
+                              ) : message.status === "delivered" ? (
+                                <CheckCheck size={13} />
+                              ) : (
+                                <Check size={13} />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : isAttachment(message.metadata) ? (
+                      /* ── Attachment message ─────────────────────── */
+                      <div
+                        className={`rounded-2xl overflow-hidden ${
+                          isMine
+                            ? "bg-[#b08d57] text-black rounded-br-md"
+                            : "bg-[#1b1b1b] border border-white/[0.06] text-white rounded-bl-md"
+                        }`}
+                      >
+                        {!isMine && conversation.type === "group" && (
+                          <div className="text-[11px] font-semibold text-[#b08d57] px-4 pt-2">{senderName}</div>
+                        )}
+                        <div className="p-1.5">
+                          <AttachmentBubble metadata={message.metadata as AttachmentMetadata} isMine={isMine} />
+                        </div>
+                        {message.content && !message.content.startsWith("📷") && !message.content.startsWith("📎") && (
+                          <div className={`px-4 pb-2 text-sm ${isMine ? "text-black/80" : "text-white/70"}`}>
+                            {message.content}
+                          </div>
+                        )}
+                        <div className={`px-4 pb-2 flex items-center gap-1 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
+                          {formatTimestamp(message.created_at)}
+                          {isMine && (
+                            <span className="inline-flex ml-0.5">
+                              {message.status === "seen" ? (
+                                <CheckCheck size={13} className="text-[#b08d57]/80" />
+                              ) : message.status === "delivered" ? (
+                                <CheckCheck size={13} />
+                              ) : (
+                                <Check size={13} />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : message.metadata?.type === "entity_card" ? (
                       /* ── Entity card message ─────────────────────── */
                       <Link
                         href={message.metadata.url}
@@ -533,7 +694,7 @@ export default function ActiveChatPage({
 
       <div className={`border-t border-white/[0.06] bg-[#0A0A0A] px-4 py-3 ${replyTo ? "border-t-0" : ""}`}>
         {/* Identity switcher — only show when user has multiple identities */}
-        {ownedEntities.length > 1 && (
+        {ownedEntities.length > 1 && !voiceRecording && (
           <div className="max-w-3xl mx-auto mb-2 relative">
             <button
               type="button"
@@ -585,52 +746,123 @@ export default function ActiveChatPage({
           </div>
         )}
 
-        <form
-          onSubmit={async (event) => {
-            event.preventDefault();
-            await handleSend();
-          }}
-          className="max-w-3xl mx-auto flex items-end gap-2"
-        >
-          <button
-            type="button"
-            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors mb-0.5"
-            title="Attach file"
-          >
-            <Paperclip size={18} strokeWidth={1.8} />
-          </button>
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={inputText}
-              onChange={(event) => handleInputChange(event.target.value)}
-              placeholder="Write a message..."
-              className="w-full resize-none rounded-2xl bg-[#1A1A1A] border border-white/[0.06] pl-4 pr-10 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32 transition-colors"
-              style={{ fieldSizing: "content" } as React.CSSProperties}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  void handleSend();
-                }
-              }}
-            />
+        {/* Attachment preview */}
+        {pendingAttachment && (
+          <div className="max-w-3xl mx-auto mb-2 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            {pendingAttachment.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={pendingAttachment.previewUrl} alt="" className="w-14 h-14 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0">
+                <FileText size={20} className="text-white/30" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] text-white/70 truncate">{pendingAttachment.file.name}</p>
+              <p className="text-[10px] text-white/30">
+                {(pendingAttachment.file.size / 1024).toFixed(1)} KB &middot; {pendingAttachment.file.type.split("/")[1]?.toUpperCase() || "FILE"}
+              </p>
+            </div>
             <button
-              type="button"
-              className="absolute right-3 bottom-3 text-white/25 hover:text-white/50 transition-colors"
-              title="Emoji"
+              onClick={() => { if (pendingAttachment.previewUrl) URL.revokeObjectURL(pendingAttachment.previewUrl); setPendingAttachment(null); }}
+              className="p-1.5 rounded-full hover:bg-white/[0.06] text-white/30 hover:text-white/60 transition-colors shrink-0"
             >
-              <Smile size={18} strokeWidth={1.8} />
+              <X size={16} />
             </button>
           </div>
-          <button
-            type="submit"
-            disabled={!inputText.trim() || sending}
-            className="w-10 h-10 shrink-0 rounded-xl bg-[#b08d57] text-black flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#9a7545] mb-0.5"
-          >
-            <Send size={15} />
-          </button>
-        </form>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        <div className="max-w-3xl mx-auto">
+          {/* Voice recording mode */}
+          {voiceRecording ? (
+            <VoiceNoteRecorder
+              onSend={handleVoiceNoteSend}
+              onCancel={() => setVoiceRecording(false)}
+            />
+          ) : uploading ? (
+            <div className="flex items-center justify-center gap-2 py-3 text-white/40 text-sm">
+              <Loader2 size={16} className="animate-spin" />
+              Uploading…
+            </div>
+          ) : (
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (pendingAttachment) {
+                  await handleAttachmentSend();
+                } else {
+                  await handleSend();
+                }
+              }}
+              className="flex items-end gap-2"
+            >
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-colors mb-0.5"
+                title="Attach file"
+              >
+                <Paperclip size={18} strokeWidth={1.8} />
+              </button>
+              <div className="flex-1 relative">
+                <textarea
+                  ref={inputRef}
+                  rows={1}
+                  value={inputText}
+                  onChange={(event) => handleInputChange(event.target.value)}
+                  placeholder="Write a message..."
+                  className="w-full resize-none rounded-2xl bg-[#1A1A1A] border border-white/[0.06] pl-4 pr-10 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32 transition-colors"
+                  style={{ fieldSizing: "content" } as React.CSSProperties}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      if (pendingAttachment) {
+                        void handleAttachmentSend();
+                      } else {
+                        void handleSend();
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 bottom-3 text-white/25 hover:text-white/50 transition-colors"
+                  title="Emoji"
+                >
+                  <Smile size={18} strokeWidth={1.8} />
+                </button>
+              </div>
+              {/* Show mic button when no text, send button when there is text or attachment */}
+              {!inputText.trim() && !pendingAttachment ? (
+                <button
+                  type="button"
+                  onClick={() => setVoiceRecording(true)}
+                  className="w-10 h-10 shrink-0 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white/40 flex items-center justify-center hover:text-[#b08d57] hover:bg-[#b08d57]/[0.06] hover:border-[#b08d57]/20 transition-colors mb-0.5"
+                  title="Record voice note"
+                >
+                  <Mic size={18} strokeWidth={1.8} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={(!inputText.trim() && !pendingAttachment) || sending}
+                  className="w-10 h-10 shrink-0 rounded-xl bg-[#b08d57] text-black flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#9a7545] mb-0.5"
+                >
+                  <Send size={15} />
+                </button>
+              )}
+            </form>
+          )}
+        </div>
       </div>
 
       {/* Thread detail panel */}

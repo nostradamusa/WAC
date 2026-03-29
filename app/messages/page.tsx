@@ -393,7 +393,7 @@ export default function MessagesInboxPage() {
                 return (
                   <Link
                     key={result.message_id}
-                    href={`/messages/${result.conversation_id}`}
+                    href={`/messages/${result.conversation_id}?jump=${result.message_id}`}
                     className="flex items-start gap-3 p-3 mx-1 mb-0.5 rounded-xl hover:bg-white/[0.04] transition-colors"
                   >
                     <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0 mt-0.5">

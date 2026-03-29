@@ -16,17 +16,23 @@ import {
   CreditCard,
   Users,
   ChevronRight,
+  Mic,
+  Play,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isAttachment, isVoiceNote } from "@/lib/messaging/metadata";
+import type { AttachmentMetadata, VoiceNoteMetadata } from "@/lib/messaging/metadata";
+import type { EntityCardMetadata } from "@/lib/messaging/metadata";
 import type { ConversationOverview, MessageInterface } from "@/lib/services/messagingService";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type SharedContent = {
   links: { url: string; domain: string; messageId: string; senderName: string; createdAt: string }[];
-  cards: { metadata: NonNullable<MessageInterface["metadata"]>; messageId: string; senderName: string; createdAt: string }[];
-  mediaCount: number;
-  fileCount: number;
+  cards: { metadata: EntityCardMetadata; messageId: string; senderName: string; createdAt: string }[];
+  media: { metadata: AttachmentMetadata; messageId: string; senderName: string; createdAt: string }[];
+  files: { metadata: AttachmentMetadata; messageId: string; senderName: string; createdAt: string }[];
+  voiceNotes: { metadata: VoiceNoteMetadata; messageId: string; senderName: string; createdAt: string }[];
 };
 
 type Props = {
@@ -60,7 +66,7 @@ function formatDate(iso: string): string {
 
 export default function ThreadDetailPanel({ conversation, messages, senderNameMap, onClose }: Props) {
   const [muted, setMuted] = useState(false);
-  const [activeSection, setActiveSection] = useState<"links" | "cards" | null>(null);
+  const [activeSection, setActiveSection] = useState<"links" | "cards" | "media" | "files" | null>(null);
 
   const isGroup = conversation.type === "group";
   const other = conversation.other_participant;
@@ -69,25 +75,41 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
   const shared = useMemo<SharedContent>(() => {
     const links: SharedContent["links"] = [];
     const cards: SharedContent["cards"] = [];
-    let mediaCount = 0;
-    let fileCount = 0;
+    const media: SharedContent["media"] = [];
+    const files: SharedContent["files"] = [];
+    const voiceNotes: SharedContent["voiceNotes"] = [];
 
     for (const msg of messages) {
+      const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
+
       // Extract links from message content
       const urls = extractLinks(msg.content);
       for (const url of urls) {
-        const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
         links.push({ url, domain: extractDomain(url), messageId: msg.id, senderName, createdAt: msg.created_at });
       }
 
       // Entity cards
       if (msg.metadata?.type === "entity_card") {
-        const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
-        cards.push({ metadata: msg.metadata, messageId: msg.id, senderName, createdAt: msg.created_at });
+        cards.push({ metadata: msg.metadata as EntityCardMetadata, messageId: msg.id, senderName, createdAt: msg.created_at });
+      }
+
+      // Attachments — separate into media vs files
+      if (isAttachment(msg.metadata)) {
+        const meta = msg.metadata as AttachmentMetadata;
+        if (meta.mime_type.startsWith("image/") || meta.mime_type.startsWith("video/")) {
+          media.push({ metadata: meta, messageId: msg.id, senderName, createdAt: msg.created_at });
+        } else {
+          files.push({ metadata: meta, messageId: msg.id, senderName, createdAt: msg.created_at });
+        }
+      }
+
+      // Voice notes
+      if (isVoiceNote(msg.metadata)) {
+        voiceNotes.push({ metadata: msg.metadata as VoiceNoteMetadata, messageId: msg.id, senderName, createdAt: msg.created_at });
       }
     }
 
-    return { links: links.reverse(), cards: cards.reverse(), mediaCount, fileCount };
+    return { links: links.reverse(), cards: cards.reverse(), media: media.reverse(), files: files.reverse(), voiceNotes: voiceNotes.reverse() };
   }, [messages, senderNameMap]);
 
   // Profile URL for the other participant
@@ -99,8 +121,8 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
-      <div className="relative w-full max-w-[380px] h-full bg-[#0A0A0A] border-l border-white/[0.06] overflow-y-auto wac-scrollbar animate-in slide-in-from-right duration-200">
+      {/* Panel — full-screen on mobile, 380px slide-over on desktop */}
+      <div className="relative w-full sm:max-w-[380px] h-full bg-[#0A0A0A] sm:border-l border-white/[0.06] overflow-y-auto wac-scrollbar animate-in slide-in-from-right duration-200">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/[0.06]">
           <h2 className="text-[16px] font-serif font-bold">Details</h2>
@@ -269,23 +291,105 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
             </div>
           )}
 
-          {/* Media placeholder */}
-          <div className="flex items-center gap-3 py-3 px-2 rounded-xl opacity-40">
+          {/* Media */}
+          <button
+            onClick={() => setActiveSection(activeSection === "media" ? null : "media")}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
             <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
               <ImageIcon size={16} className="text-white/40" />
             </div>
             <span className="flex-1 text-left text-[14px] text-white/70">Media</span>
-            <span className="text-[10px] text-white/20 mr-1">Coming soon</span>
-          </div>
+            <span className="text-[12px] text-white/25 mr-1">{shared.media.length}</span>
+            <ChevronRight size={14} className={`text-white/20 transition-transform ${activeSection === "media" ? "rotate-90" : ""}`} />
+          </button>
 
-          {/* Files placeholder */}
-          <div className="flex items-center gap-3 py-3 px-2 rounded-xl opacity-40">
+          {activeSection === "media" && (
+            <div className="ml-2 mb-2 animate-in fade-in slide-in-from-top-2 duration-150">
+              {shared.media.length === 0 ? (
+                <p className="py-3 px-2 text-[12px] text-white/25">No shared media yet</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1 rounded-lg overflow-hidden">
+                  {shared.media.slice(0, 12).map((item, i) => (
+                    <a
+                      key={`${item.messageId}-${i}`}
+                      href={item.metadata.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-square bg-[#1A1A1A] overflow-hidden hover:opacity-80 transition-opacity"
+                    >
+                      {item.metadata.mime_type.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.metadata.file_url} alt={item.metadata.file_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Play size={20} className="text-white/30" />
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Files */}
+          <button
+            onClick={() => setActiveSection(activeSection === "files" ? null : "files")}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
             <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
               <FileText size={16} className="text-white/40" />
             </div>
             <span className="flex-1 text-left text-[14px] text-white/70">Files</span>
-            <span className="text-[10px] text-white/20 mr-1">Coming soon</span>
-          </div>
+            <span className="text-[12px] text-white/25 mr-1">{shared.files.length + shared.voiceNotes.length}</span>
+            <ChevronRight size={14} className={`text-white/20 transition-transform ${activeSection === "files" ? "rotate-90" : ""}`} />
+          </button>
+
+          {activeSection === "files" && (
+            <div className="ml-2 mb-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
+              {shared.files.length === 0 && shared.voiceNotes.length === 0 ? (
+                <p className="py-3 px-2 text-[12px] text-white/25">No shared files yet</p>
+              ) : (
+                <>
+                  {shared.voiceNotes.slice(0, 5).map((vn, i) => (
+                    <a
+                      key={`vn-${vn.messageId}-${i}`}
+                      href={vn.metadata.audio_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#b08d57]/10 flex items-center justify-center shrink-0">
+                        <Mic size={14} className="text-[#b08d57]" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70">Voice note</p>
+                        <p className="text-[10px] text-white/25">{vn.senderName} &middot; {formatDate(vn.createdAt)} &middot; {Math.floor(vn.metadata.duration_seconds / 60)}:{(vn.metadata.duration_seconds % 60).toString().padStart(2, "0")}</p>
+                      </div>
+                    </a>
+                  ))}
+                  {shared.files.slice(0, 10).map((file, i) => (
+                    <a
+                      key={`file-${file.messageId}-${i}`}
+                      href={file.metadata.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                        <FileText size={14} className="text-white/30" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70 truncate">{file.metadata.file_name}</p>
+                        <p className="text-[10px] text-white/25">{file.senderName} &middot; {formatDate(file.createdAt)}</p>
+                      </div>
+                    </a>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="h-px bg-white/[0.05] mx-5" />
