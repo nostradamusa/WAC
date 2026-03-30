@@ -5,6 +5,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users, Mic, Loader2, FileText } from "lucide-react";
 import ThreadDetailPanel from "@/components/messages/ThreadDetailPanel";
+import ConversationList from "@/components/messages/ConversationList";
 import VoiceNoteRecorder from "@/components/messages/VoiceNoteRecorder";
 import VoiceNotePlayer from "@/components/messages/VoiceNotePlayer";
 import AttachmentBubble from "@/components/messages/AttachmentBubble";
@@ -323,27 +324,41 @@ export default function ActiveChatPage({
 
   if (loading || isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#111] text-white/50">
-        Loading conversation...
-      </div>
+      <>
+        <div className="hidden md:block">
+          <ConversationList activeConversationId={conversationId} />
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-[#111] text-white/50">
+          Loading conversation...
+        </div>
+      </>
     );
   }
 
   if (!conversation || !currentActor) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#111] text-center px-6">
-        <p className="text-xl font-serif text-white">Conversation not found</p>
-        <Link href="/messages" className="text-sm text-[#b08d57] hover:text-[#d0af7c] transition-colors">
-          Back to messages
-        </Link>
-      </div>
+      <>
+        <div className="hidden md:block">
+          <ConversationList activeConversationId={conversationId} />
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-[#111] text-center px-6">
+          <p className="text-xl font-serif text-white">Conversation not found</p>
+          <Link href="/messages" className="text-sm text-[#b08d57] hover:text-[#d0af7c] transition-colors">
+            Back to messages
+          </Link>
+        </div>
+      </>
     );
   }
 
   return (
+    <>
+    <div className="hidden md:block">
+      <ConversationList activeConversationId={conversationId} />
+    </div>
     <div className="flex-1 flex flex-col bg-[#111] text-white">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] bg-[#0A0A0A]">
-        <Link href="/messages" className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors shrink-0">
+        <Link href="/messages" className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors shrink-0 md:hidden">
           <ArrowLeft size={20} />
         </Link>
 
@@ -875,5 +890,6 @@ export default function ActiveChatPage({
         />
       )}
     </div>
+    </>
   );
 }
