@@ -206,6 +206,9 @@ export interface ConversationOverview {
     type: MessagingActorType;
   }[];
   unread_count: number;
+  muted_at: string | null;
+  pinned_at: string | null;
+  pinned_message_id: string | null;
 }
 
 export async function getUserConversations(
@@ -219,7 +222,9 @@ export async function getUserConversations(
       .select(`
         conversation_id,
         last_read_at,
-        conversations ( id, type, title, updated_at )
+        muted_at,
+        pinned_at,
+        conversations ( id, type, title, updated_at, pinned_message_id )
       `)
       .eq("actor_id", actorId)
       .eq("actor_type", actorType);
@@ -338,12 +343,20 @@ export async function getUserConversations(
                 : undefined,
         } : undefined,
         participants: conv?.type === 'group' ? groupProfiles : undefined,
-        unread_count
+        unread_count,
+        muted_at: (p as Record<string, unknown>).muted_at as string | null ?? null,
+        pinned_at: (p as Record<string, unknown>).pinned_at as string | null ?? null,
+        pinned_message_id: conv?.pinned_message_id ?? null,
       };
     });
 
-    // Sort by most recently updated
-    return overviews.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    // Sort: pinned first (by pin date), then by most recently updated
+    return overviews.sort((a, b) => {
+      if (a.pinned_at && !b.pinned_at) return -1;
+      if (!a.pinned_at && b.pinned_at) return 1;
+      if (a.pinned_at && b.pinned_at) return new Date(b.pinned_at).getTime() - new Date(a.pinned_at).getTime();
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
 
   } catch (err) {
     console.error("Error fetching user conversations:", err);
@@ -364,6 +377,7 @@ export interface MessageInterface {
   reply_to_id: string | null;
   metadata: MessageMetadata;
   status: "sending" | "sent" | "delivered" | "seen";
+  mentions: string[];
   created_at: string;
 }
 
@@ -413,6 +427,7 @@ export async function sendMessage(
   content: string,
   replyToId?: string,
   metadata?: MessageMetadata,
+  mentions?: string[],
 ): Promise<MessageInterface | null> {
   const { data, error } = await supabase
     .from('messages')
@@ -424,6 +439,7 @@ export async function sendMessage(
       reactions: [],
       ...(replyToId ? { reply_to_id: replyToId } : {}),
       ...(metadata ? { metadata } : {}),
+      ...(mentions && mentions.length > 0 ? { mentions } : {}),
     }])
     .select()
     .single();
@@ -511,7 +527,7 @@ export async function searchConversationMessages(
 
 export async function toggleMessageReactionDB(msgId: string, reactionType: string, currentReactions: string[]): Promise<void> {
   const hasReacted = currentReactions.includes(reactionType);
-  const newReactions = hasReacted 
+  const newReactions = hasReacted
     ? currentReactions.filter(r => r !== reactionType)
     : [...currentReactions, reactionType];
 
@@ -523,4 +539,196 @@ export async function toggleMessageReactionDB(msgId: string, reactionType: strin
   if (error) {
     console.error("Error updating reactions:", error);
   }
+}
+
+// ── Mute / Unmute ───────────────────────────────────────────────────────────
+
+export async function muteConversation(
+  conversationId: string,
+  actorId: string,
+  actorType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ muted_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("actor_id", actorId)
+    .eq("actor_type", actorType);
+  if (error) { console.error("Error muting conversation:", error); return false; }
+  return true;
+}
+
+export async function unmuteConversation(
+  conversationId: string,
+  actorId: string,
+  actorType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ muted_at: null })
+    .eq("conversation_id", conversationId)
+    .eq("actor_id", actorId)
+    .eq("actor_type", actorType);
+  if (error) { console.error("Error unmuting conversation:", error); return false; }
+  return true;
+}
+
+// ── Pin / Unpin Conversations ───────────────────────────────────────────────
+
+export async function pinConversation(
+  conversationId: string,
+  actorId: string,
+  actorType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ pinned_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("actor_id", actorId)
+    .eq("actor_type", actorType);
+  if (error) { console.error("Error pinning conversation:", error); return false; }
+  return true;
+}
+
+export async function unpinConversation(
+  conversationId: string,
+  actorId: string,
+  actorType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ pinned_at: null })
+    .eq("conversation_id", conversationId)
+    .eq("actor_id", actorId)
+    .eq("actor_type", actorType);
+  if (error) { console.error("Error unpinning conversation:", error); return false; }
+  return true;
+}
+
+// ── Pin / Unpin Messages ────────────────────────────────────────────────────
+
+export async function pinMessage(conversationId: string, messageId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ pinned_message_id: messageId })
+    .eq("id", conversationId);
+  if (error) { console.error("Error pinning message:", error); return false; }
+  return true;
+}
+
+export async function unpinMessage(conversationId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ pinned_message_id: null })
+    .eq("id", conversationId);
+  if (error) { console.error("Error unpinning message:", error); return false; }
+  return true;
+}
+
+// ── Block / Unblock ─────────────────────────────────────────────────────────
+
+export async function blockUser(
+  blockerId: string,
+  blockerType: MessagingActorType,
+  blockedId: string,
+  blockedType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("blocked_users")
+    .insert([{ blocker_id: blockerId, blocker_type: blockerType, blocked_id: blockedId, blocked_type: blockedType }]);
+  if (error) { console.error("Error blocking user:", error); return false; }
+  return true;
+}
+
+export async function unblockUser(
+  blockerId: string,
+  blockerType: MessagingActorType,
+  blockedId: string,
+  blockedType: MessagingActorType,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("blocked_users")
+    .delete()
+    .eq("blocker_id", blockerId)
+    .eq("blocker_type", blockerType)
+    .eq("blocked_id", blockedId)
+    .eq("blocked_type", blockedType);
+  if (error) { console.error("Error unblocking user:", error); return false; }
+  return true;
+}
+
+export async function getBlockedUsers(
+  actorId: string,
+  actorType: MessagingActorType,
+): Promise<{ blocked_id: string; blocked_type: string }[]> {
+  const { data, error } = await supabase
+    .from("blocked_users")
+    .select("blocked_id, blocked_type")
+    .eq("blocker_id", actorId)
+    .eq("blocker_type", actorType);
+  if (error) { console.error("Error fetching blocked users:", error); return []; }
+  return data ?? [];
+}
+
+export async function isUserBlocked(
+  blockerId: string,
+  blockerType: MessagingActorType,
+  blockedId: string,
+  blockedType: MessagingActorType,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("blocked_users")
+    .select("id")
+    .eq("blocker_id", blockerId)
+    .eq("blocker_type", blockerType)
+    .eq("blocked_id", blockedId)
+    .eq("blocked_type", blockedType)
+    .maybeSingle();
+  return !!data;
+}
+
+// ── Paginated messages ──────────────────────────────────────────────────────
+
+export async function getMessagesPaginated(
+  conversationId: string,
+  limit = 50,
+  before?: string,
+): Promise<{ messages: MessageInterface[]; hasMore: boolean }> {
+  let query = supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(limit + 1);
+
+  if (before) {
+    query = query.lt("created_at", before);
+  }
+
+  const { data, error } = await query;
+  if (error) { console.error("Error fetching paginated messages:", error); return { messages: [], hasMore: false }; }
+
+  const hasMore = (data?.length ?? 0) > limit;
+  const messages = (data?.slice(0, limit) ?? []).reverse() as MessageInterface[];
+  return { messages, hasMore };
+}
+
+// ── Report content ──────────────────────────────────────────────────────────
+
+export async function reportUser(
+  reporterId: string,
+  targetId: string,
+  reason: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("reported_content")
+    .insert([{
+      reporter_id: reporterId,
+      content_type: "user",
+      content_id: targetId,
+      reason,
+      status: "pending",
+    }]);
+  if (error) { console.error("Error reporting user:", error); return false; }
+  return true;
 }

@@ -35,14 +35,34 @@ export interface AttachmentMetadata {
   height?: number;
 }
 
-// Future types — add here when ready, never inline elsewhere.
-// export interface EventCardMetadata { type: "event_card"; ... }
-// export interface GroupCardMetadata { type: "group_card"; ... }
+export interface EventCardMetadata {
+  type: "event_card";
+  event_id: string;
+  title: string;
+  start_date: string; // ISO 8601
+  end_date?: string;
+  location?: string;
+  is_virtual?: boolean;
+  image_url?: string;
+  url: string;
+}
+
+export interface GroupCardMetadata {
+  type: "group_card";
+  group_id: string;
+  name: string;
+  member_count: number;
+  description?: string;
+  image_url?: string;
+  url: string;
+}
 
 export type MessageMetadata =
   | EntityCardMetadata
   | VoiceNoteMetadata
-  | AttachmentMetadata;
+  | AttachmentMetadata
+  | EventCardMetadata
+  | GroupCardMetadata;
 
 // ── Type guards ──────────────────────────────────────────────────────────────
 
@@ -74,8 +94,20 @@ export function isImageAttachment(meta: unknown): meta is AttachmentMetadata {
   return isAttachment(meta) && meta.mime_type.startsWith("image/");
 }
 
+export function isEventCard(meta: unknown): meta is EventCardMetadata {
+  if (!meta || typeof meta !== "object") return false;
+  const m = meta as Record<string, unknown>;
+  return m.type === "event_card" && typeof m.event_id === "string" && typeof m.title === "string" && typeof m.url === "string";
+}
+
+export function isGroupCard(meta: unknown): meta is GroupCardMetadata {
+  if (!meta || typeof meta !== "object") return false;
+  const m = meta as Record<string, unknown>;
+  return m.type === "group_card" && typeof m.group_id === "string" && typeof m.name === "string" && typeof m.url === "string";
+}
+
 export function isValidMetadata(meta: unknown): meta is MessageMetadata {
-  return isEntityCard(meta) || isVoiceNote(meta) || isAttachment(meta);
+  return isEntityCard(meta) || isVoiceNote(meta) || isAttachment(meta) || isEventCard(meta) || isGroupCard(meta);
 }
 
 // ── Label extraction (for search indexing) ───────────────────────────────────
@@ -85,6 +117,8 @@ export function metadataSearchLabel(meta: MessageMetadata | null | undefined): s
   if (isEntityCard(meta)) return [meta.name, meta.entity_type, meta.headline].filter(Boolean).join(" ");
   if (isVoiceNote(meta)) return "Voice note";
   if (isAttachment(meta)) return meta.file_name;
+  if (isEventCard(meta)) return [meta.title, meta.location].filter(Boolean).join(" ");
+  if (isGroupCard(meta)) return [meta.name, meta.description].filter(Boolean).join(" ");
   return "";
 }
 
@@ -138,6 +172,44 @@ export function buildAttachmentPayload(
     mime_type: mimeType,
     ...(opts?.width ? { width: opts.width } : {}),
     ...(opts?.height ? { height: opts.height } : {}),
+  };
+}
+
+export function buildEventCardPayload(
+  eventId: string,
+  title: string,
+  startDate: string,
+  url: string,
+  opts?: { end_date?: string; location?: string; is_virtual?: boolean; image_url?: string },
+): EventCardMetadata {
+  return {
+    type: "event_card",
+    event_id: eventId,
+    title,
+    start_date: startDate,
+    url,
+    ...(opts?.end_date ? { end_date: opts.end_date } : {}),
+    ...(opts?.location ? { location: opts.location } : {}),
+    ...(opts?.is_virtual != null ? { is_virtual: opts.is_virtual } : {}),
+    ...(opts?.image_url ? { image_url: opts.image_url } : {}),
+  };
+}
+
+export function buildGroupCardPayload(
+  groupId: string,
+  name: string,
+  memberCount: number,
+  url: string,
+  opts?: { description?: string; image_url?: string },
+): GroupCardMetadata {
+  return {
+    type: "group_card",
+    group_id: groupId,
+    name,
+    member_count: memberCount,
+    url,
+    ...(opts?.description ? { description: opts.description } : {}),
+    ...(opts?.image_url ? { image_url: opts.image_url } : {}),
   };
 }
 

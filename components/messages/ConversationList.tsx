@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Search, Settings, CheckCircle2, Plus, PenSquare, X, Loader2 } from "lucide-react";
+import { Search, Settings, CheckCircle2, Plus, PenSquare, X, Loader2, Pin, BellOff } from "lucide-react";
 import { useActor } from "@/components/providers/ActorProvider";
 import { useRouter } from "next/navigation";
 import { useDebounce } from "@/lib/hooks/useDebounce";
@@ -345,9 +345,13 @@ export default function ConversationList({ activeConversationId }: Props) {
                           <span className="text-[10px] text-white/25 shrink-0">{conversation.participants.length}</span>
                         )}
                       </div>
-                      <span className={`text-[11px] shrink-0 font-medium ${isUnread ? "text-[#b08d57]" : "text-white/30"}`}>
-                        {formatConversationTime(conversation.updated_at)}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {conversation.pinned_at && <Pin size={10} className="text-[#b08d57]/50" />}
+                        {conversation.muted_at && <BellOff size={10} className="text-white/20" />}
+                        <span className={`text-[11px] font-medium ${isUnread ? "text-[#b08d57]" : "text-white/30"}`}>
+                          {formatConversationTime(conversation.updated_at)}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <p className={`text-[13px] truncate leading-tight ${isUnread ? "text-white/90 font-medium" : "text-white/40"}`}>

@@ -177,6 +177,9 @@ export default function FloatingMessagingIcon() {
           type: 'direct',
           updated_at: new Date().toISOString(),
           unread_count: 0,
+          muted_at: null,
+          pinned_at: null,
+          pinned_message_id: null,
           other_participant: {
             id: contact.id,
             name: contact.name,
@@ -208,6 +211,9 @@ export default function FloatingMessagingIcon() {
           participants: selectedContacts.map(c => ({ id: c.id, name: c.name, type: c.type, avatar_url: c.avatar_url })),
           updated_at: new Date().toISOString(),
           unread_count: 0,
+          muted_at: null,
+          pinned_at: null,
+          pinned_message_id: null,
         };
         
         setConversations(prev => {

@@ -18,12 +18,21 @@ import {
   ChevronRight,
   Mic,
   Play,
+  Pin,
+  PinOff,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { isAttachment, isVoiceNote } from "@/lib/messaging/metadata";
-import type { AttachmentMetadata, VoiceNoteMetadata } from "@/lib/messaging/metadata";
+import { isAttachment, isVoiceNote, isEventCard, isGroupCard } from "@/lib/messaging/metadata";
+import type { AttachmentMetadata, VoiceNoteMetadata, EventCardMetadata, GroupCardMetadata } from "@/lib/messaging/metadata";
 import type { EntityCardMetadata } from "@/lib/messaging/metadata";
-import type { ConversationOverview, MessageInterface } from "@/lib/services/messagingService";
+import type { ConversationOverview, MessageInterface, MessagingActorType } from "@/lib/services/messagingService";
+import {
+  muteConversation,
+  unmuteConversation,
+  pinConversation,
+  unpinConversation,
+  blockUser,
+  reportUser,
+} from "@/lib/services/messagingService";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,13 +42,18 @@ type SharedContent = {
   media: { metadata: AttachmentMetadata; messageId: string; senderName: string; createdAt: string }[];
   files: { metadata: AttachmentMetadata; messageId: string; senderName: string; createdAt: string }[];
   voiceNotes: { metadata: VoiceNoteMetadata; messageId: string; senderName: string; createdAt: string }[];
+  eventCards: { metadata: EventCardMetadata; messageId: string; senderName: string; createdAt: string }[];
+  groupCards: { metadata: GroupCardMetadata; messageId: string; senderName: string; createdAt: string }[];
 };
 
 type Props = {
   conversation: ConversationOverview;
   messages: MessageInterface[];
   senderNameMap: Map<string, string>;
+  actorId: string;
+  actorType: MessagingActorType;
   onClose: () => void;
+  onConversationUpdate?: () => void;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,8 +78,9 @@ function formatDate(iso: string): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function ThreadDetailPanel({ conversation, messages, senderNameMap, onClose }: Props) {
-  const [muted, setMuted] = useState(false);
+export default function ThreadDetailPanel({ conversation, messages, senderNameMap, actorId, actorType, onClose, onConversationUpdate }: Props) {
+  const [muted, setMuted] = useState(!!conversation.muted_at);
+  const [pinned, setPinned] = useState(!!conversation.pinned_at);
   const [activeSection, setActiveSection] = useState<"links" | "cards" | "media" | "files" | null>(null);
 
   const isGroup = conversation.type === "group";
@@ -78,6 +93,8 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
     const media: SharedContent["media"] = [];
     const files: SharedContent["files"] = [];
     const voiceNotes: SharedContent["voiceNotes"] = [];
+    const eventCards: SharedContent["eventCards"] = [];
+    const groupCards: SharedContent["groupCards"] = [];
 
     for (const msg of messages) {
       const senderName = senderNameMap.get(`${msg.sender_id}:${msg.sender_type}`) ?? "Member";
@@ -107,9 +124,19 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
       if (isVoiceNote(msg.metadata)) {
         voiceNotes.push({ metadata: msg.metadata as VoiceNoteMetadata, messageId: msg.id, senderName, createdAt: msg.created_at });
       }
+
+      // Event cards
+      if (isEventCard(msg.metadata)) {
+        eventCards.push({ metadata: msg.metadata as EventCardMetadata, messageId: msg.id, senderName, createdAt: msg.created_at });
+      }
+
+      // Group cards
+      if (isGroupCard(msg.metadata)) {
+        groupCards.push({ metadata: msg.metadata as GroupCardMetadata, messageId: msg.id, senderName, createdAt: msg.created_at });
+      }
     }
 
-    return { links: links.reverse(), cards: cards.reverse(), media: media.reverse(), files: files.reverse(), voiceNotes: voiceNotes.reverse() };
+    return { links: links.reverse(), cards: cards.reverse(), media: media.reverse(), files: files.reverse(), voiceNotes: voiceNotes.reverse(), eventCards: eventCards.reverse(), groupCards: groupCards.reverse() };
   }, [messages, senderNameMap]);
 
   // Profile URL for the other participant
@@ -258,35 +285,67 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
               <CreditCard size={16} className="text-white/40" />
             </div>
             <span className="flex-1 text-left text-[14px] text-white/70">WAC Cards</span>
-            <span className="text-[12px] text-white/25 mr-1">{shared.cards.length}</span>
+            <span className="text-[12px] text-white/25 mr-1">{shared.cards.length + shared.eventCards.length + shared.groupCards.length}</span>
             <ChevronRight size={14} className={`text-white/20 transition-transform ${activeSection === "cards" ? "rotate-90" : ""}`} />
           </button>
 
           {activeSection === "cards" && (
             <div className="ml-2 mb-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150">
-              {shared.cards.length === 0 ? (
+              {shared.cards.length + shared.eventCards.length + shared.groupCards.length === 0 ? (
                 <p className="py-3 px-2 text-[12px] text-white/25">No shared cards yet</p>
               ) : (
-                shared.cards.slice(0, 10).map((card, i) => (
-                  <Link
-                    key={`${card.messageId}-${i}`}
-                    href={card.metadata.url}
-                    className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-white/[0.06] overflow-hidden flex items-center justify-center shrink-0">
-                      {card.metadata.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={card.metadata.avatar_url} alt={card.metadata.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[10px] font-bold text-[#b08d57]">{card.metadata.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-white/70 truncate">{card.metadata.name}</p>
-                      <p className="text-[10px] text-white/25 capitalize">{card.metadata.entity_type} &middot; {formatDate(card.createdAt)}</p>
-                    </div>
-                  </Link>
-                ))
+                <>
+                  {shared.cards.slice(0, 10).map((card, i) => (
+                    <Link
+                      key={`ec-${card.messageId}-${i}`}
+                      href={card.metadata.url}
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-white/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+                        {card.metadata.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={card.metadata.avatar_url} alt={card.metadata.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-[#b08d57]">{card.metadata.name.charAt(0)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70 truncate">{card.metadata.name}</p>
+                        <p className="text-[10px] text-white/25 capitalize">{card.metadata.entity_type} &middot; {formatDate(card.createdAt)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                  {shared.eventCards.slice(0, 5).map((ev, i) => (
+                    <Link
+                      key={`ev-${ev.messageId}-${i}`}
+                      href={ev.metadata.url}
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#b08d57]/10 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-[#b08d57]">📅</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70 truncate">{ev.metadata.title}</p>
+                        <p className="text-[10px] text-white/25">Event &middot; {formatDate(ev.createdAt)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                  {shared.groupCards.slice(0, 5).map((gr, i) => (
+                    <Link
+                      key={`gr-${gr.messageId}-${i}`}
+                      href={gr.metadata.url}
+                      className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center shrink-0">
+                        <Users size={14} className="text-white/30" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-white/70 truncate">{gr.metadata.name}</p>
+                        <p className="text-[10px] text-white/25">{gr.metadata.member_count} members &middot; {formatDate(gr.createdAt)}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </>
               )}
             </div>
           )}
@@ -398,8 +457,30 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
         <div className="px-5 py-5">
           <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/25 mb-3">Actions</h4>
 
+          {/* Pin / Unpin */}
           <button
-            onClick={() => setMuted(!muted)}
+            onClick={async () => {
+              const ok = pinned
+                ? await unpinConversation(conversation.id, actorId, actorType)
+                : await pinConversation(conversation.id, actorId, actorType);
+              if (ok) { setPinned(!pinned); onConversationUpdate?.(); }
+            }}
+            className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
+              {pinned ? <PinOff size={16} className="text-[#b08d57]" /> : <Pin size={16} className="text-white/40" />}
+            </div>
+            <span className="text-[14px] text-white/70">{pinned ? "Unpin Conversation" : "Pin Conversation"}</span>
+          </button>
+
+          {/* Mute / Unmute */}
+          <button
+            onClick={async () => {
+              const ok = muted
+                ? await unmuteConversation(conversation.id, actorId, actorType)
+                : await muteConversation(conversation.id, actorId, actorType);
+              if (ok) { setMuted(!muted); onConversationUpdate?.(); }
+            }}
             className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
           >
             <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
@@ -417,16 +498,32 @@ export default function ThreadDetailPanel({ conversation, messages, senderNameMa
             </button>
           )}
 
-          {!isGroup && (
+          {!isGroup && other && (
             <>
-              <button className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+              <button
+                onClick={async () => {
+                  if (!confirm("Block this account? They won't be able to message you.")) return;
+                  await blockUser(actorId, actorType, other.id, other.type);
+                  onConversationUpdate?.();
+                  onClose();
+                }}
+                className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+              >
                 <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
                   <Ban size={16} className="text-red-400/60" />
                 </div>
                 <span className="text-[14px] text-red-400/60">Block Account</span>
               </button>
 
-              <button className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors">
+              <button
+                onClick={async () => {
+                  const reason = prompt("Why are you reporting this account?");
+                  if (!reason) return;
+                  await reportUser(actorId, other.id, reason);
+                  alert("Report submitted. Thank you.");
+                }}
+                className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-white/[0.03] transition-colors"
+              >
                 <div className="w-9 h-9 rounded-full bg-white/[0.04] flex items-center justify-center shrink-0">
                   <Flag size={16} className="text-red-400/60" />
                 </div>

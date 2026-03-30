@@ -3,27 +3,30 @@
 import Link from "next/link";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users, Mic, Loader2, FileText } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, Smile, Reply, X, ChevronDown, ExternalLink, Check, CheckCheck, Info, Users, Mic, Loader2, FileText, Pin, Phone, Video, Calendar, UsersRound } from "lucide-react";
 import ThreadDetailPanel from "@/components/messages/ThreadDetailPanel";
 import ConversationList from "@/components/messages/ConversationList";
 import VoiceNoteRecorder from "@/components/messages/VoiceNoteRecorder";
 import VoiceNotePlayer from "@/components/messages/VoiceNotePlayer";
 import AttachmentBubble from "@/components/messages/AttachmentBubble";
+import MentionPicker from "@/components/messages/MentionPicker";
 import { supabase } from "@/lib/supabase";
 import { useActor } from "@/components/providers/ActorProvider";
 import { SUPPORTED_REACTIONS } from "@/components/ui/ReactionIcon";
 import { usePresence, formatPresence } from "@/lib/hooks/usePresence";
-import { isVoiceNote, isAttachment, buildVoiceNotePayload, buildAttachmentPayload } from "@/lib/messaging/metadata";
+import { isVoiceNote, isAttachment, isEventCard, isGroupCard, buildVoiceNotePayload, buildAttachmentPayload } from "@/lib/messaging/metadata";
 import type { AttachmentMetadata } from "@/lib/messaging/metadata";
 import {
   ConversationOverview,
-  getMessages,
+  getMessagesPaginated,
   getUserConversations,
   markConversationRead,
   MessageInterface,
   MessagingActorType,
   sendMessage,
   toggleMessageReactionDB,
+  pinMessage,
+  unpinMessage,
 } from "@/lib/services/messagingService";
 
 function toMessagingActorType(type: "person" | "business" | "organization"): MessagingActorType {
@@ -38,6 +41,35 @@ function formatConversationTitle(conversation: ConversationOverview) {
   }
 
   return conversation.other_participant?.name ?? "Direct conversation";
+}
+
+/** Render message content with @mention highlights */
+function renderMessageContent(content: string, isMine: boolean): React.ReactNode {
+  const mentionRegex = /@([\w\s]+?)(?=\s@|\s|$)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={match.index}
+        className={`font-semibold ${isMine ? "text-black/90 bg-black/10" : "text-[#b08d57] bg-[#b08d57]/10"} rounded px-0.5`}
+      >
+        {match[0]}
+      </span>,
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : content;
 }
 
 function formatTimestamp(isoString: string) {
@@ -71,6 +103,10 @@ export default function ActiveChatPage({
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<{ file: File; previewUrl?: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIds, setMentionIds] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,7 +124,7 @@ export default function ActiveChatPage({
   // Touch last_active_at on mount and message send
   useEffect(() => { touchLastActive(); }, [touchLastActive]);
 
-  // Emit typing events on input change
+  // Emit typing events on input change + detect @mentions
   function handleInputChange(value: string) {
     setInputText(value);
     if (value.trim()) {
@@ -98,6 +134,52 @@ export default function ActiveChatPage({
     } else {
       sendTyping(false);
     }
+
+    // Detect @mention query for group chats
+    if (conversation?.type === "group") {
+      const cursorPos = inputRef.current?.selectionStart ?? value.length;
+      const textBefore = value.slice(0, cursorPos);
+      const mentionMatch = textBefore.match(/@(\w*)$/);
+      setMentionQuery(mentionMatch ? mentionMatch[1] : null);
+    } else {
+      setMentionQuery(null);
+    }
+  }
+
+  function handleMentionSelect(participant: { id: string; name: string }) {
+    if (!inputRef.current) return;
+    const cursorPos = inputRef.current.selectionStart ?? inputText.length;
+    const textBefore = inputText.slice(0, cursorPos);
+    const textAfter = inputText.slice(cursorPos);
+    const replaced = textBefore.replace(/@\w*$/, `@${participant.name} `);
+    setInputText(replaced + textAfter);
+    setMentionQuery(null);
+    setMentionIds((prev) => prev.includes(participant.id) ? prev : [...prev, participant.id]);
+    inputRef.current.focus();
+  }
+
+  async function loadOlderMessages() {
+    if (!messages.length || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const scrollEl = scrollRef.current;
+    const prevHeight = scrollEl?.scrollHeight ?? 0;
+
+    const { messages: older, hasMore: more } = await getMessagesPaginated(
+      conversationId,
+      50,
+      messages[0].created_at,
+    );
+
+    setMessages((prev) => [...older, ...prev]);
+    setHasMore(more);
+    setLoadingMore(false);
+
+    // Maintain scroll position after prepending
+    requestAnimationFrame(() => {
+      if (scrollEl) {
+        scrollEl.scrollTop = scrollEl.scrollHeight - prevHeight;
+      }
+    });
   }
 
   useEffect(() => {
@@ -115,16 +197,17 @@ export default function ActiveChatPage({
 
       setLoading(true);
       const actorType = toMessagingActorType(currentActor.type);
-      const [conversations, threadMessages] = await Promise.all([
+      const [conversations, paginated] = await Promise.all([
         getUserConversations(currentActor.id, actorType),
-        getMessages(conversationId),
+        getMessagesPaginated(conversationId, 50),
       ]);
 
       if (cancelled) return;
 
       const matchedConversation = conversations.find((item) => item.id === conversationId) ?? null;
       setConversation(matchedConversation);
-      setMessages(threadMessages);
+      setMessages(paginated.messages);
+      setHasMore(paginated.hasMore);
       setLoading(false);
 
       if (matchedConversation) {
@@ -217,12 +300,18 @@ export default function ActiveChatPage({
     setInputText("");
     setReplyTo(null);
 
+    const mentions = mentionIds.length > 0 ? [...mentionIds] : undefined;
+    setMentionIds([]);
+    setMentionQuery(null);
+
     await sendMessage(
       conversation.id,
       currentActor.id,
       toMessagingActorType(currentActor.type),
       content,
       replyId,
+      undefined,
+      mentions,
     );
 
     await markConversationRead(
@@ -412,18 +501,77 @@ export default function ActiveChatPage({
           </div>
         )}
 
+        {/* Call icons (light hooks — disabled) */}
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            disabled
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white/20 cursor-not-allowed shrink-0"
+            title="Audio call (coming soon)"
+          >
+            <Phone size={16} strokeWidth={1.8} />
+          </button>
+          <button
+            disabled
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white/20 cursor-not-allowed shrink-0"
+            title="Video call (coming soon)"
+          >
+            <Video size={16} strokeWidth={1.8} />
+          </button>
+        </div>
+
         {/* Info button */}
         <button
           onClick={() => setDetailPanelOpen(true)}
-          className="ml-auto w-9 h-9 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors shrink-0"
+          className="w-9 h-9 rounded-full bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-colors shrink-0"
           title="Thread details"
         >
           <Info size={16} strokeWidth={1.8} />
         </button>
       </div>
 
+      {/* Pinned message bar */}
+      {conversation.pinned_message_id && (() => {
+        const pinned = messages.find((m) => m.id === conversation.pinned_message_id);
+        if (!pinned) return null;
+        return (
+          <div className="flex items-center gap-3 px-4 py-2 bg-[#0d0d0d] border-b border-white/[0.06]">
+            <Pin size={13} className="text-[#b08d57] shrink-0" />
+            <button
+              className="flex-1 min-w-0 text-left"
+              onClick={() => {
+                const el = document.getElementById(`msg-${pinned.id}`);
+                el?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              <p className="text-[11px] font-semibold text-[#b08d57]">Pinned Message</p>
+              <p className="text-[12px] text-white/40 truncate">{pinned.content}</p>
+            </button>
+            <button
+              onClick={async () => { await unpinMessage(conversation.id); setConversation((c) => c ? { ...c, pinned_message_id: null } : c); }}
+              className="p-1 rounded-full hover:bg-white/[0.06] text-white/25 hover:text-white/50 transition-colors shrink-0"
+              title="Unpin"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        );
+      })()}
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto wac-scrollbar px-4 py-6" onClick={() => setActiveReactionMsgId(null)}>
         <div className="max-w-3xl mx-auto space-y-3">
+          {/* Load older messages */}
+          {hasMore && (
+            <div className="flex justify-center pb-4">
+              <button
+                onClick={loadOlderMessages}
+                disabled={loadingMore}
+                className="px-4 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] text-[12px] text-white/40 hover:text-white/60 hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : "Load older messages"}
+              </button>
+            </div>
+          )}
+
           {messages.length === 0 ? (
             <div className="text-center text-white/40 py-16">No messages yet. Start the conversation.</div>
           ) : (
@@ -580,6 +728,65 @@ export default function ActiveChatPage({
                           {formatTimestamp(message.created_at)}
                         </div>
                       </Link>
+                    ) : isEventCard(message.metadata) ? (
+                      /* ── Event card message ─────────────────────── */
+                      <Link
+                        href={message.metadata.url}
+                        className={`block rounded-2xl overflow-hidden border ${
+                          isMine
+                            ? "bg-[#b08d57]/90 border-[#9a7545] rounded-br-md"
+                            : "bg-[#1b1b1b] border-white/[0.06] rounded-bl-md"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 p-3">
+                          <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${isMine ? "bg-black/10" : "bg-[#b08d57]/10"}`}>
+                            <Calendar size={20} className={isMine ? "text-black/50" : "text-[#b08d57]"} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`font-semibold text-sm truncate block ${isMine ? "text-black" : "text-white"}`}>
+                              {message.metadata.title}
+                            </span>
+                            <span className={`text-xs block truncate ${isMine ? "text-black/60" : "text-white/40"}`}>
+                              {new Date(message.metadata.start_date).toLocaleDateString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                              {message.metadata.location ? ` · ${message.metadata.location}` : ""}
+                              {message.metadata.is_virtual ? " · Virtual" : ""}
+                            </span>
+                          </div>
+                          <ExternalLink size={14} className={isMine ? "text-black/40" : "text-white/20"} />
+                        </div>
+                        <div className={`px-3 pb-2 text-[11px] ${isMine ? "text-black/40" : "text-white/25"}`}>
+                          {formatTimestamp(message.created_at)}
+                        </div>
+                      </Link>
+                    ) : isGroupCard(message.metadata) ? (
+                      /* ── Group card message ─────────────────────── */
+                      <Link
+                        href={message.metadata.url}
+                        className={`block rounded-2xl overflow-hidden border ${
+                          isMine
+                            ? "bg-[#b08d57]/90 border-[#9a7545] rounded-br-md"
+                            : "bg-[#1b1b1b] border-white/[0.06] rounded-bl-md"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 p-3">
+                          <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${isMine ? "bg-black/10" : "bg-white/[0.06]"}`}>
+                            <UsersRound size={20} className={isMine ? "text-black/50" : "text-white/40"} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`font-semibold text-sm truncate block ${isMine ? "text-black" : "text-white"}`}>
+                              {message.metadata.name}
+                            </span>
+                            <span className={`text-xs block truncate ${isMine ? "text-black/60" : "text-white/40"}`}>
+                              {message.metadata.member_count} members
+                              {message.metadata.description ? ` · ${message.metadata.description}` : ""}
+                            </span>
+                          </div>
+                          <ExternalLink size={14} className={isMine ? "text-black/40" : "text-white/20"} />
+                        </div>
+                        <div className={`px-3 pb-2 text-[11px] ${isMine ? "text-black/40" : "text-white/25"}`}>
+                          {formatTimestamp(message.created_at)}
+                        </div>
+                      </Link>
                     ) : (
                       /* ── Regular text message ────────────────────── */
                       <div
@@ -592,7 +799,7 @@ export default function ActiveChatPage({
                         {!isMine && conversation.type === "group" && (
                           <div className="text-[11px] font-semibold text-[#b08d57] mb-1">{senderName}</div>
                         )}
-                        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</div>
+                        <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{renderMessageContent(message.content, isMine)}</div>
                         <div className={`mt-1.5 flex items-center gap-1 text-[11px] ${isMine ? "text-black/50" : "text-white/30"}`}>
                           {formatTimestamp(message.created_at)}
                           {isMine && (
@@ -644,6 +851,25 @@ export default function ActiveChatPage({
                         title="Reply"
                       >
                         <Reply size={13} />
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const isPinned = conversation.pinned_message_id === message.id;
+                          if (isPinned) {
+                            await unpinMessage(conversation.id);
+                            setConversation((c) => c ? { ...c, pinned_message_id: null } : c);
+                          } else {
+                            await pinMessage(conversation.id, message.id);
+                            setConversation((c) => c ? { ...c, pinned_message_id: message.id } : c);
+                          }
+                        }}
+                        className={`w-7 h-7 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center hover:text-white/70 hover:bg-white/[0.1] transition-colors ${
+                          conversation.pinned_message_id === message.id ? "text-[#b08d57]" : "text-white/40"
+                        }`}
+                        title={conversation.pinned_message_id === message.id ? "Unpin" : "Pin"}
+                      >
+                        <Pin size={12} />
                       </button>
                     </div>
 
@@ -829,6 +1055,16 @@ export default function ActiveChatPage({
                 <Paperclip size={18} strokeWidth={1.8} />
               </button>
               <div className="flex-1 relative">
+                {/* Mention picker */}
+                {mentionQuery !== null && conversation.type === "group" && conversation.participants && (
+                  <MentionPicker
+                    participants={conversation.participants}
+                    query={mentionQuery}
+                    onSelect={handleMentionSelect}
+                    onClose={() => setMentionQuery(null)}
+                    position={{ bottom: 56, left: 0 }}
+                  />
+                )}
                 <textarea
                   ref={inputRef}
                   rows={1}
@@ -838,6 +1074,8 @@ export default function ActiveChatPage({
                   className="w-full resize-none rounded-2xl bg-[#1A1A1A] border border-white/[0.06] pl-4 pr-10 py-3 text-sm text-white outline-none focus:border-[#b08d57]/40 min-h-[48px] max-h-32 transition-colors"
                   style={{ fieldSizing: "content" } as React.CSSProperties}
                   onKeyDown={(event) => {
+                    // Let MentionPicker handle Enter/Tab/Arrow keys when open
+                    if (mentionQuery !== null && ["Enter", "Tab", "ArrowUp", "ArrowDown", "Escape"].includes(event.key)) return;
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
                       if (pendingAttachment) {
@@ -886,6 +1124,8 @@ export default function ActiveChatPage({
           conversation={conversation}
           messages={messages}
           senderNameMap={senderNameMap}
+          actorId={currentActor.id}
+          actorType={toMessagingActorType(currentActor.type)}
           onClose={() => setDetailPanelOpen(false)}
         />
       )}
